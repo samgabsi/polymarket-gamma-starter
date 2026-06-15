@@ -1,0 +1,31 @@
+# OS / editor / cache
+.DS_Store
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+
+# Environment / secrets
+.env
+.env.*
+*.env
+
+# Virtualenv
+.venv/
+venv/
+
+# Python tooling
+.mypy_cache/
+.pytest_cache/
+.coverage
+*.log
+
+# Project data (local runtime)
+data/
+latest_markets.json
+snapshots/
+
+# Release artifacts
+*.zip
+*.pdf
