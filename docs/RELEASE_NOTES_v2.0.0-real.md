@@ -1,8 +1,8 @@
-# Release Notes — v2.0.0-real
+# Release Notes — v2.1.0-real
 
 ## Summary
 
-`v2.0.0-real` introduces the first full live-trading build: live data discovery, live order-book inspection, trade-ticket preview, strict pre-trade risk checks, human approval, typed confirmation, isolated CLOB submit/cancel adapter calls, open-order/position read paths, reconciliation, emergency controls, and JSONL/CSV audit exports.
+`v2.1.0-real` introduces the first full live-trading build: live data discovery, live order-book inspection, trade-ticket preview, strict pre-trade risk checks, human approval, typed confirmation, isolated CLOB submit/cancel adapter calls, open-order/position read paths, reconciliation, emergency controls, and JSONL/CSV audit exports.
 
 ## Added
 

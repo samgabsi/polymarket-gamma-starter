@@ -1,4 +1,4 @@
-# Validation Report — v2.0.0-real
+# Validation Report — v2.1.0-real
 
 Generated: 2026-06-15T20:32:52Z
 
@@ -11,7 +11,7 @@ $ python -m pytest -q
 ......                                                                   [100%]
 6 passed in 0.47s
 $ python - << route/import smoke test
-PASS: imported FastAPI app version=2.0.0-real; routes=488; required_v2_routes_present=7
+PASS: imported FastAPI app version=2.1.0-real; routes=488; required_v2_routes_present=7
 $ python - << package safety scan
 NOTE: transient cache dirs may exist during validation: ['.pytest_cache', 'app/__pycache__', 'tests/__pycache__']
 PASS: no non-empty secret assignments found in release files

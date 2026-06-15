@@ -958,7 +958,7 @@ def setup_runtime_status() -> dict[str, Any]:
     }
     deps_missing = [row for row in dependency_rows if not row.get("available")]
     status["sections"] = [
-        {"name": "App", "tone": "ok", "rows": [{"label": "App version", "detected": APP_VERSION, "expected": "2.0.0-real"}, {"label": "Package mode", "detected": status["package_mode"], "expected": "source_tree"}]},
+        {"name": "App", "tone": "ok", "rows": [{"label": "App version", "detected": APP_VERSION, "expected": "2.1.0-real"}, {"label": "Package mode", "detected": status["package_mode"], "expected": "source_tree"}]},
         {"name": "Python", "tone": "ok", "rows": [{"label": "Python version", "detected": status["python_version"], "expected": "3.10+"}, {"label": "Executable", "detected": status["python_executable"], "expected": "Project venv executable recommended"}]},
         {"name": "Virtual Environment", "tone": "ok" if venv_detected else "warning", "rows": [{"label": "Venv detected", "detected": "yes" if venv_detected else "no", "expected": "yes for local operator installs"}, {"label": "sys.prefix", "detected": sys.prefix, "expected": "Inside .venv when activated"}]},
         {"name": "Launch", "tone": "info", "rows": [{"label": "Expected launch", "detected": status["expected_launch_command"], "expected": "Copy and run manually; UI does not execute commands"}]},

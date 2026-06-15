@@ -1,6 +1,6 @@
-# Live Trading v2 — v2.0.0-real
+# Live Trading v2 — v2.1.0-real
 
-`v2.0.0-real` adds the first full live-trading control plane for the Polymarket Gamma Starter package. The implementation is intentionally operator-controlled and fail-closed: it can build and preview live tickets, run strict risk checks, require explicit human approval, require a typed confirmation phrase, route real submit/cancel attempts through the isolated CLOB adapter, record a local audit ledger, inspect read-only account state where supported, and reconcile local records against remote open-order state.
+`v2.1.0-real` adds the first full live-trading control plane for the Polymarket Gamma Starter package. The implementation is intentionally operator-controlled and fail-closed: it can build and preview live tickets, run strict risk checks, require explicit human approval, require a typed confirmation phrase, route real submit/cancel attempts through the isolated CLOB adapter, record a local audit ledger, inspect read-only account state where supported, and reconcile local records against remote open-order state.
 
 ## Main routes
 
@@ -55,4 +55,8 @@ The v2 control plane is real application code and not a mock UI. Public Gamma an
 
 ## Current SDK note
 
-As of the v2.0.0-real build, Polymarket documentation points developers toward official clients and a newer unified Python SDK. The older `py-clob-client` package is retained only as a legacy compatibility fallback for the existing isolated adapter boundary. The app surfaces SDK availability in readiness rather than pretending an unavailable runtime is usable.
+As of the v2.1.0-real build, Polymarket documentation points developers toward official clients and a newer unified Python SDK. The older `py-clob-client` package is retained only as a legacy compatibility fallback for the existing isolated adapter boundary. The app surfaces SDK availability in readiness rather than pretending an unavailable runtime is usable.
+
+## v2.1.0 UI/UX redesign
+
+The v2.1 console keeps the v2.0 live control plane but reorganizes operator workflows around a persistent status bar, compact dashboard, step-based trade ticket, explicit refresh buttons, collapsed raw payloads, grouped settings, Markdown audit export, and task-based docs. Backend risk and execution gates remain unchanged and authoritative.

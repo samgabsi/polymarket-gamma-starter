@@ -1,101 +1,298 @@
 {% extends "base.html" %}
-{% block title %}Live Trading v2{% endblock %}
-{% block breadcrumbs %}<a href="/">Overview</a> / <span>Live Trading v2</span>{% endblock %}
+{% block title %}Live v2 Console · Polymarket Gamma Starter{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a><span>/</span><a href="/v2-live">Live v2</a><span>/</span><span>{{ section|replace('_', ' ')|title }}</span>{% endblock %}
 {% block content %}
-<section class="page-header">
+{% set readiness = status.readiness %}
+{% set cfg = readiness.config %}
+{% set audit_summary = status.audit_summary %}
+{% set tabs = [
+  ('dashboard','Dashboard','/v2-live'),
+  ('market_data','Markets','/v2-live/markets'),
+  ('trade_ticket','Trade Ticket','/v2-live/trade-ticket'),
+  ('orders','Orders','/v2-live/orders'),
+  ('positions','Positions','/v2-live/positions'),
+  ('risk','Risk','/v2-live/risk'),
+  ('audit','Audit','/v2-live/audit'),
+  ('settings','Settings','/v2-live/settings'),
+  ('emergency','Emergency','/v2-live/emergency'),
+  ('docs','Docs','/v2-live/docs')
+] %}
+
+<section class="page-header live-v2-hero">
   <div>
-    <p class="eyebrow">v2.0.0-real · Fully functional live trading control plane</p>
-    <h1>Live Trading v2</h1>
-    <p class="page-subtitle">End-to-end live market data, trade ticket preview, human approval, risk checks, guarded CLOB submit/cancel, positions/open-order reads, reconciliation, emergency controls, and audit exports.</p>
-    <div class="action-bar">
-      <a class="button-link" href="/v2-live">Dashboard</a>
-      <a class="button-link quiet" href="/v2-live/readiness">Live readiness</a>
-      <a class="button-link quiet" href="/v2-live/market-data">Market data</a>
-      <a class="button-link quiet" href="/v2-live/trade-ticket">Trade ticket</a>
-      <a class="button-link quiet" href="/v2-live/orders">Orders</a>
-      <a class="button-link quiet" href="/v2-live/positions">Positions</a>
-      <a class="button-link quiet" href="/v2-live/risk">Risk</a>
-      <a class="button-link quiet" href="/v2-live/audit">Audit</a>
-      <a class="button-link quiet" href="/v2-live/emergency">Emergency</a>
-    </div>
+    <p class="eyebrow">v2.1.0-real · UI/UX cleanup · operator console</p>
+    <div class="page-title-row"><h1>Live v2 Console</h1><span class="status-badge tone-{{ ui.mode_tone|default('neutral') }}">{{ ui.mode_label|default(cfg.trading_mode) }}</span></div>
+    <p class="page-subtitle">A decluttered control center for readiness, market discovery, trade-ticket rehearsal, order operations, risk, audit exports, settings, and emergency actions. Backend gates remain the source of truth for every live action.</p>
+  </div>
+  <div class="live-v2-hero-actions">
+    <a class="button-link quiet" href="/api/v2/live/status">Status JSON</a>
+    <a class="button-link quiet" href="/api/v2/live/audit.csv">Export CSV</a>
+    <a class="button-link danger" href="/v2-live/emergency">Kill Switch</a>
   </div>
 </section>
 
-<div class="callout danger"><strong>Live-money guardrail:</strong> the submit endpoint requires armed mode, real-network gates, risk pass, human approval, warning acknowledgement, and the configured typed confirmation phrase. This page never bypasses backend gates.</div>
-
-<section class="metric-grid" aria-label="Live v2 summary">
-  <article class="metric-card"><strong>{{ status.overall_status }}</strong><span>Overall status</span></article>
-  <article class="metric-card"><strong>{{ status.ready_to_arm }}</strong><span>Ready to arm</span></article>
-  <article class="metric-card"><strong>{{ status.readiness.config.trading_mode }}</strong><span>Trading mode</span></article>
-  <article class="metric-card"><strong>{{ status.readiness.config.kill_switch_active }}</strong><span>Kill switch</span></article>
-  <article class="metric-card"><strong>{{ status.readiness.config.enable_submit }}</strong><span>Submit gate</span></article>
-  <article class="metric-card"><strong>{{ status.audit_summary.count }}</strong><span>v2 audit records</span></article>
+<section class="live-v2-statusbar" aria-label="Persistent live trading status">
+  <span class="status-badge tone-info">Version {{ status.app_version }}</span>
+  <span class="status-badge tone-{{ ui.mode_tone|default('neutral') }}">MODE: {{ ui.mode_label|default('Unknown') }}</span>
+  <span class="status-badge tone-{{ 'danger' if ui.live_armed else 'neutral' }}">{{ ui.live_armed_label|default('Live Not Armed') }}</span>
+  <span class="status-badge tone-{{ 'warning' if cfg.read_only else 'danger' }}">{{ ui.read_only_label|default('Read-Only') }}</span>
+  <span class="status-badge tone-{{ ui.kill_switch_tone|default('neutral') }}">{{ ui.kill_switch_label|default('Kill Switch Unknown') }}</span>
+  <span class="status-badge tone-{{ ui.readiness_tone|default('neutral') }}">READINESS: {{ ui.readiness_label|default(status.overall_status) }}</span>
+  <span class="status-badge tone-info">{{ ui.gamma_label|default('Gamma Unknown') }}</span>
+  <span class="status-badge tone-info">{{ ui.clob_label|default('CLOB Unknown') }}</span>
+  <span class="status-badge tone-neutral">Refresh {{ ui.last_refresh|default(status.generated_at) }}</span>
 </section>
 
-{% if section in ["dashboard", "readiness"] %}
-<section class="content-card">
-  <div class="section-header"><div><h2>Live Trading Readiness</h2><p class="help-text">Pass/fail/unknown checks for environment, credentials, SDK/runtime, risk controls, live arming, and CLOB boundary.</p></div><a class="button-link quiet" href="/api/v2/live/readiness">JSON</a></div>
-  <div class="table-wrap"><table><thead><tr><th>Check</th><th>Status</th><th>Detail</th><th>Remediation</th></tr></thead><tbody>{% for row in status.readiness.checks %}<tr><td>{{ row.label }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.detail }}</td><td>{{ row.remediation }}</td></tr>{% endfor %}</tbody></table></div>
+{% if ui.last_critical_error and ui.last_critical_error != 'None' %}
+<section class="callout danger"><strong>Last critical issue:</strong> {{ ui.last_critical_error }}</section>
+{% endif %}
+
+<nav class="live-v2-tabs" aria-label="Live v2 sections">
+  {% for key,label,href in tabs %}
+    <a href="{{ href }}" class="{% if section == key or (section == 'readiness' and key == 'risk') %}active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</nav>
+
+{% if section == "dashboard" %}
+<section class="live-v2-dashboard-grid">
+  <article class="metric-card critical-card"><span>Mode</span><strong>{{ ui.mode_label }}</strong><small>{{ 'Live order submit is possible only after every backend gate passes.' if ui.live_armed else 'Live submit remains gated and fail-closed.' }}</small></article>
+  <article class="metric-card"><span>Readiness</span><strong>{{ ui.readiness_label }}</strong><small>{{ ui.fail_count }} blockers · {{ ui.warning_count }} warnings</small></article>
+  <article class="metric-card"><span>Kill Switch</span><strong>{{ ui.kill_switch_label }}</strong><small>{{ 'New live submits blocked.' if cfg.kill_switch_active else 'Danger posture: additional gates still required.' }}</small></article>
+  <article class="metric-card"><span>Open Orders</span><strong>{{ ui.open_orders_state }}</strong><small>Use Orders to refresh read-only state.</small></article>
+  <article class="metric-card"><span>Positions</span><strong>{{ ui.positions_state }}</strong><small>Unknown/unavailable is shown instead of invented P&L.</small></article>
+  <article class="metric-card"><span>Today Notional</span><strong>{{ "%.2f"|format(ui.today_notional_used|float) }}</strong><small>Daily limit {{ cfg.max_daily_notional }}</small></article>
+  <article class="metric-card"><span>Risk</span><strong>{{ ui.risk_state }}</strong><small>Backend risk checks are mandatory.</small></article>
+  <article class="metric-card"><span>Audit Events</span><strong>{{ audit_summary.count }}</strong><small>JSONL/CSV/Markdown exports available.</small></article>
 </section>
+
 <section class="two-col">
-  <article class="content-card"><h2>Credential summary</h2><dl class="metadata-grid">{% for key, value in status.readiness.credentials.items() %}<div><dt>{{ key }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl></article>
-  <article class="content-card"><h2>SDK/runtime summary</h2><dl class="metadata-grid">{% for key, value in status.readiness.sdk.items() %}<div><dt>{{ key }}</dt><dd>{{ value }}</dd></div>{% endfor %}</dl></article>
+  <article class="content-card">
+    <div class="section-header"><div><h2>Next recommended action</h2><p class="help-text">Operator-first guidance based on current posture.</p></div><span class="status-badge tone-{{ ui.readiness_tone }}">{{ ui.readiness_label }}</span></div>
+    <p>{{ ui.next_action }}</p>
+    <div class="operator-next-steps">
+      <a href="/v2-live/markets"><strong>Search market</strong><span>Find an outcome and inspect order-book context.</span></a>
+      <a href="/v2-live/trade-ticket"><strong>Preview ticket</strong><span>Rehearse sizing, risk, approval, and confirmation.</span></a>
+      <a href="/v2-live/emergency"><strong>Emergency controls</strong><span>Review kill switch and read-only posture.</span></a>
+    </div>
+  </article>
+  <article class="content-card">
+    <div class="section-header"><div><h2>Recent audit activity</h2><p class="help-text">Last records only; expand Audit for filters and exports.</p></div><a class="button-link quiet" href="/v2-live/audit">Open Audit</a></div>
+    <ul class="clean-list compact">
+      {% for row in audit_rows[:6] %}<li><strong>{{ row.action }}</strong> <span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="small">{{ row.timestamp }} · {{ row.market_id|compact_id }}</span></li>{% else %}<li class="empty-state">No audit records yet. Preview a ticket to create the first local ledger entry.</li>{% endfor %}
+    </ul>
+  </article>
 </section>
 {% endif %}
 
-{% if section in ["dashboard", "market_data"] %}
+{% if section in ["readiness", "risk"] %}
 <section class="content-card">
-  <h2>Market Discovery + Order Book</h2>
-  <p class="help-text">Use these API routes for live public market/order-book data. They do not require wallet credentials and do not submit orders.</p>
-  <div class="grid">
-    <article class="card"><h3>Search active markets</h3><p><code>/api/v2/live/markets?q=bitcoin&limit=25</code></p><a class="button-link quiet" href="/api/v2/live/markets?limit=25">Fetch top markets JSON</a></article>
-    <article class="card"><h3>Inspect an order book</h3><p>Call <code>/api/v2/live/orderbook/&lt;token_id&gt;</code> after selecting a CLOB token ID from Gamma market data.</p></article>
-  </div>
+  <div class="section-header"><div><h2>Risk and Readiness Center</h2><p class="help-text">Clear pass/fail status for arming live trading. Failures block live submit; warnings require deliberate review.</p></div><a class="button-link quiet" href="/api/v2/live/readiness">Readiness JSON</a></div>
+  <div class="table-wrap"><table><thead><tr><th>Status</th><th>Check</th><th>Details</th><th>Remediation</th></tr></thead><tbody>
+    {% for row in readiness.checks %}<tr><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td><strong>{{ row.label }}</strong><br><span class="small">{{ row.key }}</span></td><td>{{ row.detail }}</td><td>{{ row.remediation }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+<section class="grid">
+  <article class="card"><h3>Current limits</h3><dl class="metadata-grid"><div><dt>Max order</dt><dd>{{ cfg.max_order_notional }}</dd></div><div><dt>Daily notional</dt><dd>{{ cfg.max_daily_notional }}</dd></div><div><dt>Max open orders</dt><dd>{{ cfg.max_open_orders }}</dd></div><div><dt>Daily loss</dt><dd>{{ cfg.max_daily_loss }}</dd></div></dl></article>
+  <article class="card"><h3>Blocking dependencies</h3><ul class="clean-list compact"><li>Kill Switch must be off only when deliberately arming.</li><li>Read-Only must be false only for approved live submit posture.</li><li>Human Approval and typed confirmation remain mandatory.</li></ul></article>
 </section>
 {% endif %}
 
-{% if section in ["dashboard", "trade_ticket", "risk"] %}
+{% if section == "market_data" %}
 <section class="content-card">
-  <h2>Trade Ticket Preview</h2>
-  <p class="help-text">POST JSON to <code>/api/v2/live/ticket/preview</code> to create a draft ticket, calculate notional/max loss, and run strict risk checks. POST the same payload to <code>/api/v2/live/order/submit</code> only after human approval, warning acknowledgement, and typed confirmation.</p>
-  <div class="table-wrap"><table><thead><tr><th>Field</th><th>Required</th><th>Notes</th></tr></thead><tbody>
-    <tr><td>market_id</td><td>Yes</td><td>Gamma market or condition identifier.</td></tr>
-    <tr><td>token_id</td><td>Yes</td><td>CLOB token/asset id for selected outcome.</td></tr>
-    <tr><td>side</td><td>Yes</td><td>BUY or SELL.</td></tr>
-    <tr><td>price</td><td>Yes</td><td>Strictly between 0 and 1.</td></tr>
-    <tr><td>size</td><td>Yes</td><td>Outcome shares.</td></tr>
-    <tr><td>order_type</td><td>No</td><td>GTC default; FOK/FAK require market-order permission.</td></tr>
-    <tr><td>human_approval</td><td>Submit only</td><td>Must be true when approval is required.</td></tr>
-    <tr><td>acknowledge_warnings</td><td>Submit only</td><td>Must be true when warnings exist.</td></tr>
-    <tr><td>confirmation_phrase</td><td>Submit only</td><td>Must exactly match configured phrase; default is LIVE ORDER APPROVED.</td></tr>
+  <div class="section-header"><div><h2>Markets</h2><p class="help-text">Search and inspect public market/order-book data. Raw API payloads stay collapsed by default.</p></div><span class="status-badge tone-info">Read-only public data</span></div>
+  <form class="live-tool-form" data-method="GET" data-target="/api/v2/live/markets" data-result="market-results">
+    <label>Search query<input name="q" type="text" placeholder="bitcoin, election, fed"></label>
+    <label>Limit<input name="limit" type="number" min="1" max="100" value="10"></label>
+    <button type="submit">Search markets</button>
+  </form>
+  <div id="market-results" class="live-result empty-state">Run a search to view compact JSON results. Select token IDs from market details and use the order-book lookup below.</div>
+</section>
+<section class="content-card">
+  <h2>Order-book preview</h2>
+  <form class="live-tool-form" data-method="GET" data-target="/api/v2/live/orderbook/{token_id}" data-path-field="token_id" data-result="orderbook-results">
+    <label>CLOB token ID<input name="token_id" type="text" placeholder="Token / asset id"></label>
+    <button type="submit">Fetch order book</button>
+  </form>
+  <div id="orderbook-results" class="live-result empty-state">Order-book data appears here with stale/error state surfaced by the API response.</div>
+</section>
+{% endif %}
+
+{% if section == "trade_ticket" %}
+<section class="content-card">
+  <div class="section-header"><div><h2>Trade Ticket Workflow</h2><p class="help-text">Step-by-step ticket preview. Submit remains disabled until backend gates pass, approval is checked, warnings are acknowledged, and the typed phrase matches.</p></div><span class="status-badge tone-{{ ui.mode_tone }}">{{ ui.mode_label }}</span></div>
+  <ol class="stepper"><li>Select market/outcome</li><li>Enter order details</li><li>Preview</li><li>Risk check</li><li>Human approval</li><li>Submit/rehearse</li></ol>
+  <form id="ticket-form" class="ticket-form">
+    <fieldset><legend>Step 1 · Market/outcome</legend><label>Market ID<input name="market_id" required placeholder="market or condition id"></label><label>Token ID<input name="token_id" required placeholder="CLOB token id"></label><label>Outcome<input name="outcome" placeholder="YES / NO / candidate"></label></fieldset>
+    <fieldset><legend>Step 2 · Order details</legend><label>Side<select name="side"><option>BUY</option><option>SELL</option></select></label><label>Order type<select name="order_type"><option>GTC</option><option>GTD</option><option>FOK</option><option>FAK</option></select></label><label>Limit price<input name="price" type="number" step="0.0001" min="0.0001" max="0.9999" value="0.50"></label><label>Size / shares<input name="size" type="number" step="0.01" min="0.01" value="1"></label><label class="full-span">Rationale / notes<textarea name="note" placeholder="Why this trade belongs in the queue"></textarea></label></fieldset>
+    <fieldset><legend>Step 5 · Approval friction</legend><label class="checkbox-line"><input name="human_approval" type="checkbox" value="true"> Human Approval Required</label><label class="checkbox-line"><input name="acknowledge_warnings" type="checkbox" value="true"> Warning Acknowledgement Required</label><label>Typed confirmation<input name="confirmation_phrase" type="text" placeholder="LIVE ORDER APPROVED"></label></fieldset>
+    <div class="action-bar"><button type="button" id="preview-ticket">Preview + risk check</button><button type="button" id="submit-ticket" class="danger" disabled title="Submit unlocks only after a passing preview and deliberate confirmation.">Submit live order</button><span id="submit-state" class="status-badge tone-neutral">Submit locked</span></div>
+  </form>
+  <div id="ticket-results" class="live-result empty-state">Preview results, blocker reasons, estimates, and raw details appear here.</div>
+</section>
+{% endif %}
+
+{% if section == "orders" %}
+<section class="content-card">
+  <div class="section-header"><div><h2>Orders</h2><p class="help-text">Open-order lookup, targeted cancellation, and raw payload inspection. Cancel-all remains preview-only unless an operator implements and enables it deliberately.</p></div><button class="button-link quiet js-fetch" data-target="/api/v2/live/orders/open" data-result="orders-results">Refresh open orders</button></div>
+  <div id="orders-results" class="live-result empty-state">Open orders are fetched only when requested.</div>
+</section>
+<section class="content-card">
+  <h2>Cancel single order</h2>
+  <form class="live-tool-form" data-method="POST" data-target="/api/v2/live/order/cancel" data-result="cancel-results">
+    <label>Order ID<input name="order_id" required></label><label>Reason<input name="reason" placeholder="operator cancel"></label><label>Confirmation phrase<input name="confirmation_phrase" placeholder="LIVE ORDER APPROVED"></label><label class="checkbox-line"><input type="checkbox" name="human_approval" value="true"> Human approval</label><button type="submit" class="danger">Preview/cancel through gates</button>
+  </form>
+  <div id="cancel-results" class="live-result empty-state">Cancellation result appears here.</div>
+</section>
+{% endif %}
+
+{% if section == "positions" %}
+<section class="content-card">
+  <div class="section-header"><div><h2>Positions and balances</h2><p class="help-text">Account data is read-only and shown as unknown/unavailable when reliable data is missing.</p></div><button class="button-link quiet js-fetch" data-target="/api/v2/live/positions" data-result="positions-results">Refresh positions</button></div>
+  <div id="positions-results" class="live-result empty-state">Positions are not fetched on page load.</div>
+</section>
+<section class="content-card">
+  <div class="section-header"><div><h2>Reconciliation</h2><p class="help-text">Compare local audit records with remote open-order state when read-only live data is enabled.</p></div><button class="button-link quiet js-post" data-target="/api/v2/live/reconcile" data-result="reconcile-results">Run reconciliation</button></div>
+  <div id="reconcile-results" class="live-result empty-state">Reconciliation report appears here.</div>
+</section>
+{% endif %}
+
+{% if section == "audit" %}
+<section class="content-card">
+  <div class="section-header"><div><h2>Audit Ledger</h2><p class="help-text">Human-readable default view, expandable raw details, and export formats.</p></div><div class="action-bar"><a class="button-link quiet" href="/api/v2/live/audit">JSON</a><a class="button-link quiet" href="/api/v2/live/audit.csv">CSV</a><a class="button-link quiet" href="/api/v2/live/audit.md">Markdown</a></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Time</th><th>Mode</th><th>Action</th><th>Status</th><th>Market</th><th>Token</th><th>Notional</th><th>Details</th></tr></thead><tbody>
+    {% for row in audit_rows %}<tr><td>{{ row.timestamp }}</td><td>{{ row.mode }}</td><td>{{ row.action }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.market_id|compact_id }}</td><td>{{ row.token_id|compact_id }}</td><td>{{ row.notional }}</td><td><details><summary>Raw</summary><pre>{{ row|tojson(indent=2) }}</pre></details></td></tr>{% else %}<tr><td colspan="8" class="empty-state">No v2 audit records yet.</td></tr>{% endfor %}
   </tbody></table></div>
 </section>
 {% endif %}
 
-{% if section in ["dashboard", "orders", "positions"] %}
-<section class="two-col">
-  <article class="content-card"><h2>Open orders</h2><p class="help-text">Read-only live CLOB order lookup is gated by real-network/read-only settings.</p><a class="button-link quiet" href="/api/v2/live/orders/open">Open orders JSON</a></article>
-  <article class="content-card"><h2>Positions / balances</h2><p class="help-text">Positions use the configured public Data API wallet address and degrade safely if disabled or unavailable.</p><a class="button-link quiet" href="/api/v2/live/positions">Positions JSON</a></article>
-</section>
-<section class="content-card"><h2>Reconciliation</h2><p class="help-text">POST <code>/api/v2/live/reconcile</code> to compare local v2 audit records with remote open-order state when available.</p></section>
-{% endif %}
-
-{% if section in ["dashboard", "audit"] %}
+{% if section == "settings" %}
 <section class="content-card">
-  <div class="section-header"><div><h2>Audit ledger</h2><p class="help-text">Local JSONL ledger with CSV export. Secrets are redacted before writing.</p></div><div class="action-bar"><a class="button-link quiet" href="/api/v2/live/audit">JSON</a><a class="button-link quiet" href="/api/v2/live/audit.csv">CSV</a></div></div>
-  <div class="table-wrap"><table><thead><tr><th>Time</th><th>Mode</th><th>Action</th><th>Status</th><th>Market</th><th>Token</th><th>Notional</th><th>Network</th></tr></thead><tbody>{% for row in audit_rows %}<tr><td>{{ row.timestamp }}</td><td>{{ row.mode }}</td><td>{{ row.action }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.market_id|compact_id }}</td><td>{{ row.token_id|compact_id }}</td><td>{{ row.notional }}</td><td>{{ row.network_attempted }}</td></tr>{% else %}<tr><td colspan="8" class="empty-state">No v2 audit records yet.</td></tr>{% endfor %}</tbody></table></div>
+  <div class="section-header"><div><h2>Settings</h2><p class="help-text">Grouped, GUI-first settings map. The release does not write secrets from this page; use it to understand and validate your local environment safely.</p></div><a class="button-link quiet" href="/settings/configuration">Open full configuration console</a></div>
+  <nav class="settings-side-nav live-settings-nav"><strong>Sections</strong>{% for group in settings_sections %}<a href="#{{ group.id }}">{{ group.title }}</a>{% endfor %}</nav>
+  {% for group in settings_sections %}<article id="{{ group.id }}" class="setting-row live-setting-group"><h3>{{ group.title }}</h3><p class="help-text">{{ group.description }}</p><div class="setting-list">{% for field in group.fields %}<div class="setting-row-main"><div class="setting-title-block"><h3>{{ field.label }}</h3><p class="help-text"><code>{{ field.key }}</code> · {{ field.helper }}</p></div><div><span class="status-badge tone-{{ 'warning' if field.secret else 'info' }}">{{ field.control }}</span><p class="mono">{{ '[masked]' if field.secret else field.current }}</p>{% if field.options %}<p class="small">Options: {{ field.options|join(', ') }}</p>{% endif %}</div></div>{% endfor %}</div></article>{% endfor %}
+</section>
+<section class="content-card">
+  <h2>Validate setting changes</h2><p class="help-text">Paste a small JSON object of candidate environment values. This only validates and never writes files.</p>
+  <form class="live-tool-form json-form" data-method="POST" data-target="/api/v2/live/settings/validate" data-json-field="settings_json" data-result="settings-validate-results"><label class="full-span">Candidate JSON<textarea name="settings_json" placeholder='{"POLYMARKET_V2_TRADING_MODE":"paper"}'></textarea></label><button type="submit">Validate</button></form>
+  <div id="settings-validate-results" class="live-result empty-state">Validation output appears here.</div>
 </section>
 {% endif %}
 
-{% if section in ["dashboard", "emergency"] %}
-<section class="content-card">
-  <h2>Emergency Controls</h2>
-  <p class="help-text">POST <code>/api/v2/live/emergency</code> with action <code>force_read_only</code>, <code>disable_new_live_orders</code>, <code>record_kill_switch</code>, or <code>cancel_all_preview</code>. Runtime environment changes remain explicit and auditable through Settings/.env so hidden background mutation cannot arm or disarm trading unexpectedly.</p>
+{% if section == "emergency" %}
+<section class="content-card emergency-panel">
+  <div class="section-header"><div><h2>Emergency Controls</h2><p class="help-text">Serious controls for forcing read-only posture, disabling new live order flow, recording kill-switch events, and previewing cancel-all behavior.</p></div><span class="status-badge tone-{{ ui.kill_switch_tone }}">{{ ui.kill_switch_label }}</span></div>
   <div class="grid">
-    <article class="card"><h3>Force read-only</h3><p>Records an emergency read-only action and directs the operator to persist READ_ONLY=true and submit gates false.</p></article>
-    <article class="card"><h3>Disable new live orders</h3><p>Records a control action for turning off submit gates.</p></article>
-    <article class="card"><h3>Cancel all preview</h3><p>Preview-only safety action; targeted cancellation remains confirmed and audited.</p></article>
+    <article class="card"><h3>Force read-only</h3><p>Records an emergency read-only action. Persist READ_ONLY=true in environment/settings.</p><button class="danger js-emergency" data-action="force_read_only">Record force read-only</button></article>
+    <article class="card"><h3>Disable new live orders</h3><p>Records operator intent to shut off submit gates without hidden mutation.</p><button class="danger js-emergency" data-action="disable_new_live_orders">Record disable new orders</button></article>
+    <article class="card"><h3>Record kill switch</h3><p>Audits a kill-switch action. Environment remains explicit and operator-controlled.</p><button class="danger js-emergency" data-action="record_kill_switch">Record kill switch</button></article>
+    <article class="card"><h3>Cancel-all preview</h3><p>Preview-only safety action. Targeted cancellation still requires confirmation.</p><button class="warning js-emergency" data-action="cancel_all_preview">Preview cancel all</button></article>
+  </div>
+  <div id="emergency-results" class="live-result empty-state">Emergency action receipts appear here.</div>
+</section>
+{% endif %}
+
+{% if section == "docs" %}
+<section class="content-card">
+  <h2>Task-based docs</h2><p class="help-text">Fast paths for operators during a session.</p>
+  <div class="settings-link-grid">
+    <a class="settings-link-card" href="/docs/LIVE_TRADING_SETUP_GUIDE.md"><strong>First Run / Live Read-Only</strong><span>Setup, credentials, readiness, safe defaults.</span></a>
+    <a class="settings-link-card" href="/docs/LIVE_TRADING_V2.md"><strong>Live Trading</strong><span>Control-plane architecture and gates.</span></a>
+    <a class="settings-link-card" href="/docs/RISK_CONTROLS_GUIDE.md"><strong>Risk Controls</strong><span>Limit, approval, warning, and blocker behavior.</span></a>
+    <a class="settings-link-card" href="/docs/ORDER_LIFECYCLE_GUIDE.md"><strong>Order Lifecycle</strong><span>Preview, approval, submit, status, cancel, reconcile.</span></a>
+    <a class="settings-link-card" href="/docs/EMERGENCY_KILL_SWITCH_GUIDE.md"><strong>Emergency Controls</strong><span>Kill switch, read-only, disable-orders, cancel preview.</span></a>
+    <a class="settings-link-card" href="/docs/ENVIRONMENT_VARIABLES_REFERENCE.md"><strong>Environment Variables</strong><span>Grouped settings and secret handling.</span></a>
+    <a class="settings-link-card" href="/docs/TROUBLESHOOTING_GUIDE.md"><strong>Troubleshooting</strong><span>Common failures and recovery paths.</span></a>
+    <a class="settings-link-card" href="/docs/RELEASE_NOTES_v2.1.0-real.md"><strong>Release Notes</strong><span>What changed in v2.1.0-real.</span></a>
   </div>
 </section>
 {% endif %}
+
+<script>
+(function () {
+  const cache = new Map();
+  function showResult(id, data, tone) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('empty-state');
+    el.innerHTML = '<details open><summary>' + (tone || 'Result') + '</summary><pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre></details>';
+  }
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[ch]));
+  }
+  async function requestJson(method, url, body, resultId) {
+    const key = method + ':' + url + ':' + JSON.stringify(body || {});
+    const cached = method === 'GET' ? cache.get(key) : null;
+    if (cached && Date.now() - cached.at < 15000) { showResult(resultId, cached.data, 'Cached result'); return cached.data; }
+    showResult(resultId, {status: 'loading', url}, 'Loading');
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
+    try {
+      const response = await fetch(url, {method, headers: {'Content-Type': 'application/json'}, body: method === 'GET' ? undefined : JSON.stringify(body || {}), signal: controller.signal});
+      const data = await response.json();
+      if (method === 'GET') cache.set(key, {at: Date.now(), data});
+      showResult(resultId, data, response.ok ? 'Result' : 'Error');
+      return data;
+    } catch (err) {
+      const data = {status: 'request_failed', error: String(err)};
+      showResult(resultId, data, 'Error');
+      return data;
+    } finally { clearTimeout(timer); }
+  }
+  function formPayload(form) {
+    const data = {};
+    new FormData(form).forEach((value, key) => {
+      if (value === 'true') data[key] = true;
+      else if (value === 'false') data[key] = false;
+      else if (['price','size','limit'].includes(key)) data[key] = Number(value);
+      else data[key] = value;
+    });
+    return data;
+  }
+  document.querySelectorAll('.live-tool-form').forEach(form => {
+    form.addEventListener('submit', ev => {
+      ev.preventDefault();
+      let method = form.dataset.method || 'GET';
+      let target = form.dataset.target;
+      const result = form.dataset.result;
+      let payload = formPayload(form);
+      if (form.dataset.jsonField) {
+        try { payload = JSON.parse(payload[form.dataset.jsonField] || '{}'); } catch (err) { showResult(result, {valid:false, errors:['Invalid JSON: ' + err]}, 'Validation error'); return; }
+      }
+      if (form.dataset.pathField) {
+        target = target.replace('{' + form.dataset.pathField + '}', encodeURIComponent(payload[form.dataset.pathField] || ''));
+        delete payload[form.dataset.pathField];
+      }
+      if (method === 'GET') {
+        const params = new URLSearchParams(payload);
+        target += target.includes('?') ? '&' + params : '?' + params;
+        payload = null;
+      }
+      requestJson(method, target, payload, result);
+    });
+  });
+  document.querySelectorAll('.js-fetch').forEach(btn => btn.addEventListener('click', () => requestJson('GET', btn.dataset.target, null, btn.dataset.result)));
+  document.querySelectorAll('.js-post').forEach(btn => btn.addEventListener('click', () => requestJson('POST', btn.dataset.target, {}, btn.dataset.result)));
+  document.querySelectorAll('.js-emergency').forEach(btn => btn.addEventListener('click', () => {
+    if (!confirm('Record emergency action: ' + btn.dataset.action + '?')) return;
+    requestJson('POST', '/api/v2/live/emergency', {action: btn.dataset.action, note: 'ui_v2_1_emergency_panel'}, 'emergency-results');
+  }));
+  const previewBtn = document.getElementById('preview-ticket');
+  const submitBtn = document.getElementById('submit-ticket');
+  const submitState = document.getElementById('submit-state');
+  let lastPreviewPassed = false;
+  if (previewBtn) previewBtn.addEventListener('click', async () => {
+    const payload = formPayload(document.getElementById('ticket-form'));
+    const data = await requestJson('POST', '/api/v2/live/ticket/preview', payload, 'ticket-results');
+    lastPreviewPassed = !!(data && data.submit_ready);
+    submitBtn.disabled = !lastPreviewPassed;
+    submitState.textContent = lastPreviewPassed ? 'Backend preview passed · submit still requires confirmation' : 'Submit locked';
+    submitState.className = 'status-badge ' + (lastPreviewPassed ? 'tone-warning' : 'tone-neutral');
+  });
+  if (submitBtn) submitBtn.addEventListener('click', () => {
+    if (!lastPreviewPassed) return;
+    if (!confirm('This calls the live submit endpoint. Backend gates will still block unless everything is valid. Continue?')) return;
+    requestJson('POST', '/api/v2/live/order/submit', formPayload(document.getElementById('ticket-form')), 'ticket-results');
+  });
+})();
+</script>
 {% endblock %}

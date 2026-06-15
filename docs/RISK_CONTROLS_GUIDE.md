@@ -1,4 +1,4 @@
-# Risk Controls Guide — v2.0.0-real
+# Risk Controls Guide — v2.1.0-real
 
 The v2 risk engine runs before live submission. Failures block submission. Warnings must be explicitly acknowledged.
 

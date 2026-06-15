@@ -1,4 +1,4 @@
-# Troubleshooting Guide — v2.0.0-real
+# Troubleshooting Guide — v2.1.0-real
 
 ## Readiness says credentials are missing
 
@@ -41,3 +41,10 @@ If the Data API does not return a field needed for P&L, the app shows unknown/un
 ## Reconciliation flags local-only records
 
 A local-only record can mean the order was blocked before submission, the exchange did not acknowledge it, the order is no longer open, remote open-order reads are disabled, or API credentials are missing. Review the corresponding audit record details.
+
+## v2.1.0 UI troubleshooting
+
+- If a Live v2 panel looks empty, use its explicit Refresh/Search/Preview button. v2.1 avoids noisy automatic fetching.
+- If a button is disabled, read the nearby status badge and run `/v2-live/risk` to see backend blockers.
+- If raw API output is needed, expand the details panel in the result area or use the matching `/api/v2/live/*` route.
+- If settings look wrong, open `/v2-live/settings` for grouped review and `/settings/configuration` for the audited configuration editor.

@@ -1,4 +1,4 @@
-# Emergency and Kill Switch Guide — v2.0.0-real
+# Emergency and Kill Switch Guide — v2.1.0-real
 
 The emergency posture is conservative by default.
 
@@ -37,3 +37,7 @@ POLYMARKET_LIVE_MANUAL_CANCEL_ENABLED=true
 ```
 
 This posture blocks new orders while preserving a path for deliberate targeted cancellation if the operator enables cancel gates and confirms each action.
+
+## v2.1.0 Emergency UI
+
+`/v2-live/emergency` presents emergency actions as a dedicated control center. The buttons record audited emergency intent and explain what must be persisted in the environment. Hidden background mutation is intentionally avoided so live trading cannot be armed or disarmed accidentally.

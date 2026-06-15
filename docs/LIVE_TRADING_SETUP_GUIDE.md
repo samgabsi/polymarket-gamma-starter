@@ -1,4 +1,4 @@
-# Live Trading Setup Guide — v2.0.0-real
+# Live Trading Setup Guide — v2.1.0-real
 
 This guide describes the intended operator path for enabling live trading. Do not skip directly to armed mode.
 

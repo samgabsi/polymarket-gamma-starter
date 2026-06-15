@@ -1,7 +1,34 @@
-# Polymarket Gamma Starter v2.0.0-real
+# Polymarket Gamma Starter v2.1.0-real
 
-Local-first Polymarket market-intelligence, paper-ops, staged live-readiness, and guarded execution-control console.
+Local-first Polymarket market-intelligence, paper-ops, staged live-readiness, guarded execution-control, and decluttered live-operator console.
 
+## What changed in v2.1.0-real
+
+UI/UX Redesign, Cleanup, Declutter, Smoothness, and Speed Pass milestone:
+
+- Redesigned `/v2-live` into a cleaner operator console with compact top-level sections: Dashboard, Markets, Trade Ticket, Orders, Positions, Risk, Audit, Settings, Emergency, and Docs.
+- Added a persistent Live v2 status bar showing app version, trading mode, live armed state, read-only state, kill-switch state, readiness, Gamma/CLOB posture, refresh time, and recent critical issue state.
+- Reworked the v2 dashboard into concise status cards for mode, readiness, kill switch, open orders, positions, daily notional, risk state, audit events, and next recommended action.
+- Rebuilt the Trade Ticket page as a step-by-step workflow: market/outcome, order details, preview, risk check, human approval, and submit/rehearse. Live submit remains disabled until backend gates pass.
+- Cleaned up Markets, Orders, Positions, Risk, Audit, Settings, Emergency, and Docs sections with progressive disclosure, explicit refresh buttons, collapsed raw payloads, loading/error states, and compact tables/cards.
+- Added GUI-first Live v2 settings schema and validation endpoints: `/api/v2/live/settings/schema` and `/api/v2/live/settings/validate`. They never return secret values and do not write files.
+- Added Markdown audit export at `/api/v2/live/audit.md` alongside JSON and CSV exports.
+- Added a safe `/docs/{file}` markdown/text route for task-based operator docs inside the UI.
+- Added UI route smoke tests, settings validation tests, Markdown audit export tests, and docs route tests.
+- Preserved all v2.0 live-trading safety: risk checks, human approval, warning acknowledgement, typed confirmation phrase, kill switch, read-only gate, submit/cancel gates, CLOB adapter boundary, audit ledger, and fail-closed defaults.
+
+### Primary Live v2 console routes
+
+- Dashboard: `/v2-live`
+- Markets: `/v2-live/markets`
+- Trade Ticket: `/v2-live/trade-ticket`
+- Orders: `/v2-live/orders`
+- Positions: `/v2-live/positions`
+- Risk: `/v2-live/risk`
+- Audit: `/v2-live/audit`
+- Settings: `/v2-live/settings`
+- Emergency: `/v2-live/emergency`
+- Docs: `/v2-live/docs`
 
 ## What changed in v2.0.0-real
 

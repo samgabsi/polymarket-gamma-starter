@@ -368,7 +368,7 @@ def build_live_v2_readiness() -> dict[str, Any]:
     hard_fails = [row for row in checks if row["status"] == "fail"]
     warnings = [row for row in checks if row["status"] == "warn"]
     return {
-        "version": "2.0.0-live-v2-readiness",
+        "version": "2.1.0-live-v2-readiness",
         "generated_at": _now(),
         "app_version": APP_VERSION,
         "overall_status": "ready_to_arm" if not hard_fails else "blocked",
@@ -386,19 +386,162 @@ def build_live_v2_readiness() -> dict[str, Any]:
     }
 
 
+def _mode_label(mode: str) -> str:
+    labels = {
+        "research_only": "Research Only",
+        "paper": "Paper",
+        "live_read_only": "Live Read-Only",
+        "live_trading_armed": "Live Armed",
+    }
+    return labels.get(mode, "Unknown")
+
+
+def _tone_for_mode(mode: str) -> str:
+    if mode == "live_trading_armed":
+        return "danger"
+    if mode == "live_read_only":
+        return "warning"
+    if mode == "paper":
+        return "paper"
+    return "neutral"
+
+
+def _recent_errors(rows: list[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
+    flagged: list[dict[str, Any]] = []
+    for row in rows:
+        status = _text(row.get("status")).lower()
+        if any(marker in status for marker in ["fail", "error", "blocked", "reject", "mismatch"]):
+            flagged.append(row)
+        if len(flagged) >= limit:
+            break
+    return flagged
+
+
+def build_live_v2_ui_summary(readiness: dict[str, Any] | None = None, audit_rows: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    readiness = readiness or build_live_v2_readiness()
+    cfg = build_live_v2_config()
+    audit_rows = audit_rows if audit_rows is not None else list_audit_records(limit=250)
+    failures = [row for row in readiness.get("checks", []) if row.get("status") == "fail"]
+    warnings = [row for row in readiness.get("checks", []) if row.get("status") == "warn"]
+    open_orders_state = "Unknown"
+    positions_state = "Unknown"
+    risk_state = "Ready" if not failures else "Risk Blocked"
+    if cfg.kill_switch_active:
+        next_action = "Review readiness, configure limits, and keep Kill Switch active until deliberate arming."
+    elif cfg.trading_mode == "live_trading_armed" and readiness.get("ready_to_arm"):
+        next_action = "Use Trade Ticket preview, then approval and typed confirmation for any live order."
+    elif cfg.trading_mode == "paper":
+        next_action = "Rehearse tickets in Paper mode and review audit exports before arming live."
+    else:
+        next_action = "Move through readiness checks before enabling any live submit gate."
+    return {
+        "version": "2.1.0-live-v2-ui-summary",
+        "generated_at": _now(),
+        "mode_label": _mode_label(cfg.trading_mode),
+        "mode_tone": _tone_for_mode(cfg.trading_mode),
+        "live_armed": cfg.trading_mode == "live_trading_armed",
+        "live_armed_label": "Live Armed" if cfg.trading_mode == "live_trading_armed" else "Live Not Armed",
+        "read_only_label": "Read-Only" if cfg.read_only else "Writable Gates Possible",
+        "kill_switch_label": "Kill Switch ON" if cfg.kill_switch_active else "Kill Switch OFF",
+        "kill_switch_tone": "ok" if cfg.kill_switch_active else "danger",
+        "readiness_label": "Ready" if readiness.get("ready_to_arm") else "Not Ready",
+        "readiness_tone": "ok" if readiness.get("ready_to_arm") else "danger",
+        "clob_label": "CLOB OK" if not any(row.get("key") == "clob_configured" and row.get("status") == "fail" for row in readiness.get("checks", [])) else "CLOB Error",
+        "gamma_label": "Gamma OK" if not any(row.get("key") == "gamma_configured" and row.get("status") == "fail" for row in readiness.get("checks", [])) else "Gamma Error",
+        "last_refresh": _now(),
+        "last_critical_error": _text(_recent_errors(audit_rows, 1)[0].get("status")) if _recent_errors(audit_rows, 1) else "None",
+        "fail_count": len(failures),
+        "warning_count": len(warnings),
+        "risk_state": risk_state,
+        "open_orders_state": open_orders_state,
+        "positions_state": positions_state,
+        "today_notional_used": sum(_safe_float(row.get("notional"), 0.0) for row in audit_rows if str(row.get("timestamp", ""))[:10] == _now()[:10]),
+        "daily_limit": cfg.max_daily_notional,
+        "recent_errors": _recent_errors(audit_rows),
+        "next_action": next_action,
+    }
+
+
 def build_live_v2_status() -> dict[str, Any]:
     readiness = build_live_v2_readiness()
     audit_rows = list_audit_records(limit=1000)
+    ui_summary = build_live_v2_ui_summary(readiness, audit_rows)
     return {
-        "version": "2.0.0-live-v2-status",
+        "version": "2.1.0-live-v2-status",
         "generated_at": _now(),
         "app_version": APP_VERSION,
         "overall_status": readiness["overall_status"],
         "ready_to_arm": readiness["ready_to_arm"],
         "readiness": readiness,
+        "ui": ui_summary,
         "audit_summary": summarize_audit(audit_rows),
         "guardrail": "Live v2 routes use preview, risk, approval, confirmation, and adapter gates. They do not submit unless the explicit submit endpoint receives a valid approved ticket in armed live mode.",
     }
+
+
+def build_live_v2_settings_sections() -> list[dict[str, Any]]:
+    cfg = build_live_v2_config()
+    return [
+        {"id": "general", "title": "General", "description": "Console posture and operator defaults.", "fields": [
+            {"key": "APP_MODE", "label": "App Mode", "control": "dropdown", "current": _env_any("APP_MODE", default="read_only"), "options": ["read_only", "paper"], "secret": False, "helper": "Use paper for rehearsal; read_only keeps the console informational."},
+        ]},
+        {"id": "trading-mode", "title": "Trading Mode", "description": "Canonical mode labels used across the operator console.", "fields": [
+            {"key": "POLYMARKET_V2_TRADING_MODE", "label": "Trading Mode", "control": "radio", "current": cfg.trading_mode, "options": sorted(TRADING_MODES), "secret": False, "helper": "Live Armed still requires readiness, kill switch off, submit gates, approval, and typed confirmation."},
+        ]},
+        {"id": "api-hosts", "title": "API Hosts", "description": "Public data and CLOB endpoints.", "fields": [
+            {"key": "GAMMA_BASE_URL", "label": "Gamma API", "control": "url", "current": cfg.gamma_base_url, "secret": False, "helper": "Public market metadata endpoint."},
+            {"key": "CLOB_BASE_URL", "label": "CLOB API", "control": "url", "current": cfg.clob_base_url, "secret": False, "helper": "Order book and private trading endpoint host."},
+            {"key": "POLYMARKET_DATA_API_BASE_URL", "label": "Data API", "control": "url", "current": cfg.data_api_base_url, "secret": False, "helper": "Balances, positions, and account state where supported."},
+        ]},
+        {"id": "credentials", "title": "Credentials / Secrets", "description": "Secrets are environment-only, masked in UI, and redacted in logs.", "fields": [
+            {"key": "POLYMARKET_PRIVATE_KEY", "label": "Wallet Private Key", "control": "password", "current": "configured" if _credential_summary()["private_key_present"] else "missing", "secret": True, "helper": "Never commit this value. Prefer local .env or process secrets."},
+            {"key": "POLYMARKET_CLOB_API_KEY", "label": "CLOB API Key", "control": "password", "current": "configured" if _credential_summary()["api_key_present"] else "missing", "secret": True, "helper": "Required for authenticated private endpoints."},
+        ]},
+        {"id": "gates", "title": "Live Trading Gates", "description": "Deliberate friction for money-moving actions.", "fields": [
+            {"key": "POLYMARKET_LIVE_KILL_SWITCH", "label": "Kill Switch", "control": "toggle", "current": cfg.kill_switch_active, "secret": False, "helper": "Default ON. New live submit is blocked while active."},
+            {"key": "READ_ONLY", "label": "Read-Only", "control": "toggle", "current": cfg.read_only, "secret": False, "helper": "Default true. Must be false before live submit can pass."},
+            {"key": "POLYMARKET_V2_REQUIRE_APPROVAL", "label": "Human Approval Required", "control": "toggle", "current": cfg.require_approval, "secret": False, "helper": "Keep enabled; backend also enforces this."},
+            {"key": "POLYMARKET_V2_CONFIRMATION_PHRASE", "label": "Typed Confirmation Phrase", "control": "text", "current": "configured", "secret": True, "helper": "Default: LIVE ORDER APPROVED."},
+        ]},
+        {"id": "risk-limits", "title": "Risk Limits", "description": "Numerical blockers enforced before live submission.", "fields": [
+            {"key": "POLYMARKET_LIVE_MAX_ORDER_NOTIONAL", "label": "Max Order Notional", "control": "number", "current": cfg.max_order_notional, "secret": False, "helper": "Per-order cap in USDC-notional terms."},
+            {"key": "POLYMARKET_LIVE_MAX_DAILY_NOTIONAL", "label": "Max Daily Notional", "control": "number", "current": cfg.max_daily_notional, "secret": False, "helper": "Required non-zero daily notional cap."},
+            {"key": "POLYMARKET_LIVE_MAX_OPEN_ORDERS", "label": "Max Open Orders", "control": "number", "current": cfg.max_open_orders, "secret": False, "helper": "Required non-zero order-count cap."},
+        ]},
+        {"id": "order-defaults", "title": "Order Defaults", "description": "Operator defaults and order-type permissions.", "fields": [
+            {"key": "POLYMARKET_V2_ALLOW_LIMIT_ORDERS", "label": "Allow Limit Orders", "control": "toggle", "current": cfg.allow_limit_orders, "secret": False, "helper": "Limit-order permission."},
+            {"key": "POLYMARKET_V2_ALLOW_MARKET_ORDERS", "label": "Allow Marketable Orders", "control": "toggle", "current": cfg.allow_market_orders, "secret": False, "helper": "Required for FOK/FAK style behavior."},
+            {"key": "POLYMARKET_V2_DEFAULT_SLIPPAGE_BPS", "label": "Default Slippage BPS", "control": "number", "current": cfg.default_slippage_limit_bps, "secret": False, "helper": "UI hint; actual risk checks remain backend enforced."},
+        ]},
+        {"id": "audit", "title": "Audit / Exports", "description": "Local ledger exports and reconciliation reporting.", "fields": [
+            {"key": "LIVE_V2_AUDIT_PATH", "label": "Audit Path", "control": "read-only", "current": str(AUDIT_JSONL_PATH), "secret": False, "helper": "Runtime data path; not packaged in releases."},
+        ]},
+        {"id": "advanced", "title": "Advanced / Debug", "description": "Rare values, raw endpoints, and diagnostics.", "fields": [
+            {"key": "POLYMARKET_MARKET_DATA_MAX_AGE_SECONDS", "label": "Stale Data Max Age", "control": "number", "current": cfg.stale_data_max_age_seconds, "secret": False, "helper": "Used for stale-data warnings and operator review."},
+        ]},
+    ]
+
+
+def validate_live_v2_settings_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    warnings: list[str] = []
+    errors: list[str] = []
+    mode = _text(payload.get("POLYMARKET_V2_TRADING_MODE"), build_live_v2_config().trading_mode)
+    if mode not in TRADING_MODES:
+        errors.append("Trading Mode must be one of Research Only, Paper, Live Read-Only, or Live Armed.")
+    def non_negative_number(key: str, label: str) -> None:
+        if key in payload and _decimal(payload.get(key)) is None:
+            errors.append(f"{label} must be numeric.")
+        elif key in payload and _safe_float(payload.get(key), 0.0) < 0:
+            errors.append(f"{label} cannot be negative.")
+    non_negative_number("POLYMARKET_LIVE_MAX_ORDER_NOTIONAL", "Max Order Notional")
+    non_negative_number("POLYMARKET_LIVE_MAX_DAILY_NOTIONAL", "Max Daily Notional")
+    non_negative_number("POLYMARKET_LIVE_MAX_OPEN_ORDERS", "Max Open Orders")
+    if mode == "live_trading_armed":
+        if str(payload.get("POLYMARKET_LIVE_KILL_SWITCH", "true")).lower() not in {"false", "0", "no", "off"}:
+            warnings.append("Live Armed still appears blocked by Kill Switch unless explicitly set off.")
+        if str(payload.get("READ_ONLY", "true")).lower() not in {"false", "0", "no", "off"}:
+            warnings.append("Live Armed still appears blocked by Read-Only mode unless explicitly set false.")
+    return {"valid": not errors, "errors": errors, "warnings": warnings, "secret_values_returned": False}
 
 
 def _ticket_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
@@ -481,7 +624,7 @@ def evaluate_live_v2_risk(ticket: dict[str, Any], *, acknowledged_warnings: bool
     if warnings and not acknowledged_warnings:
         failures.append({"name": "warnings_acknowledged", "detail": "risk warnings must be explicitly acknowledged before submission."})
     return {
-        "version": "2.0.0-live-v2-risk",
+        "version": "2.1.0-live-v2-risk",
         "generated_at": _now(),
         "status": "blocked" if failures else "passed",
         "passed": not failures,
@@ -502,7 +645,7 @@ def build_live_v2_ticket_preview(payload: dict[str, Any]) -> dict[str, Any]:
         human_approval=bool(payload.get("human_approval")),
     )
     preview = {
-        "version": "2.0.0-live-v2-ticket-preview",
+        "version": "2.1.0-live-v2-ticket-preview",
         "generated_at": _now(),
         "recorded": False,
         "ticket": ticket,
@@ -530,10 +673,10 @@ def submit_live_v2_order(payload: dict[str, Any]) -> dict[str, Any]:
     )
     if not risk.get("passed"):
         record_audit("live_order_submit", "blocked_by_risk", ticket=ticket, risk=risk)
-        return {"version": "2.0.0-live-v2-submit", "status": "blocked_by_risk", "ticket": ticket, "risk": risk, "network_attempted": False}
+        return {"version": "2.1.0-live-v2-submit", "status": "blocked_by_risk", "ticket": ticket, "risk": risk, "network_attempted": False}
     if not _confirmation_matches(payload.get("confirmation_phrase")):
         record_audit("live_order_submit", "blocked_by_confirmation", ticket=ticket, risk=risk, details={"confirmation_present": bool(_text(payload.get("confirmation_phrase")))})
-        return {"version": "2.0.0-live-v2-submit", "status": "blocked_by_confirmation", "ticket": ticket, "risk": risk, "network_attempted": False, "blockers": ["Typed confirmation phrase did not match."]}
+        return {"version": "2.1.0-live-v2-submit", "status": "blocked_by_confirmation", "ticket": ticket, "risk": risk, "network_attempted": False, "blockers": ["Typed confirmation phrase did not match."]}
     attempt_id = f"v2lex_{uuid4().hex[:12]}"
     adapter_payload = {
         "market_id": ticket["market_id"],
@@ -554,7 +697,7 @@ def submit_live_v2_order(payload: dict[str, Any]) -> dict[str, Any]:
         order_id=_text(receipt.get("exchange_order_id")),
         network_attempted=bool(receipt.get("network_attempted")),
     )
-    return {"version": "2.0.0-live-v2-submit", "status": status, "attempt_id": attempt_id, "ticket": ticket, "risk": risk, "receipt": redact_data(receipt), "network_attempted": bool(receipt.get("network_attempted"))}
+    return {"version": "2.1.0-live-v2-submit", "status": status, "attempt_id": attempt_id, "ticket": ticket, "risk": risk, "receipt": redact_data(receipt), "network_attempted": bool(receipt.get("network_attempted"))}
 
 
 def cancel_live_v2_order(payload: dict[str, Any]) -> dict[str, Any]:
@@ -576,12 +719,12 @@ def cancel_live_v2_order(payload: dict[str, Any]) -> dict[str, Any]:
         blockers.append("Typed confirmation phrase did not match.")
     if blockers:
         record_audit("live_order_cancel", "blocked", order_id=order_id, details={"blockers": blockers, "reason": reason})
-        return {"version": "2.0.0-live-v2-cancel", "status": "blocked", "blockers": blockers, "network_attempted": False}
+        return {"version": "2.1.0-live-v2-cancel", "status": "blocked", "blockers": blockers, "network_attempted": False}
     attempt_id = f"v2can_{uuid4().hex[:12]}"
     receipt = FailClosedPolymarketClobAdapter().cancel_order(attempt_id=attempt_id, order_id=order_id)
     status = _text(receipt.get("status"), "cancel_failed")
     record_audit("live_order_cancel", status, order_id=order_id, details={"attempt_id": attempt_id, "reason": reason, "adapter_receipt": receipt}, network_attempted=bool(receipt.get("network_attempted")))
-    return {"version": "2.0.0-live-v2-cancel", "status": status, "attempt_id": attempt_id, "receipt": redact_data(receipt), "network_attempted": bool(receipt.get("network_attempted"))}
+    return {"version": "2.1.0-live-v2-cancel", "status": status, "attempt_id": attempt_id, "receipt": redact_data(receipt), "network_attempted": bool(receipt.get("network_attempted"))}
 
 
 def emergency_live_v2_action(payload: dict[str, Any]) -> dict[str, Any]:
@@ -596,7 +739,7 @@ def emergency_live_v2_action(payload: dict[str, Any]) -> dict[str, Any]:
         details["guardrail"] = "Preview only. Use targeted cancel after reviewing open orders."
         status = "preview_only"
     record_audit("emergency_control", status, details=details)
-    return {"version": "2.0.0-live-v2-emergency", "status": status, "action": action, "details": details}
+    return {"version": "2.1.0-live-v2-emergency", "status": status, "action": action, "details": details}
 
 
 def record_audit(action: str, status: str, *, ticket: dict[str, Any] | None = None, risk: dict[str, Any] | None = None, details: dict[str, Any] | None = None, order_id: str = "", network_attempted: bool = False) -> dict[str, Any]:
@@ -660,6 +803,26 @@ def audit_to_csv(rows: list[dict[str, Any]] | None = None) -> str:
     for row in rows:
         writer.writerow({field: json.dumps(row.get(field, ""), sort_keys=True) if isinstance(row.get(field), (dict, list)) else row.get(field, "") for field in AUDIT_CSV_FIELDS})
     return out.getvalue()
+
+
+def audit_to_markdown(rows: list[dict[str, Any]] | None = None, limit: int = 200) -> str:
+    rows = rows if rows is not None else list_audit_records(limit=limit)
+    lines = [f"# Live v2 Audit Report — {APP_VERSION}", "", f"Generated: {_now()}", "", "| Time | Mode | Action | Status | Market | Order | Notional | Network |", "|---|---|---|---|---|---|---:|---|"]
+    for row in rows[:limit]:
+        lines.append("| {timestamp} | {mode} | {action} | {status} | {market} | {order} | {notional} | {network} |".format(
+            timestamp=_text(row.get("timestamp")),
+            mode=_text(row.get("mode")),
+            action=_text(row.get("action")),
+            status=_text(row.get("status")),
+            market=_text(row.get("market_id"))[:18],
+            order=_text(row.get("order_id"))[:18],
+            notional=_text(row.get("notional")),
+            network=_text(row.get("network_attempted")),
+        ))
+    if not rows:
+        lines.append("| No audit rows yet |  |  |  |  |  |  |  |")
+    lines.extend(["", "Secrets are redacted before audit export. Runtime data is not included in release ZIPs."])
+    return "\n".join(lines) + "\n"
 
 
 async def search_live_v2_markets(query: str = "", limit: int = 25) -> dict[str, Any]:
@@ -740,6 +903,6 @@ def reconcile_live_v2_orders() -> dict[str, Any]:
         rows.append({"timestamp": row.get("timestamp"), "action": row.get("action"), "status": row.get("status"), "order_id": order_id, "state": state})
     for order_id in sorted(remote_ids - local_ids):
         rows.append({"timestamp": _now(), "action": "remote_open_order", "status": "unknown_local_record", "order_id": order_id, "state": "remote_only"})
-    report = {"version": "2.0.0-live-v2-reconciliation", "generated_at": _now(), "status": "ok" if not any(row["state"] != "remote_match" for row in rows) else "needs_review", "remote_status": remote.get("status") if isinstance(remote, dict) else "unknown", "remote_network_attempted": bool(remote.get("network_attempted")) if isinstance(remote, dict) else False, "items": rows}
+    report = {"version": "2.1.0-live-v2-reconciliation", "generated_at": _now(), "status": "ok" if not any(row["state"] != "remote_match" for row in rows) else "needs_review", "remote_status": remote.get("status") if isinstance(remote, dict) else "unknown", "remote_network_attempted": bool(remote.get("network_attempted")) if isinstance(remote, dict) else False, "items": rows}
     record_audit("live_reconciliation", report["status"], details=report, network_attempted=bool(report["remote_network_attempted"]))
     return report

@@ -70,17 +70,18 @@ NAV_SECTIONS: list[dict[str, Any]] = [
         ],
     },
     {
-        "label": "Live v2",
+        "label": "Live v2 Console",
         "items": [
-            {"label": "v2 Dashboard", "href": "/v2-live", "match": ["/v2-live"]},
-            {"label": "Readiness", "href": "/v2-live/readiness", "match": ["/v2-live/readiness"]},
-            {"label": "Market data", "href": "/v2-live/market-data", "match": ["/v2-live/market-data"]},
-            {"label": "Trade ticket", "href": "/v2-live/trade-ticket", "match": ["/v2-live/trade-ticket"]},
+            {"label": "Dashboard", "href": "/v2-live", "match": ["/v2-live"]},
+            {"label": "Markets", "href": "/v2-live/markets", "match": ["/v2-live/markets", "/v2-live/market-data"]},
+            {"label": "Trade Ticket", "href": "/v2-live/trade-ticket", "match": ["/v2-live/trade-ticket"]},
             {"label": "Orders", "href": "/v2-live/orders", "match": ["/v2-live/orders"]},
             {"label": "Positions", "href": "/v2-live/positions", "match": ["/v2-live/positions"]},
-            {"label": "Risk", "href": "/v2-live/risk", "match": ["/v2-live/risk"]},
+            {"label": "Risk", "href": "/v2-live/risk", "match": ["/v2-live/risk", "/v2-live/readiness"]},
             {"label": "Audit", "href": "/v2-live/audit", "match": ["/v2-live/audit"]},
+            {"label": "Settings", "href": "/v2-live/settings", "match": ["/v2-live/settings"]},
             {"label": "Emergency", "href": "/v2-live/emergency", "match": ["/v2-live/emergency"]},
+            {"label": "Docs", "href": "/v2-live/docs", "match": ["/v2-live/docs"]},
         ],
     },
     {
@@ -220,8 +221,8 @@ def build_global_safety_badges() -> list[dict[str, str]]:
 def build_quick_actions() -> list[dict[str, str]]:
     return [
         {"label": "Dashboard", "href": "/", "tone": "neutral"},
-        {"label": "Live v2", "href": "/v2-live", "tone": "danger"},
-        {"label": "CLOB adapter", "href": "/live-clob-adapter", "tone": "warning"},
+        {"label": "Live v2 Console", "href": "/v2-live", "tone": "danger"},
+        {"label": "Kill Switch", "href": "/v2-live/emergency", "tone": "warning"},
         {"label": "Training Lab", "href": "/training", "tone": "info"},
         {"label": "Data Lab", "href": "/data", "tone": "local"},
         {"label": "Runbook", "href": "/operator-runbook", "tone": "ok"},
@@ -233,7 +234,7 @@ def console_globals() -> dict[str, Any]:
         "app_version": APP_VERSION,
         "app_version_short": APP_VERSION_SHORT,
         "nav_sections": NAV_SECTIONS,
-        "app_safety_posture": "Mobile-friendly local-first operator console. v2.0.0 adds a guarded live-trading control plane with live data reads, trade-ticket preview, approval gates, risk checks, CLOB submit/cancel boundaries, positions, reconciliation, emergency controls, and audit exports while preserving fail-closed defaults and operator-only execution gates.",
+        "app_safety_posture": "Mobile-friendly local-first operator console. v2.1.0 adds a decluttered, faster live-trading operator console with live data reads, trade-ticket preview, approval gates, risk checks, CLOB submit/cancel boundaries, positions, reconciliation, emergency controls, and audit exports while preserving fail-closed defaults and operator-only execution gates.",
         "global_safety_badges": build_global_safety_badges(),
         "quick_actions": build_quick_actions(),
     }

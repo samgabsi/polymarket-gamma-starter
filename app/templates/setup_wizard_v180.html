@@ -2,7 +2,7 @@
 {% block title %}Setup Wizard{% endblock %}
 {% block breadcrumbs %}<a href="/">Overview</a> / <span>Setup</span> / <span>Wizard</span>{% endblock %}
 {% block content %}
-<section class="page-header"><div><p class="eyebrow">v2.0.0 · PRESET-DRIVEN SETUP</p><h1>Guided Setup Wizard</h1><p class="page-subtitle">Choose an operator mode, preview the .env diff, then apply only after validation. Presets do not enable autonomous live trading or bypass manual gates.</p></div></section>
+<section class="page-header"><div><p class="eyebrow">v2.1.0 · PRESET-DRIVEN SETUP</p><h1>Guided Setup Wizard</h1><p class="page-subtitle">Choose an operator mode, preview the .env diff, then apply only after validation. Presets do not enable autonomous live trading or bypass manual gates.</p></div></section>
 <div class="callout warning"><strong>Confirmation rule:</strong> dangerous live/execution-facing enabling values require this phrase: <code>{{ confirmation_phrase }}</code>. Most safe presets do not need it.</div>
 <div class="action-bar"><a class="button-link" href="/settings/configuration">Full configuration console</a><a class="button-link quiet" href="/setup/status">Runtime status</a><a class="button-link quiet" href="/api/config/presets">Presets JSON</a></div>
 {% if save_result %}<section class="content-card"><h2>Apply result</h2>{% if save_result.ok and save_result.saved %}<div class="callout ok"><strong>Preset applied.</strong> Backup: {{ save_result.backup_file or 'created new .env' }} · Audit: {{ save_result.audit_file }}. Restart the app for process-level values to take effect.</div>{% else %}<div class="callout danger"><strong>Preset not applied.</strong> Resolve blockers below.</div>{% endif %}</section>{% endif %}

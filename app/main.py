@@ -69,7 +69,9 @@ from .live_trading import autonomous_runs_to_csv, build_autonomous_run_preview, 
 from .live_clob_adapter import build_clob_adapter_status, clob_adapter_status_to_csv
 from .live_v2 import (
     audit_to_csv as live_v2_audit_to_csv,
+    audit_to_markdown as live_v2_audit_to_markdown,
     build_live_v2_readiness,
+    build_live_v2_settings_sections,
     build_live_v2_status,
     build_live_v2_ticket_preview,
     cancel_live_v2_order,
@@ -81,6 +83,7 @@ from .live_v2 import (
     reconcile_live_v2_orders,
     search_live_v2_markets,
     submit_live_v2_order,
+    validate_live_v2_settings_payload,
 )
 from .live_ops import build_live_adapter_verification, build_live_readiness_checklist, build_operator_runbook, live_adapter_verification_to_csv, live_readiness_checklist_to_csv
 from .market_data import build_execution_quality_board, build_execution_quality_simulation, build_market_data_board, execution_quality_to_csv, fetch_market_data_preview, get_execution_quality_simulation, get_market_snapshot, list_execution_quality_simulations, list_market_snapshots, market_data_alerts, market_snapshots_to_csv, parse_orderbook_metrics, record_execution_quality_simulation, record_market_snapshot, summarize_execution_quality, summarize_market_data
@@ -1146,82 +1149,87 @@ async def live_manual_cancel_create_api(
 
 
 
+
+def _live_v2_template_context(request: Request, section: str, audit_limit: int = 25) -> dict[str, Any]:
+    status = build_live_v2_status()
+    return {
+        "request": request,
+        "section": section,
+        "status": status,
+        "ui": status.get("ui", {}),
+        "audit_rows": list_live_v2_audit_records(limit=audit_limit),
+        "settings_sections": build_live_v2_settings_sections(),
+        "user": current_user(request),
+    }
+
+
 @app.get("/v2-live", response_class=HTMLResponse)
 async def live_v2_console(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {
-            "request": request,
-            "section": "dashboard",
-            "status": build_live_v2_status(),
-            "audit_rows": list_live_v2_audit_records(limit=25),
-            "user": current_user(request),
-        },
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "dashboard", 25))
 
 
 @app.get("/v2-live/readiness", response_class=HTMLResponse)
 async def live_v2_readiness_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "readiness", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "readiness", 25))
 
 
+@app.get("/v2-live/markets", response_class=HTMLResponse)
 @app.get("/v2-live/market-data", response_class=HTMLResponse)
 async def live_v2_market_data_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "market_data", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "market_data", 25))
 
 
 @app.get("/v2-live/trade-ticket", response_class=HTMLResponse)
 async def live_v2_trade_ticket_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "trade_ticket", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "trade_ticket", 25))
 
 
 @app.get("/v2-live/orders", response_class=HTMLResponse)
 async def live_v2_orders_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "orders", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=100), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "orders", 100))
 
 
 @app.get("/v2-live/positions", response_class=HTMLResponse)
 async def live_v2_positions_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "positions", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "positions", 25))
 
 
 @app.get("/v2-live/risk", response_class=HTMLResponse)
 async def live_v2_risk_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "risk", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "risk", 25))
 
 
 @app.get("/v2-live/audit", response_class=HTMLResponse)
 async def live_v2_audit_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "audit", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=200), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "audit", 200))
+
+
+@app.get("/v2-live/settings", response_class=HTMLResponse)
+async def live_v2_settings_page(request: Request):
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "settings", 25))
 
 
 @app.get("/v2-live/emergency", response_class=HTMLResponse)
 async def live_v2_emergency_page(request: Request):
-    return templates.TemplateResponse(
-        "live_v2_dashboard.html",
-        {"request": request, "section": "emergency", "status": build_live_v2_status(), "audit_rows": list_live_v2_audit_records(limit=25), "user": current_user(request)},
-    )
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "emergency", 25))
+
+
+@app.get("/v2-live/docs", response_class=HTMLResponse)
+async def live_v2_docs_page(request: Request):
+    return templates.TemplateResponse("live_v2_dashboard.html", _live_v2_template_context(request, "docs", 25))
+
+
+
+
+@app.get("/docs/{doc_path:path}", response_class=PlainTextResponse)
+async def docs_file(doc_path: str):
+    docs_root = (APP_DIR.parent / "docs").resolve()
+    candidate = (docs_root / doc_path).resolve()
+    if docs_root not in candidate.parents and candidate != docs_root:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if not candidate.exists() or not candidate.is_file() or candidate.suffix.lower() not in {".md", ".txt"}:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return PlainTextResponse(candidate.read_text(encoding="utf-8"), media_type="text/plain; charset=utf-8")
 
 
 @app.get("/api/v2/live/status")
@@ -1283,6 +1291,21 @@ async def api_live_v2_audit(limit: int = 200):
 @app.get("/api/v2/live/audit.csv", response_class=PlainTextResponse)
 async def api_live_v2_audit_csv():
     return live_v2_audit_to_csv(list_live_v2_audit_records(limit=10000))
+
+
+@app.get("/api/v2/live/audit.md", response_class=PlainTextResponse)
+async def api_live_v2_audit_markdown():
+    return live_v2_audit_to_markdown(list_live_v2_audit_records(limit=500))
+
+
+@app.get("/api/v2/live/settings/schema")
+async def api_live_v2_settings_schema():
+    return {"version": APP_VERSION, "sections": build_live_v2_settings_sections(), "secret_values_returned": False}
+
+
+@app.post("/api/v2/live/settings/validate")
+async def api_live_v2_settings_validate(payload: dict[str, Any] = Body(default_factory=dict)):
+    return validate_live_v2_settings_payload(payload)
 
 
 @app.post("/api/v2/live/emergency")

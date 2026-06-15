@@ -1,4 +1,4 @@
-# Environment Variables Reference — v2.0.0-real
+# Environment Variables Reference — v2.1.0-real
 
 ## v2 control-plane mode
 

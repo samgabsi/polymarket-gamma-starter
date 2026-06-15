@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.1.0-real
+
+- Redesigned the Live v2 UI into a cleaner, faster operator console with compact task navigation.
+- Added a persistent status bar showing version, mode, live armed state, read-only state, kill switch, readiness, Gamma/CLOB posture, refresh time, and recent critical issue.
+- Reworked dashboard, markets, trade ticket, orders, positions, risk, audit, settings, emergency, and docs areas with progressive disclosure and explicit refresh actions.
+- Added settings schema/validation endpoints and a grouped settings UI that never returns secret values.
+- Added Markdown audit export and in-app markdown docs serving.
+- Added UI route smoke tests and validation tests while preserving all v2.0 live-trading backend gates and fail-closed defaults.
+
 ## v2.0.0-real
 
 - Added guarded Live Trading v2 console and API namespace.

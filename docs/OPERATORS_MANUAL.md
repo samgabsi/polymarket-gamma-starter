@@ -83,7 +83,7 @@ Recommended flow:
 
 The settings UX is guidance and configuration only. It does not live-trade, submit/cancel orders, sign messages, touch wallets, run shell commands, run pip, mutate the venv, leak secrets, or bypass manual review.
 
-## v2.0.0-real Live Trading Control Plane
+## v2.1.0-real Live Trading Control Plane
 
 The Version 2 workflow begins at `/v2-live`. The operator should move in this order:
 
@@ -99,3 +99,9 @@ The Version 2 workflow begins at `/v2-live`. The operator should move in this or
 10. Use `/v2-live/emergency` to record emergency actions and then persist environment changes through settings or `.env`.
 
 Live trading remains fail-closed: no default setting enables real submit/cancel, tests do not place orders, and the app does not bypass Polymarket terms, geography, KYC, funding, allowance, wallet, or account restrictions.
+
+## v2.1.0-real UI/UX operator console
+
+`v2.1.0-real` reorganizes the Live v2 area into a cleaner task-based console without weakening any live-trading gate. Use `/v2-live` for the overview, `/v2-live/markets` for public market/order-book data, `/v2-live/trade-ticket` for the step-by-step ticket workflow, `/v2-live/risk` for readiness and blockers, `/v2-live/audit` for ledger exports, `/v2-live/settings` for grouped configuration review/validation, and `/v2-live/emergency` for kill-switch and emergency action receipts.
+
+The persistent Live v2 status bar should be checked before any ticket work. It shows mode, live armed state, read-only state, kill switch, readiness, Gamma/CLOB posture, and recent issue state. If any status is unknown or blocked, treat live submission as unavailable until investigated.
