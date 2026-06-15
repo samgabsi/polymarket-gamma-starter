@@ -6,8 +6,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-APP_VERSION = "1.7.0-real"
-APP_VERSION_SHORT = "1.7.0"
+APP_VERSION = "1.9.0-real"
+APP_VERSION_SHORT = "1.9.0"
 APP_DIR = PROJECT_ROOT / "app"
 DATA_DIR = PROJECT_ROOT / "data"
 
@@ -26,14 +26,14 @@ class Settings:
     live_trading_enabled: bool = os.getenv("LIVE_TRADING_ENABLED", "false").lower() in {"1", "true", "yes", "on"}
 
     # Server binding. Use 0.0.0.0 to allow other LAN devices to reach the app.
-    host: str = os.getenv("HOST", os.getenv("APP_HOST", "0.0.0.0"))
+    host: str = os.getenv("HOST", os.getenv("APP_HOST", "127.0.0.1"))
     port: int = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
     reload: bool = os.getenv("APP_RELOAD", "true").lower() in {"1", "true", "yes", "on"}
 
     # LAN/security controls. ALLOWED_HOSTS="*" is convenient for LAN testing.
     # For a fixed LAN deployment, set this to comma-separated hostnames/IPs,
     # for example: 127.0.0.1,localhost,192.168.1.50
-    allowed_hosts: list[str] = [item.strip() for item in os.getenv("ALLOWED_HOSTS", "*").split(",") if item.strip()]
+    allowed_hosts: list[str] = [item.strip() for item in os.getenv("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",") if item.strip()]
     security_headers_enabled: bool = os.getenv("SECURITY_HEADERS_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
     session_cookie_secure: bool = os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes", "on"}
     session_cookie_same_site: str = os.getenv("SESSION_COOKIE_SAMESITE", "lax")
