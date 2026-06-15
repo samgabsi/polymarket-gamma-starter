@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Setup Wizard{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Setup</span> / <span>Wizard</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">v1.8.0 · PRESET-DRIVEN SETUP</p><h1>Guided Setup Wizard</h1><p class="page-subtitle">Choose an operator mode, preview the .env diff, then apply only after validation. Presets do not enable autonomous live trading or bypass manual gates.</p></div></section>
+<div class="callout warning"><strong>Confirmation rule:</strong> dangerous live/execution-facing enabling values require this phrase: <code>{{ confirmation_phrase }}</code>. Most safe presets do not need it.</div>
+<div class="action-bar"><a class="button-link" href="/settings/configuration">Full configuration console</a><a class="button-link quiet" href="/setup/status">Runtime status</a><a class="button-link quiet" href="/api/config/presets">Presets JSON</a></div>
+{% if save_result %}<section class="content-card"><h2>Apply result</h2>{% if save_result.ok and save_result.saved %}<div class="callout ok"><strong>Preset applied.</strong> Backup: {{ save_result.backup_file or 'created new .env' }} · Audit: {{ save_result.audit_file }}. Restart the app for process-level values to take effect.</div>{% else %}<div class="callout danger"><strong>Preset not applied.</strong> Resolve blockers below.</div>{% endif %}</section>{% endif %}
+<section class="content-card">
+  <form method="post" action="/setup/wizard">
+    <h2>Choose preset</h2>
+    <div class="preset-grid">
+      {% for preset in presets %}
+      <label class="preset-card"><input type="radio" name="preset_id" value="{{ preset.preset_id }}" {% if preset.preset_id == selected_preset_id %}checked{% endif %}><strong>{{ preset.label }}</strong><span>{{ preset.description }}</span></label>
+      {% endfor %}
+    </div>
+    <label for="wizard-confirmation">Dangerous-change confirmation phrase</label>
+    <input id="wizard-confirmation" name="confirmation" type="text" placeholder="{{ confirmation_phrase }}" autocomplete="off">
+    <div class="action-bar"><button class="button-link" name="intent" value="preview" type="submit">Preview preset diff</button><button class="button-link danger" name="intent" value="apply" type="submit">Apply validated preset</button></div>
+  </form>
+</section>
+{% if diff_result %}<section class="content-card"><h2>Preset diff preview</h2>{% if diff_result.validation.blockers %}<div class="callout danger"><strong>Blockers:</strong><ul>{% for item in diff_result.validation.blockers %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}{% if diff_result.validation.warnings %}<div class="callout warning"><strong>Warnings:</strong><ul>{% for item in diff_result.validation.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}{% if diff_result.diff %}<div class="table-wrap"><table><thead><tr><th>Key</th><th>Old</th><th>New</th><th>Source</th><th>Restart</th></tr></thead><tbody>{% for row in diff_result.diff %}<tr><td><code>{{ row.key }}</code><br><span class="muted small">{{ row.label }}</span></td><td>{{ row.old_displayed_value }}</td><td>{{ row.new_displayed_value }}</td><td>{{ row.source }}</td><td>{{ 'yes' if row.restart_required else 'no' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No changes in this preset.</p>{% endif %}</section>{% endif %}
+{% endblock %}

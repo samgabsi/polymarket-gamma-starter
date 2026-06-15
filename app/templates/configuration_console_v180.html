@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}GUI Configuration Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Settings</span> / <span>Configuration console</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">v1.8.0 · GUI-FIRST CONFIGURATION · SAFE .ENV EDITING</p>
+    <h1>Configuration & Environment Setup Console</h1>
+    <p class="page-subtitle">Turn supported environment, runtime, training, data, paper, live-readiness, and LAN options into guided controls. Text entry is reserved for paths, URLs, labels, hostnames, secrets, and other values that cannot safely be constrained.</p>
+  </div>
+</section>
+
+<div class="callout warning"><strong>Safety posture:</strong> This console writes supported .env keys only after validation and diff preview. It never executes shell commands, never mutates venv packages, never exposes full secrets, and never bypasses manual review or live-trading gates. Training outputs remain manual_review_only=true and can_live_trade=false.</div>
+
+<section class="content-card">
+  <h2>Configuration routes</h2>
+  <div class="action-bar">
+    <a class="button-link" href="/settings/configuration">Configuration console</a>
+    <a class="button-link quiet" href="/setup/wizard">Setup wizard</a>
+    <a class="button-link quiet" href="/setup/status">Runtime / venv status</a>
+    <a class="button-link quiet" href="/api/config/schema">Schema JSON</a>
+    <a class="button-link quiet" href="/api/config/status">Status JSON</a>
+    <a class="button-link quiet" href="/api/config/export-sanitized">Sanitized export</a>
+    <a class="button-link quiet" href="/api/config/export-sanitized.env">Sanitized .env template</a>
+  </div>
+</section>
+
+{% if save_result %}
+<section class="content-card">
+  <h2>Save result</h2>
+  {% if save_result.ok and save_result.saved %}
+    <div class="callout ok"><strong>Saved.</strong> Backup: {{ save_result.backup_file or 'created new .env' }} · Audit: {{ save_result.audit_file }}. Restart the app for process-level values to take effect.</div>
+  {% else %}
+    <div class="callout danger"><strong>Not saved.</strong> Resolve blockers below and preview again.</div>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if diff_result %}
+<section class="content-card">
+  <h2>Pending configuration diff</h2>
+  {% if diff_result.validation.blockers %}<div class="callout danger"><strong>Blockers:</strong><ul>{% for item in diff_result.validation.blockers %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if diff_result.validation.warnings %}<div class="callout warning"><strong>Warnings:</strong><ul>{% for item in diff_result.validation.warnings %}<li>{{ item }}</li>{% endfor %}</ul></div>{% endif %}
+  {% if diff_result.diff %}
+  <div class="table-wrap"><table><thead><tr><th>Key</th><th>Old</th><th>New</th><th>Source</th><th>Restart</th><th>Flags</th></tr></thead><tbody>
+    {% for row in diff_result.diff %}<tr><td><code>{{ row.key }}</code><br><span class="muted small">{{ row.label }}</span></td><td>{{ row.old_displayed_value }}</td><td>{{ row.new_displayed_value }}</td><td>{{ row.source }}</td><td>{{ 'yes' if row.restart_required else 'no' }}</td><td>{% if row.dangerous %}<span class="status-badge tone-danger">dangerous</span>{% endif %}{% if row.secret %}<span class="status-badge tone-neutral">secret</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<p class="empty-state">No changes selected.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="content-card">
+  <h2>Runtime/setup summary</h2>
+  <section class="metric-grid">
+    <article class="metric-card"><strong>{{ status.option_count }}</strong><span>Schema-backed options</span></article>
+    <article class="metric-card"><strong>{{ 'yes' if setup_status.virtual_environment_detected else 'no' }}</strong><span>Venv detected</span></article>
+    <article class="metric-card"><strong>{{ 'yes' if status.env_present else 'no' }}</strong><span>.env present</span></article>
+    <article class="metric-card"><strong>{{ 'yes' if status.env_example_present else 'no' }}</strong><span>.env.example present</span></article>
+  </section>
+  <p class="help-text">Current .env path: <code>{{ status.env_path }}</code>. Backups are runtime-only under <code>{{ status.backup_dir }}</code>.</p>
+</section>
+
+<form method="post" action="/settings/configuration">
+  <section class="content-card">
+    <h2>Save controls</h2>
+    <p class="help-text">Use Preview diff first. Saving creates a timestamped backup, preserves unknown keys where practical, masks secrets in audit logs, and requires app restart for process-level values.</p>
+    <label for="confirmation">Dangerous-change confirmation phrase</label>
+    <input id="confirmation" name="confirmation" type="text" placeholder="{{ confirmation_phrase }}" autocomplete="off">
+    <div class="action-bar">
+      <button class="button-link" type="submit" name="intent" value="preview">Preview diff</button>
+      <button class="button-link danger" type="submit" name="intent" value="save">Save validated .env changes</button>
+      <a class="button-link quiet" href="/setup/wizard">Use preset wizard instead</a>
+    </div>
+  </section>
+
+  {% for group, options in status.groups.items() %}
+  <section class="content-card config-group" id="group-{{ group|replace(' ', '-')|lower }}">
+    <h2>{{ group }}</h2>
+    <div class="config-grid">
+      {% for option in options %}
+      <article class="config-option" id="{{ option.anchor }}">
+        <header class="config-option-header">
+          <h3>{{ option.label }}</h3>
+          <code>{{ option.key }}</code>
+        </header>
+        <p class="help-text">{{ option.description }}</p>
+        <p class="muted small">{{ option.help_text }}</p>
+        <div class="config-flags">
+          <span class="status-badge tone-neutral">{{ option.control }}</span>
+          {% if option.restart_required %}<span class="status-badge tone-warning">restart</span>{% endif %}
+          {% if option.secret %}<span class="status-badge tone-neutral">secret</span>{% endif %}
+          {% if option.advanced %}<span class="status-badge tone-info">advanced</span>{% endif %}
+          {% if option.dangerous %}<span class="status-badge tone-danger">dangerous</span>{% endif %}
+          {% if option.affects_training_jobs %}<span class="status-badge tone-local">training/data</span>{% endif %}
+          {% if option.affects_live_trading %}<span class="status-badge tone-danger">live-related</span>{% endif %}
+          {% if option.affects_lan_exposure %}<span class="status-badge tone-warning">LAN</span>{% endif %}
+        </div>
+
+        {% if option.control == 'toggle' %}
+          <input type="hidden" name="cfg__{{ option.key }}" value="false">
+          <label class="toggle-row"><input type="checkbox" name="cfg__{{ option.key }}" value="true" {% if option.current_value in ['true','1','yes','on'] %}checked{% endif %}> Enabled / true</label>
+        {% elif option.control == 'radio' %}
+          <div class="radio-stack">
+          {% for allowed in option.allowed_values %}
+            <label><input type="radio" name="cfg__{{ option.key }}" value="{{ allowed }}" {% if option.current_value == allowed %}checked{% endif %}> {{ allowed }}</label>
+          {% endfor %}
+          </div>
+        {% elif option.control == 'select' %}
+          <select name="cfg__{{ option.key }}">
+            {% for allowed in option.allowed_values %}<option value="{{ allowed }}" {% if option.current_value == allowed %}selected{% endif %}>{{ allowed }}</option>{% endfor %}
+          </select>
+        {% elif option.control == 'multi_select' %}
+          {% set selected_values = option.current_value.split(',') if option.current_value else [] %}
+          <div class="checkbox-grid">
+          {% for allowed in option.allowed_values %}
+            <label><input type="checkbox" name="cfg__{{ option.key }}" value="{{ allowed }}" {% if allowed in selected_values %}checked{% endif %}> {{ allowed }}</label>
+          {% endfor %}
+          </div>
+        {% elif option.control == 'number' %}
+          <input type="number" name="cfg__{{ option.key }}" value="{{ option.current_value }}" {% if option.min_value is not none %}min="{{ option.min_value }}"{% endif %} {% if option.max_value is not none %}max="{{ option.max_value }}"{% endif %} {% if option.step is not none %}step="{{ option.step }}"{% endif %}>
+        {% elif option.control == 'masked_secret' %}
+          <input type="password" name="cfg__{{ option.key }}" value="" placeholder="{{ option.current_value or 'blank / not set' }}" autocomplete="off">
+          <p class="muted small">Leave blank to preserve the current saved secret value.</p>
+        {% else %}
+          <input type="text" name="cfg__{{ option.key }}" value="{{ option.current_value }}" placeholder="{{ option.default_value }}">
+        {% endif %}
+
+        <details>
+          <summary>Validation and source details</summary>
+          <ul>
+            <li>Source: {{ option.source }}</li>
+            <li>Saved .env value: {{ option.saved_env_value or '(blank)' }}</li>
+            <li>Default: {{ option.default_value or '(blank)' }}</li>
+            {% for rule in option.validation_rules %}<li>{{ rule }}</li>{% endfor %}
+            {% for warning in option.warning_messages %}<li class="warning-text">{{ warning }}</li>{% endfor %}
+            {% for blocker in option.blocker_messages %}<li class="danger-text">{{ blocker }}</li>{% endfor %}
+          </ul>
+        </details>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endfor %}
+</form>
+{% endblock %}
