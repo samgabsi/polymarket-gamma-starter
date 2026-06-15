@@ -1,0 +1,52 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Review Queue - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { max-width: 1200px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
+    .muted { color: #666; }
+    .pill { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin-right: 6px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <h1>Review Queue</h1>
+  <p class="muted">Actionable workflow: evidence → thesis → risk review → paper candidate.</p>
+  <p><a href="/">Dashboard</a> · <a href="/opportunities">Opportunities</a> · <a href="/api/review-queue">JSON</a></p>
+  <table>
+    <thead>
+      <tr><th>Priority</th><th>Market</th><th>Stage</th><th>Action</th><th>Signals</th><th>Reason</th></tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr>
+        <td>{{ "%.2f"|format(item.priority * 100) }}</td>
+        <td><a href="/markets/{{ item.market_id }}">{{ item.title }}</a><br><span class="muted">{{ item.market_id }}</span></td>
+        <td><span class="pill">{{ item.stage }}</span></td>
+        <td>{{ item.action }}</td>
+        <td>
+          Edge: {{ "%.1f"|format(item.edge * 100) }}%<br>
+          Confidence: {{ "%.1f"|format(item.confidence * 100) }}%<br>
+          Evidence: {{ "%.1f"|format(item.evidence_score * 100) }}%<br>
+          Thesis: {{ "%.1f"|format(item.thesis_score * 100) }}%<br>
+          Risk: {{ "%.1f"|format(item.risk_score * 100) }}%
+        </td>
+        <td>{{ item.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

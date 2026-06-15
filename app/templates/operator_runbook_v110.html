@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Operator Runbook{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/live-trading">Live trading</a> / <span>Operator runbook</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">v1.1.0 live ops</p><h1>Operator runbook</h1><p class="page-subtitle">Practical live-operations checklist for safe local-first Polymarket operation. This page is instructional only; it never enables live trading, starts a scheduler, submits, cancels, signs, or touches wallets.</p></div></section>
+<div class="callout danger"><strong>Safety posture:</strong> keep live trading, autonomous trading, real network, submit, cancel, and scheduler disabled unless every checklist item has been reviewed by a human operator.</div>
+<section class="metric-grid"><article class="metric-card"><strong>{{ runbook.overall_status }}</strong><span>Runbook status</span></article><article class="metric-card"><strong>{{ runbook.adapter_verification_status }}</strong><span>Adapter verification</span></article><article class="metric-card"><strong>{{ runbook.reconciliation_status }}</strong><span>Reconciliation</span></article><article class="metric-card"><strong>{{ runbook.autonomous_status }}</strong><span>Autonomous status</span></article></section>
+<section class="content-card"><h2>Step-by-step procedure</h2><div class="table-wrap"><table><thead><tr><th>Step</th><th>Title</th><th>Instruction</th></tr></thead><tbody>{% for step in runbook.steps %}<tr><td>{{ step.step }}</td><td>{{ step.title }}</td><td>{{ step.instruction }}</td></tr>{% endfor %}</tbody></table></div></section>
+<section class="content-card"><h2>Guardrail</h2><p>{{ runbook.guardrail }}</p><div class="action-bar"><a class="button-link" href="/live-trading">Live readiness</a><a class="button-link quiet" href="/live-clob-adapter">Adapter verification</a><a class="button-link quiet" href="/live-reconciliation">Reconciliation</a><a class="button-link quiet" href="/api/operator-runbook">JSON</a></div></section>
+{% endblock %}

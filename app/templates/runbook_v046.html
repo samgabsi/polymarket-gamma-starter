@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Operator Runbook - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper operator runbook · v0.5.11 · local simulation only</p>
+        <h1>Paper Operator Runbook</h1>
+        <p class="muted">A generated human checklist that pulls together entry execution queue items, exit tickets, settlement candidates, risk-budget flags, and post-trade review flags.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/execution-queue">Execution queue</a> <a href="/approvals">Approvals</a> <a href="/exit-tickets">Exit tickets</a> <a href="/settlements">Settlements</a> <a href="/review-report">Review report</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/paper-handoffs">Handoffs</a> <a href="/audit?category=operator_runbook">Runbook audit</a> <a href="/api/paper/runbook">JSON</a> <a href="/api/paper/runbook.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Item ID <input name="item_id" value="{{ item_id }}" placeholder="entry:pt_... or exit:px_..."></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Scope
+          <select name="scope">
+            <option value="" {% if not scope %}selected{% endif %}>all</option>
+            <option value="entry_execution" {% if scope == 'entry_execution' %}selected{% endif %}>entry_execution</option>
+            <option value="exit_execution" {% if scope == 'exit_execution' %}selected{% endif %}>exit_execution</option>
+            <option value="settlement" {% if scope == 'settlement' %}selected{% endif %}>settlement</option>
+            <option value="risk_budget" {% if scope == 'risk_budget' %}selected{% endif %}>risk_budget</option>
+            <option value="post_trade_review" {% if scope == 'post_trade_review' %}selected{% endif %}>post_trade_review</option>
+          </select>
+        </label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all active</option>
+            <option value="ready" {% if status == 'ready' %}selected{% endif %}>ready</option>
+            <option value="action_required" {% if status == 'action_required' %}selected{% endif %}>action_required</option>
+            <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="review" {% if status == 'review' %}selected{% endif %}>review</option>
+            <option value="acknowledged" {% if status == 'acknowledged' %}selected{% endif %}>acknowledged</option>
+            <option value="skipped" {% if status == 'skipped' %}selected{% endif %}>skipped</option>
+            <option value="completed" {% if status == 'completed' %}selected{% endif %}>completed</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <label><input type="checkbox" name="include_completed" value="true" {% if include_completed %}checked{% endif %}> include completed</label>
+        <button type="submit">Filter runbook</button>
+      </form>
+    </header>
+
+    <section class="notice">{{ guardrail }}</section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Active items</span></div>
+      <div><strong>{{ summary.ready or 0 }}</strong><span>Ready</span></div>
+      <div><strong>{{ summary.action_required or 0 }}</strong><span>Action required</span></div>
+      <div><strong>{{ summary.blocked or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>{{ summary.review or 0 }}</strong><span>Review</span></div>
+      <div><strong>{{ acknowledgement_count or 0 }}</strong><span>Acknowledgements</span></div>
+      <div><strong>{{ summary.market_count or 0 }}</strong><span>Markets</span></div>
+      <div><strong>${{ '{:,.2f}'.format(summary.ready_entry_stake or 0) }}</strong><span>Ready entry stake</span></div>
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Runbook item: {{ detail.item_id }}</h2>
+      <p><strong>{{ detail.title }}</strong></p>
+      <section class="stats mini">
+        <div><strong>{{ detail.effective_status or detail.status }}</strong><span>Status</span></div>
+        <div><strong>{{ detail.scope }}</strong><span>Scope</span></div>
+        <div><strong>{{ detail.priority }}</strong><span>Priority</span></div>
+        <div><strong>{{ detail.recommended_action }}</strong><span>Action</span></div>
+      </section>
+      {% if detail.detail %}<p>{{ detail.detail }}</p>{% endif %}
+      {% if detail.checklist %}
+      <h3>Checklist</h3>
+      <ol class="compact">
+        {% for step in detail.checklist %}
+        <li><strong>{{ step.step }}</strong>{% if step.required %} <span class="pill">required</span>{% endif %}<br><span class="muted">{{ step.state }}</span></li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      <p class="muted">
+        {% for label, url in detail.links.items() %}<a href="{{ url }}">{{ label }}</a>{% if not loop.last %} · {% endif %}{% endfor %}
+      </p>
+      <form method="post" action="/runbook/ack" class="inline-form">
+        <input type="hidden" name="item_id" value="{{ detail.item_id }}">
+        <select name="status">
+          <option value="done">done</option>
+          <option value="needs_followup">needs_followup</option>
+          <option value="skipped">skipped</option>
+        </select>
+        <input name="note" placeholder="operator note" style="min-width:360px">
+        <button type="submit">Record acknowledgement</button>
+      </form>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Runbook queue</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Priority</th><th>Status</th><th>Scope</th><th>Item</th><th>Market</th><th>Recommended action</th><th>Checklist</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td>{{ row.priority }}</td>
+            <td><span class="pill">{{ row.effective_status or row.status }}</span>{% if row.acknowledgement_status %}<br><span class="muted small">ack: {{ row.acknowledgement_status }}</span>{% endif %}</td>
+            <td>{{ row.scope }}</td>
+            <td><a href="/runbook?item_id={{ row.item_id | urlencode }}"><strong>{{ row.item_id }}</strong></a><br><span class="muted small">{{ row.title }}</span></td>
+            <td>{% if row.market_id %}<a href="/markets/{{ row.market_id }}">{{ row.question }}</a><br><span class="muted small">{{ row.market_id }}</span>{% else %}<span class="muted">portfolio</span>{% endif %}</td>
+            <td>{{ row.recommended_action }}{% if row.detail %}<br><span class="muted small">{{ row.detail }}</span>{% endif %}</td>
+            <td>{{ row.checklist_required }}/{{ row.checklist_total }} required</td>
+            <td>{% for label, url in row.links.items() %}<a href="{{ url }}">{{ label }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No active runbook items match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Recent acknowledgements</h2>
+      {% if acknowledgements %}
+      <table>
+        <thead><tr><th>Time</th><th>Status</th><th>Item</th><th>Scope</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for row in acknowledgements %}
+          <tr>
+            <td><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td><a href="/runbook?item_id={{ row.item_id | urlencode }}">{{ row.item_id }}</a></td>
+            <td>{{ row.scope }}</td>
+            <td>{{ row.note or row.recommended_action_at_ack }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No runbook acknowledgements yet.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

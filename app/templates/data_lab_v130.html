@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Data Ingestion & Dataset Builder{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Data system</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">v1.6.0 · DATA INGESTION · SCOPED BACKFILL · CATEGORY DATASETS</p>
+    <h1>Market Data Ingestion & Dataset Builder</h1>
+    <p class="page-subtitle">Local-first data sources, scoped historical backfills, raw snapshots, normalized records, labels, category datasets, manifests, and reproducible Training Lab dataset builds.</p>
+  </div>
+</section>
+<div class="callout warning"><strong>Safety guardrail:</strong> {{ guardrail }}. Data collection does not trade, labels can be wrong, and generated datasets only feed Training Lab workflows.</div>
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ status.source_count }}</strong><span>Data sources</span></article>
+  <article class="metric-card"><strong>{{ status.ingestion_job_count }}</strong><span>Ingestion jobs</span></article>
+  <article class="metric-card"><strong>{{ status.raw_snapshot_count }}</strong><span>Raw snapshots</span></article>
+  <article class="metric-card"><strong>{{ status.normalized_record_count }}</strong><span>Normalized records</span></article>
+  <article class="metric-card"><strong>{{ status.label_count }}</strong><span>Labels</span></article>
+  <article class="metric-card"><strong>{{ status.dataset_build_count }}</strong><span>Dataset builds</span></article>
+</section>
+<section class="content-card">
+  <h2>Data navigation</h2>
+  <div class="action-bar">
+    <a class="button-link" href="/data">Overview</a>
+    <a class="button-link quiet" href="/data/sources">Sources</a>
+    <a class="button-link quiet" href="/data/internet-sources">Internet sources</a>
+    <a class="button-link quiet" href="/data/internet-ingestion">Internet ingestion</a>
+    <a class="button-link quiet" href="/data/internet-workflow">Internet workflow</a>
+    <a class="button-link quiet" href="/data/scopes">Scopes</a>
+    <a class="button-link quiet" href="/data/backfills">Backfills</a>
+    <a class="button-link quiet" href="/training/category-datasets">Category datasets</a>
+    <a class="button-link quiet" href="/data/ingestion">Ingestion</a>
+    <a class="button-link quiet" href="/data/snapshots">Snapshots</a>
+    <a class="button-link quiet" href="/data/normalized">Normalized</a>
+    <a class="button-link quiet" href="/data/labels">Labels</a>
+    <a class="button-link quiet" href="/training/dataset-builder">Dataset builder</a>
+    <a class="button-link quiet" href="/training">Training Lab</a>
+  </div>
+</section>
+
+{% if page in ['overview','scopes'] %}
+<section class="content-card">
+  <h2>Market/category scope registry</h2>
+  <p class="help-text">Reusable scopes keep medium-large training data focused by category, market IDs, condition IDs, date range, volume, and liquidity filters.</p>
+  <div class="callout"><strong>Guardrail:</strong> SCOPED BACKFILL · NETWORK DISABLED BY DEFAULT · CATEGORY DATASET · MEMORY-SAFE TRAINING · NO LIVE TRADING.</div>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/scopes">JSON</a><a class="button-link quiet" href="/api/data/scopes.csv">CSV</a></div>
+  {% if data_scopes %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Category</th><th>Max records</th><th>Status</th><th>Warnings</th></tr></thead><tbody>{% for row in data_scopes %}<tr><td>{{ row.scope_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.scope_type }}</td><td>{{ row.category }}</td><td>{{ row.max_records }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No data scopes yet. Create a crypto, sports, politics/elections, daily-price, or market-ID scope before running larger backfills.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','backfills'] %}
+<section class="content-card">
+  <h2>Scoped historical backfills</h2>
+  <p class="help-text">Backfill jobs are operator-controlled plans for paginated, deduplicated, capped data collection. Network remains disabled by default.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/backfills">JSON</a><a class="button-link quiet" href="/api/data/backfills.csv">CSV</a></div>
+  {% if backfills %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Scope</th><th>Status</th><th>Estimated records</th><th>Requests</th><th>Risk</th><th>Duplicates</th></tr></thead><tbody>{% for row in backfills %}<tr><td>{{ row.backfill_job_id|compact_id }}</td><td>{{ row.scope_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.estimated_records_total }}</td><td>{{ row.max_requests }}</td><td>{{ row.size_estimate.risk_level if row.size_estimate else '' }}</td><td>{{ row.duplicates_skipped }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No scoped backfills yet. Preview first to see pagination, storage, RAM, and row-count risk before starting.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','category_datasets'] %}
+<section class="content-card">
+  <h2>Category dataset builder</h2>
+  <p class="help-text">Build capped category-specific datasets from scopes, snapshots, labels, and feature groups. Outputs stay in Training Lab and require review.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/category-datasets">JSON</a><a class="button-link quiet" href="/api/training/category-datasets.csv">CSV</a></div>
+  {% if category_datasets %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Category</th><th>Scope</th><th>Split</th><th>Rows</th><th>Status</th></tr></thead><tbody>{% for row in category_datasets %}<tr><td>{{ row.dataset_build_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.category }}</td><td>{{ row.scope_id|compact_id }}</td><td>{{ row.split_method }}</td><td>{{ row.train_rows }}/{{ row.validation_rows }}/{{ row.test_rows }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No category datasets yet. Register a scope, preview a dataset, then build a capped training dataset such as 100k, 250k, or 500k rows.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','sources'] %}
+<section class="content-card">
+  <h2>Data source registry</h2>
+  <p class="help-text">Register local/import or disabled network source metadata. Network sources are disabled by default and schedulers are not enabled.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/sources">JSON</a><a class="button-link quiet" href="/api/data/sources.csv">CSV</a></div>
+  {% if sources %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Mode</th><th>Network</th><th>Enabled</th><th>Status</th></tr></thead><tbody>{% for row in sources %}<tr><td>{{ row.source_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.source_type }}</td><td>{{ row.mode }}</td><td>{{ row.network_required }}</td><td>{{ row.enabled }}</td><td><span class="status-badge tone-{{ row.last_status|status_tone }}">{{ row.last_status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No data sources registered yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','ingestion'] %}
+<section class="content-card">
+  <h2>Ingestion jobs</h2>
+  <p class="help-text">Ingestion is explicit and local-first. Default validation does not call real network ingestion.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/ingestion/jobs">JSON</a><a class="button-link quiet" href="/api/data/ingestion/jobs.csv">CSV</a></div>
+  {% if ingestion_jobs %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Source</th><th>Status</th><th>Seen</th><th>Written</th><th>Network</th><th>Warnings</th></tr></thead><tbody>{% for row in ingestion_jobs %}<tr><td>{{ row.ingestion_job_id|compact_id }}</td><td>{{ row.source_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.records_seen }}</td><td>{{ row.records_written }}</td><td>{{ row.network_attempted }}</td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No ingestion jobs yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','snapshots'] %}
+<section class="content-card">
+  <h2>Raw snapshot registry</h2>
+  <p class="help-text">Raw data files are runtime state and are excluded from release ZIPs. Snapshot metadata includes hashes for reproducibility.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/snapshots">JSON</a><a class="button-link quiet" href="/api/data/snapshots.csv">CSV</a></div>
+  {% if snapshots %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Records</th><th>Source</th><th>Status</th><th>Hash</th></tr></thead><tbody>{% for row in snapshots %}<tr><td>{{ row.snapshot_id|compact_id }}</td><td>{{ row.snapshot_type }}</td><td>{{ row.record_count }}</td><td>{{ row.source_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.content_hash|compact_id }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No raw snapshots yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','normalized'] %}
+<section class="content-card">
+  <h2>Normalized market-data records</h2>
+  <p class="help-text">Normalized records are deterministic rows derived from raw snapshots. They do not place trades or modify live state.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/normalized">JSON</a><a class="button-link quiet" href="/api/data/normalized.csv">CSV</a></div>
+  {% if normalized_records %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Market</th><th>Token</th><th>Snapshot</th><th>Warnings</th></tr></thead><tbody>{% for row in normalized_records %}<tr><td>{{ row.record_id|compact_id }}</td><td>{{ row.record_type }}</td><td>{{ row.market_id|compact_id }}</td><td>{{ row.token_id|compact_id }}</td><td>{{ row.snapshot_id|compact_id }}</td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No normalized records yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','labels'] %}
+<section class="content-card">
+  <h2>Labeling workbench</h2>
+  <p class="help-text">Labels are generated for training/backtesting and require review. Labels can be wrong and are not trading instructions.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/labels">JSON</a><a class="button-link quiet" href="/api/data/labels.csv">CSV</a></div>
+  {% if labels %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Value</th><th>Record</th><th>Status</th><th>Confidence</th></tr></thead><tbody>{% for row in labels %}<tr><td>{{ row.label_id|compact_id }}</td><td>{{ row.label_type }}</td><td>{{ row.label_value }}</td><td>{{ row.record_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.confidence }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No labels generated yet.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','internet_sources'] %}
+<section class="content-card">
+  <h2>Approved internet source registry</h2>
+  <p class="help-text">Public/read-only internet sources are disabled by default, require domain allowlists, and never trade or sign orders.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/internet-sources">JSON</a><a class="button-link quiet" href="/api/data/internet-sources.csv">CSV</a><a class="button-link quiet" href="/api/data/internet-workflow">Workflow JSON</a></div>
+  <div class="callout warning"><strong>Internet posture:</strong> enabled={{ internet_status.internet_ingestion_enabled }} · allowed domains={{ internet_status.allowed_domain_count }} · scheduler={{ internet_status.internet_scheduler_enabled }}.</div>
+  {% if internet_sources %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Domain</th><th>Enabled</th><th>Status</th><th>Warnings</th></tr></thead><tbody>{% for row in internet_sources %}<tr><td>{{ row.source_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.source_type }}</td><td>{{ row.allowed_domain }}</td><td>{{ row.enabled }}</td><td><span class="status-badge tone-{{ row.last_status|status_tone }}">{{ row.last_status }}</span></td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No internet data sources registered yet. Register a public/read-only source, allowlist its domain, then preview ingestion before any network fetch.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','internet_ingestion'] %}
+<section class="content-card">
+  <h2>Internet ingestion jobs & disabled scheduler</h2>
+  <p class="help-text">Internet ingestion preview is no-network by default. Real fetches require explicit env gates, allowlists, confirmation, timeout, rate limit, and safe GET-only source configuration.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/data/internet-ingestion/jobs">Jobs JSON</a><a class="button-link quiet" href="/api/data/internet-ingestion/jobs.csv">Jobs CSV</a><a class="button-link quiet" href="/api/data/internet-ingestion/schedules">Schedules JSON</a></div>
+  {% if internet_ingestion_jobs %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Source</th><th>Status</th><th>Network</th><th>Seen</th><th>Written</th><th>Blockers</th></tr></thead><tbody>{% for row in internet_ingestion_jobs %}<tr><td>{{ row.ingestion_job_id|compact_id }}</td><td>{{ row.source_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.network_attempted }}</td><td>{{ row.records_seen }}</td><td>{{ row.records_written }}</td><td>{{ row.blockers|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No internet ingestion jobs yet. Use preview first; network is blocked unless explicitly enabled and allowlisted.</p>{% endif %}
+  <h3>Schedules</h3>
+  {% if internet_schedules %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Source</th><th>Enabled</th><th>Interval</th><th>Status</th><th>Warnings</th></tr></thead><tbody>{% for row in internet_schedules %}<tr><td>{{ row.schedule_id|compact_id }}</td><td>{{ row.source_id|compact_id }}</td><td>{{ row.enabled }}</td><td>{{ row.interval_minutes }}m</td><td>{{ row.last_status }}</td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No ingestion schedules. The scheduler is disabled by default and no background ingestion starts on boot.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','internet_workflow'] %}
+<section class="content-card">
+  <h2>Internet-to-training workflow</h2>
+  <p class="help-text">Guidance only. Each step requires explicit operator action; this page does not fetch data, train, or trade.</p>
+  <div class="callout"><strong>Guardrail:</strong> {{ internet_workflow.guardrail or 'Internet ingestion and host training are disabled by default.' }}</div>
+  {% if internet_workflow.steps %}<div class="table-wrap"><table><thead><tr><th>#</th><th>Step</th><th>Description</th><th>Status</th></tr></thead><tbody>{% for row in internet_workflow.steps %}<tr><td>{{ row.step }}</td><td>{{ row.title }}</td><td>{{ row.description }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">Workflow status is available through /api/data/internet-workflow.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','dataset_builder'] %}
+<section class="content-card">
+  <h2>Training dataset builder</h2>
+  <p class="help-text">Build reproducible Training Lab datasets from sources, snapshots, normalized rows, labels, feature groups, and leakage-aware split plans. Default split preference is chronological/walk-forward.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/dataset-builder/status">Builder status</a><a class="button-link quiet" href="/api/training/dataset-builds">JSON</a><a class="button-link quiet" href="/api/training/dataset-builds.csv">CSV</a></div>
+  <div class="callout"><strong>Recommended split:</strong> {{ dataset_builder_status.recommended_split_method }} · <strong>Guardrail:</strong> {{ dataset_builder_status.guardrail }}</div>
+  {% if dataset_builds %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Split</th><th>Rows</th><th>Dataset</th><th>Status</th><th>Manifest</th></tr></thead><tbody>{% for row in dataset_builds %}<tr><td>{{ row.dataset_build_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.split_method }}</td><td>{{ row.train_rows }}/{{ row.validation_rows }}/{{ row.test_rows }}</td><td>{{ row.dataset_id|compact_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.manifest_hash|compact_id }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No dataset builds yet.</p>{% endif %}
+</section>
+{% endif %}
+<section class="content-card">
+  <h2>Data audit events</h2>
+  {% if audit_events %}<div class="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Source</th><th>Detail</th></tr></thead><tbody>{% for row in audit_events %}<tr><td>{{ row.timestamp }}</td><td>{{ row.event_type }}</td><td>{{ row.source_id|compact_id }}</td><td>{{ row.detail }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No data audit events yet.</p>{% endif %}
+</section>
+{% endblock %}

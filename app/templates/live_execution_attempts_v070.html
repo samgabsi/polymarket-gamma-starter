@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Live Execution Attempts - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Execution attempts</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Execution attempt ledger · {{ app_version_short }} · audited local records</p>
+    <div class="page-title-row">
+      <h1>Live Execution Attempts</h1>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+      <span class="status-badge tone-info">FAKE LOCAL POSSIBLE</span>
+    </div>
+    <p class="page-subtitle">Blocked attempts, fake-local receipts, and gated real-live requests are recorded without secrets.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter execution attempts">
+    <label>Status <input name="status" value="{{ status }}" placeholder="optional"></label>
+    <label>Adapter mode <input name="adapter_mode" value="{{ adapter_mode }}" placeholder="optional"></label>
+    <label>Action <input name="action" value="{{ action }}" placeholder="submit or cancel"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+    <label>Attempt ID <input name="attempt_id" value="{{ attempt_id }}" placeholder="optional"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter attempts</button>
+  </form>
+</section>
+
+<section class="callout info">
+  <h3>Ledger Guardrail</h3>
+  <p>{{ guardrail }} Generated at {{ generated_at }}.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.saved_count or 0 }}</strong><span>Saved attempts</span></article>
+  <article class="metric-card"><strong>{{ summary.submit_attempts or 0 }}</strong><span>Submit attempts</span></article>
+  <article class="metric-card"><strong>{{ summary.cancel_attempts or 0 }}</strong><span>Cancel attempts</span></article>
+  <article class="metric-card"><strong>{{ summary.submitted_fake_adapter_only or 0 }}</strong><span>Fake submits</span></article>
+  <article class="metric-card"><strong>{{ summary.real_live_attempts or 0 }}</strong><span>Real-live requested</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if summary.real_network_attempted else 'no' }}</strong><span>Network attempted</span></article>
+</section>
+
+{% if detail %}
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Attempt Detail</h2>
+      <p class="muted">Attempt {{ detail.attempt_id }} · {{ detail.created_at }}</p>
+    </div>
+    <span class="status-badge tone-{{ detail.status|status_tone }}">{{ detail.status }}</span>
+  </div>
+  <div class="metadata-grid">
+    <div><dt>Adapter</dt><dd>{{ detail.adapter_mode }}</dd></div>
+    <div><dt>Action</dt><dd>{{ detail.action }}</dd></div>
+    <div><dt>Market</dt><dd>{{ detail.market_id }}</dd></div>
+    <div><dt>Order</dt><dd>{{ detail.side }} · ${{ '%.2f'|format(detail.notional or 0) }}</dd></div>
+    <div><dt>Receipt</dt><dd>{{ detail.fake_submit_receipt_id or detail.fake_cancel_receipt_id or detail.fake_order_id or 'none' }}</dd></div>
+    <div><dt>Network</dt><dd>{{ detail.real_network_attempted }}</dd></div>
+    <div><dt>Signed payload</dt><dd>{{ detail.signed_payload_present }}</dd></div>
+    <div><dt>Exchange ack</dt><dd>{{ detail.exchange_acknowledgement_present }}</dd></div>
+  </div>
+  {% if detail.blockers %}
+  <div class="callout danger"><h3>Blockers</h3><p>{{ (detail.blockers or [])|join(' | ') }}</p></div>
+  {% endif %}
+  {% if detail.warnings %}
+  <div class="callout warning"><h3>Warnings</h3><p>{{ (detail.warnings or [])|join(' | ') }}</p></div>
+  {% endif %}
+  <p class="muted">Attempt hash: <code>{{ detail.attempt_hash }}</code></p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Attempts</h2>
+      <p class="muted">Every final-boundary attempt is visible here, including safe blocked outcomes.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/live-manual-execution">Manual submit</a>
+      <a class="button-link quiet" href="/live-manual-cancel">Manual cancel</a>
+      <a class="button-link quiet" href="/api/live/execution-attempts.csv">CSV</a>
+      <a class="button-link quiet" href="/audit?category=live_manual_submit_attempt">Audit</a>
+    </div>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attempt</th><th>Action</th><th>Status</th><th>Adapter</th><th>Source IDs</th><th>Safety flags</th><th>Next action</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><a href="/live-execution-attempts?attempt_id={{ row.attempt_id }}" title="{{ row.attempt_id }}">{{ row.attempt_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.attempt_hash[:16] if row.attempt_hash else '' }}</code></span></td>
+          <td>{{ row.action }}</td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+          <td>{{ row.adapter_mode }}<br><span class="muted small">fake={{ row.fake_adapter_used }}</span></td>
+          <td>request={{ row.adapter_request_id|compact_id if row.adapter_request_id else 'none' }}<br>packet={{ row.packet_id|compact_id if row.packet_id else 'none' }}<br>auth={{ row.authorization_id|compact_id if row.authorization_id else 'none' }}</td>
+          <td>network={{ row.real_network_attempted }}<br>signed={{ row.signed_payload_present }}<br>ack={{ row.exchange_acknowledgement_present }}</td>
+          <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.recommended_next_action }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Attempts Yet</h3>
+    <p>No execution attempts match this filter. Attempt records are created from the manual submit or manual cancel pages, and may intentionally record blocked outcomes.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

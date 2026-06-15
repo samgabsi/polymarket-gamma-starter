@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>User Management · Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Admin console · v0.2.2</p>
+        <h1>User Management</h1>
+        <p class="muted">Create, update, suspend, reactivate, reset passwords, and delete local accounts. Roles are Admin or Read-Only.</p>
+      </div>
+      <nav class="top-nav"><a href="/">Dashboard</a> · <a href="/administration/config">Config</a> · <a href="/administration/maintenance">Maintenance</a><a href="/administration/config">Config</a><a href="/logout">Logout {{ user.username }}</a></nav>
+    </header>
+    {% if error %}<section class="notice danger">{{ error }}</section>{% endif %}
+
+    <section class="panel">
+      <h2>Create user</h2>
+      <form method="post" action="/users/create" class="inline-form wide-form">
+        <label>Username <input name="username" required></label>
+        <label>Password <input name="password" type="password" required minlength="8"></label>
+        <label>Role
+          <select name="role">
+            <option value="read_only">Read-Only</option>
+            <option value="admin">Admin</option>
+          </select>
+        </label>
+        <button type="submit">Create</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Existing users</h2>
+      <table>
+        <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Last login</th><th>Created</th><th>Update</th><th>Delete</th></tr></thead>
+        <tbody>
+        {% for account in users %}
+          <tr>
+            <td><strong>{{ account.username }}</strong>{% if account.username == user.username %}<br><span class="small">current session</span>{% endif %}</td>
+            <td>{{ account.role }}</td>
+            <td>{{ account.status }}</td>
+            <td>{{ account.last_login_at or 'never' }}</td>
+            <td>{{ account.created_at }}</td>
+            <td>
+              <form method="post" action="/users/update/{{ account.username }}" class="mini-form">
+                <select name="role">
+                  <option value="admin" {% if account.role == 'admin' %}selected{% endif %}>Admin</option>
+                  <option value="read_only" {% if account.role == 'read_only' %}selected{% endif %}>Read-Only</option>
+                </select>
+                <select name="status">
+                  <option value="active" {% if account.status == 'active' %}selected{% endif %}>Active</option>
+                  <option value="suspended" {% if account.status == 'suspended' %}selected{% endif %}>Suspended</option>
+                </select>
+                <input name="password" type="password" placeholder="new password optional" minlength="8">
+                <button type="submit">Save</button>
+              </form>
+            </td>
+            <td>
+              <form method="post" action="/users/delete/{{ account.username }}" onsubmit="return confirm('Delete user {{ account.username }}?');">
+                <button type="submit" class="danger-button" {% if account.username == user.username %}disabled{% endif %}>Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </section>
+  </main>
+</body>
+</html>

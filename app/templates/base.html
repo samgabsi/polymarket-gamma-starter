@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark">
+  <title>{% block title %}Polymarket Gamma Starter{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="console-body">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  {% set active_path = request.url.path if request is defined and request else '' %}
+  <div class="app-shell">
+    <aside class="app-sidebar" aria-label="Primary navigation">
+      <div class="brand-block">
+        <a class="brand-title" href="/">Polymarket Gamma Starter</a>
+        <div class="brand-subtitle">{{ app_version }} · Mobile-ready operator console</div>
+      </div>
+      <div class="environment-stack" aria-label="Environment posture">
+        {% for badge in global_safety_badges[:4] %}
+          <span class="status-badge tone-{{ badge.tone }}" title="{{ badge.detail }}">{{ badge.label }}</span>
+        {% endfor %}
+      </div>
+      <nav class="nav-groups" aria-label="Desktop navigation">
+        {% for section in nav_sections %}
+        <section class="nav-group">
+          <h2>{{ section.label }}</h2>
+          <ul>
+          {% for item in section["items"] %}
+              {% set is_active = active_path == item.href or (item.match and active_path in item.match) %}
+              <li><a href="{{ item.href }}" class="{% if is_active %}active{% endif %}" {% if is_active %}aria-current="page"{% endif %}>{{ item.label }}</a></li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      </nav>
+    </aside>
+
+    <div class="app-frame">
+      <header class="app-topbar">
+        <div class="topbar-primary">
+          <div class="breadcrumbs" aria-label="Breadcrumbs">
+            {% block breadcrumbs %}<a href="/">Overview</a>{% endblock %}
+          </div>
+          <p class="topbar-status"><span class="status-dot" aria-hidden="true"></span> Local console · {{ app_version_short }} · UI never bypasses backend gates</p>
+        </div>
+        <div class="topbar-actions">
+          {% for action in quick_actions[:4] %}
+            <a class="quick-action quick-action-{{ action.tone }}" href="{{ action.href }}">{{ action.label }}</a>
+          {% endfor %}
+          {% if user is defined and user %}
+            <span class="session-chip">{{ user.username }} · {{ user.role }}</span>
+            <a class="button-link quiet" href="/logout">Logout</a>
+          {% else %}
+            <a class="button-link quiet" href="/login">Login</a>
+          {% endif %}
+        </div>
+      </header>
+
+      <details class="mobile-nav-panel">
+        <summary aria-label="Open mobile navigation">Menu · Safety · Workflows</summary>
+        <div class="mobile-safety-stack" aria-label="Mobile safety status">
+          {% for badge in global_safety_badges %}
+            <span class="status-badge tone-{{ badge.tone }}" title="{{ badge.detail }}">{{ badge.label }}</span>
+          {% endfor %}
+        </div>
+        <nav class="mobile-nav-groups" aria-label="Mobile navigation">
+          {% for section in nav_sections %}
+          <section class="nav-group">
+            <h2>{{ section.label }}</h2>
+            <ul>
+            {% for item in section["items"] %}
+              {% set is_active = active_path == item.href or (item.match and active_path in item.match) %}
+              <li><a href="{{ item.href }}" class="{% if is_active %}active{% endif %}" {% if is_active %}aria-current="page"{% endif %}>{{ item.label }}</a></li>
+            {% endfor %}
+            </ul>
+          </section>
+          {% endfor %}
+        </nav>
+      </details>
+
+      <section class="global-safety-banner" aria-label="Global safety status">
+        <div class="safety-banner-label">
+          <strong>Global safety posture</strong>
+          <span>Read-only by default · operator-controlled · no accidental trading</span>
+        </div>
+        <div class="safety-badges">
+          {% for badge in global_safety_badges %}
+            <span class="status-badge tone-{{ badge.tone }}" title="{{ badge.detail }}">{{ badge.label }}</span>
+          {% endfor %}
+        </div>
+      </section>
+
+      <main id="main-content" class="console-main" tabindex="-1">
+        {% block content %}{% endblock %}
+      </main>
+
+      <footer class="app-footer">
+        <span>{{ app_safety_posture }}</span>
+        <span>Version {{ app_version }} · Local state stays outside release ZIPs.</span>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

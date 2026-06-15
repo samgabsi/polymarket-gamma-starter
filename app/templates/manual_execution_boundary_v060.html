@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual Execution Boundary - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Manual execution boundary · v0.9.0 · not submitted</p>
+        <h1>Manual Execution Review</h1>
+        <p class="muted">A local final checklist for future manual execution design. These records can acknowledge review state, but they do not submit orders, sign payloads, call the network, or receive exchange acknowledgements.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-adapter">Adapter readiness</a> <a href="/live-adapter-requests">Adapter requests</a> <a href="/live-execution-packets">Execution packets</a> <a href="/live-dry-run-review">Dry-run review</a> <a href="/live-manual-execution">Manual submit</a> <a href="/live-execution-attempts">Attempts</a> <a href="/api/live/manual-execution-reviews">JSON</a> <a href="/api/live/manual-execution-reviews.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status <input name="status" value="{{ status }}" placeholder="optional"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Packet ID <input name="packet_id" value="{{ packet_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter reviews</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <p><span class="status-badge tone-neutral">LIVE DISABLED</span> <span class="status-badge tone-info">MANUAL REVIEW</span> <span class="status-badge tone-neutral">NOT SUBMITTED</span></p>
+      <strong>Manual-only guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved reviews</span></div>
+      <div><strong>{{ summary.ready_total or 0 }}</strong><span>Review ready</span></div>
+      <div><strong>{{ summary.operator_final_confirmation_required or 0 }}</strong><span>Need confirmation</span></div>
+      <div><strong>{{ summary.execution_submission_disabled or 0 }}</strong><span>Submit disabled</span></div>
+      <div><strong>{{ 'no' if not summary.network_attempted else 'yes' }}</strong><span>Network attempted</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Record manual review from adapter request</h2>
+      {% if adapter_request_candidates %}
+      <table>
+        <thead><tr><th>Adapter request</th><th>Status</th><th>Order</th><th>Manual review</th></tr></thead>
+        <tbody>
+          {% for row in adapter_request_candidates %}
+          <tr>
+            <td><a href="/api/live/adapter/requests/{{ row.request_id }}" target="_blank" rel="noreferrer">{{ row.request_id }}</a><br><span class="muted small">packet={{ row.packet_id }}</span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">submit={{ row.order_submission_enabled }} · network={{ row.network_submission_attempted }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>
+              <form method="post" action="/live-execution-packets/{{ row.packet_id }}/manual-execution-review" class="stacked-form">
+                <input type="hidden" name="operator" value="{{ default_operator }}">
+                <label class="check"><input type="checkbox" name="acknowledged" value="true"> final local acknowledgement</label>
+                <label>Note <input name="note" placeholder="optional review note"></label>
+                <button type="submit">Record manual review</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No adapter request candidates are available for manual execution review.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved manual execution reviews</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Review</th><th>Status</th><th>Adapter request</th><th>Order</th><th>Submission flags</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/manual-execution-reviews/{{ row.review_id }}" target="_blank" rel="noreferrer">{{ row.review_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.review_hash[:16] if row.review_hash else '' }}</code></span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+            <td>{{ row.adapter_request_id }}<br><span class="muted small">packet={{ row.packet_id }} · {{ row.adapter_request_status_snapshot }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>not_submitted={{ row.not_submitted }}<br>network={{ row.network_submission_attempted }}<br>signed={{ row.signed_payload_present }}<br>ack={{ row.exchange_acknowledgement }}</td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No manual execution review records match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>What this does not do</h2>
+      <p class="muted">Manual execution review is not order placement. It stores a local checklist and optional acknowledgement only. Signed payloads, network submission, exchange order IDs, cancellation, wallet operations, and autonomous loops are not implemented here.</p>
+    </section>
+  </main>
+</body>
+</html>

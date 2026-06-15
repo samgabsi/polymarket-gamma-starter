@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Execution Packets - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live execution packets · v0.5.11 · unsigned local package only</p>
+        <h1>Live Execution Packet Review</h1>
+        <p class="muted">Create deterministic unsigned packets from authorized live-intent reviews. Packets preserve future execution inputs for offline review/export only; they do not sign, submit, cancel, automate, or touch wallets.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/live-order-intents">Intent previews</a> <a href="/live-order-intent-preflight">Preflight</a> <a href="/live-order-authorizations">Authorizations</a> <a href="/live-dry-run-adapter">Dry-run adapter</a> <a href="/live-dry-run-review">Dry-run review</a> <a href="/audit?category=live_execution_packet">Packet audit</a> <a href="/api/live/execution-packets">JSON</a> <a href="/api/live/execution-packets.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="packet_ready_dry_run" {% if status == 'packet_ready_dry_run' %}selected{% endif %}>packet_ready_dry_run</option>
+            <option value="packet_ready_with_warnings" {% if status == 'packet_ready_with_warnings' %}selected{% endif %}>packet_ready_with_warnings</option>
+            <option value="blocked_by_authorization" {% if status == 'blocked_by_authorization' %}selected{% endif %}>blocked_by_authorization</option>
+            <option value="blocked_by_preflight" {% if status == 'blocked_by_preflight' %}selected{% endif %}>blocked_by_preflight</option>
+            <option value="invalid" {% if status == 'invalid' %}selected{% endif %}>invalid</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Intent ID <input name="intent_id" value="{{ intent_id }}" placeholder="optional"></label>
+        <label>Authorization ID <input name="authorization_id" value="{{ authorization_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter packets</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved packets</span></div>
+      <div><strong>{{ summary.ready_total or 0 }}</strong><span>Ready for review</span></div>
+      <div><strong>{{ summary.blocked_total or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>${{ '%.2f'|format(summary.total_ready_notional or 0) }}</strong><span>Ready notional</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+      <div><strong>{{ 'no' if not summary.order_submission_enabled else 'yes' }}</strong><span>Submission enabled</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Package from authorized snapshots</h2>
+      <p class="muted">Only acknowledged <code>authorized_dry_run</code> or <code>authorized_with_warnings</code> records can create ready packets. Current preflight is rechecked at package time and drift/blockers are preserved in the packet.</p>
+      {% if authorization_items %}
+      <table>
+        <thead><tr><th>Authorization</th><th>Intent</th><th>Market / order</th><th>Status</th><th>Package</th></tr></thead>
+        <tbody>
+          {% for row in authorization_items %}
+          <tr>
+            <td><a href="/api/live/order-intents/authorizations/{{ row.authorization_id }}" target="_blank" rel="noreferrer">{{ row.authorization_id }}</a><br><span class="muted small"><code>{{ row.authorization_hash[:16] if row.authorization_hash else '' }}</code></span></td>
+            <td>{{ row.intent_id }}<br><span class="muted small">ticket={{ row.source_ticket_id or 'missing' }} · approval={{ row.source_approval_id or 'missing' }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · {{ row.order_type }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">preflight={{ row.preflight_state_snapshot }} · ack={{ row.acknowledgement }}</span></td>
+            <td>
+              <form method="post" action="/live-order-intents/{{ row.intent_id }}/execution-packet" class="stacked-form">
+                <input type="hidden" name="authorization_id" value="{{ row.authorization_id }}">
+                <input type="hidden" name="operator" value="{{ default_operator }}">
+                <label>Note <input name="note" placeholder="optional packet note"></label>
+                <button type="submit">Create unsigned packet</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No authorized live-order snapshots are available for this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved execution packets</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Packet</th><th>Status</th><th>Intent / authorization</th><th>Wire preview</th><th>Guards</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/execution-packets/{{ row.packet_id }}" target="_blank" rel="noreferrer">{{ row.packet_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.packet_hash[:16] if row.packet_hash else '' }}</code></span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+            <td>{{ row.intent_id }}<br><span class="muted small">auth={{ row.authorization_id or 'missing' }}<br>preflight={{ row.preflight_state_snapshot }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">asset={{ row.token_id or 'missing' }}<br>{{ row.side }} {{ row.outcome }} · {{ row.time_in_force }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>execution={{ row.execution_allowed }}<br>signed={{ row.signed_payload_present }}<br>exchange_ack={{ row.exchange_acknowledgement }}</td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live execution packets match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>What this does not do</h2>
+      <p class="muted">A packet is not an exchange order, not a signature request, not a CLOB acknowledgement, and not authorization for automated trading. It is an unsigned local package for human review and future adapter design.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Playbook Performance - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Playbook performance · v0.5.11 · paper-only</p>
+        <h1>Playbook Performance Review</h1>
+        <p class="muted">Connects local playbook decisions to the paper review report so each strategy rule can be judged by discipline, lifecycle follow-through, and simulated P&amp;L. No wallet, no live orders, no autonomous execution.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/playbooks">Playbooks</a> <a href="/review-report">Review report</a> <a href="/audit?category=playbook_decision">Playbook audit</a> <a href="/api/playbook-performance">JSON</a> <a href="/api/playbook-performance.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Playbook
+          <select name="playbook_id">
+            <option value="" {% if not playbook_id %}selected{% endif %}>all</option>
+            {% for pb in playbooks %}
+              <option value="{{ pb.playbook_id }}" {% if playbook_id == pb.playbook_id %}selected{% endif %}>{{ pb.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Decision status <input name="status" value="{{ status }}" placeholder="assigned / completed"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter</button>
+      </form>
+    </header>
+
+    <section class="notice">{{ guardrail }}</section>
+
+    <section class="stats">
+      <div><strong>{{ summary.playbook_count or 0 }}</strong><span>Playbooks shown</span></div>
+      <div><strong>{{ summary.decision_count or 0 }}</strong><span>Decisions counted</span></div>
+      <div><strong>{{ summary.paper_lifecycle_market_count or 0 }}</strong><span>Paper lifecycle markets</span></div>
+      <div><strong>{{ '%.1f'|format(summary.win_rate_percent or 0) }}%</strong><span>Win rate, win/loss only</span></div>
+      <div><strong>{{ '%+.0f'|format(summary.realized_pnl or 0) }}</strong><span>Realized P&amp;L</span></div>
+      <div><strong>{{ '%+.0f'|format(summary.unrealized_pnl or 0) }}</strong><span>Unrealized P&amp;L</span></div>
+      <div><strong>{{ '%+.0f'|format(summary.net_pnl or 0) }}</strong><span>Net paper P&amp;L</span></div>
+      <div><strong>{{ summary.warning_count or 0 }}</strong><span>Discipline warnings</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Performance by playbook</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Playbook</th><th>Decisions</th><th>Lifecycle</th><th>Paper P&amp;L</th><th>Discipline</th><th>Recent markets</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><strong>{{ row.playbook_name }}</strong><br><span class="muted small">{{ row.playbook_id }} · {{ row.playbook_status }}</span><br><span class="pill">{{ row.recommended_action }}</span></td>
+            <td>
+              <strong>{{ row.decision_count }}</strong> decisions<br>
+              {{ row.unique_market_count }} markets<br>
+              {% for key, value in (row.status_counts or {}).items() %}<span class="pill">{{ key }} {{ value }}</span>{% endfor %}
+            </td>
+            <td>
+              {{ row.paper_lifecycle_market_count }} paper lifecycle markets<br>
+              {% for key, value in (row.lifecycle_counts or {}).items() %}<span class="pill">{{ key }} {{ value }}</span>{% endfor %}<br>
+              <span class="muted small">wins {{ row.win_count }} · losses {{ row.loss_count }} · breakeven {{ row.breakeven_count }}</span>
+            </td>
+            <td>
+              realized {{ '%+.2f'|format(row.realized_pnl or 0) }}<br>
+              unrealized {{ '%+.2f'|format(row.unrealized_pnl or 0) }}<br>
+              <strong>net {{ '%+.2f'|format(row.net_pnl or 0) }}</strong><br>
+              <span class="muted small">avg/lifecycle {{ '%+.2f'|format(row.avg_net_pnl_per_lifecycle_market or 0) }}</span>
+            </td>
+            <td>
+              warnings {{ row.warning_count }} · positives {{ row.positive_count }}<br>
+              <span class="muted small">warning rate {{ '%.2f'|format(row.warning_rate_per_market or 0) }}/reviewed market</span><br>
+              {% for key, value in (row.flag_counts or {}).items() %}<span class="pill">{{ key }} {{ value }}</span>{% endfor %}
+            </td>
+            <td>
+              {% for item in row.recent_markets[:4] %}
+                <div><a href="/review-report?market_id={{ item.market_id }}">{{ item.question or item.market_id }}</a><br><span class="muted small">{{ item.decision_status }} · {{ item.lifecycle_status }} · net {{ '%+.2f'|format(item.net_pnl or 0) }}</span></div>
+              {% else %}<span class="muted">No decisions logged yet.</span>{% endfor %}
+            </td>
+            <td><a href="/playbook-performance?playbook_id={{ row.playbook_id }}">detail</a><br><a href="/playbooks?playbook_id={{ row.playbook_id }}">board</a><br><a href="/audit?category=playbook_decision">audit</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No playbook performance rows available yet.</p>{% endif %}
+    </section>
+
+    {% if detail and detail.item %}
+    {% set item = detail.item %}
+    <section class="panel">
+      <h2>Detail: {{ item.playbook_name }}</h2>
+      <p class="muted">This detail view counts each market once for P&amp;L even if the playbook has multiple decisions for that market.</p>
+      <section class="stats mini">
+        <div><strong>{{ item.decision_count }}</strong><span>Decisions</span></div>
+        <div><strong>{{ item.unique_market_count }}</strong><span>Markets</span></div>
+        <div><strong>{{ item.paper_lifecycle_market_count }}</strong><span>Lifecycle markets</span></div>
+        <div><strong>{{ '%+.2f'|format(item.net_pnl or 0) }}</strong><span>Net P&amp;L</span></div>
+      </section>
+      <h3>Recent markets</h3>
+      <table>
+        <thead><tr><th>Market</th><th>Status</th><th>Lifecycle</th><th>Net P&amp;L</th><th>Warnings</th><th>Lesson</th></tr></thead>
+        <tbody>
+          {% for market in item.recent_markets %}
+          <tr>
+            <td><a href="/markets/{{ market.market_id }}">{{ market.question or market.market_id }}</a><br><span class="muted small">{{ market.market_id }}</span></td>
+            <td>{{ market.decision_status }}<br><span class="muted small">{{ market.decision_at }}</span></td>
+            <td>{{ market.lifecycle_status }} · {{ market.outcome_label }}</td>
+            <td>{{ '%+.2f'|format(market.net_pnl or 0) }}</td>
+            <td>{{ market.warning_count }}</td>
+            <td>{{ market.lesson }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

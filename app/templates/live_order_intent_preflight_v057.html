@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Intent Preflight - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live intent preflight · v0.9.0 · read-only governance review</p>
+        <h1>Live Order Intent Preflight</h1>
+        <p class="muted">Review saved live-order intent previews against local paper tickets, explicit paper approvals, current paper preflight, local market-data quality, and live guard settings. This page never signs, submits, cancels, or automates orders.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/market-data">Market data</a> <a href="/execution-quality">Execution quality</a> <a href="/live-order-intents">Intent previews</a> <a href="/live-order-authorizations">Authorizations</a> <a href="/audit?category=live_order_preflight">Preflight audit</a> <a href="/api/live/order-intents/preflight">JSON</a> <a href="/api/live/order-intents/preflight.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>State
+          <select name="state">
+            <option value="" {% if not state %}selected{% endif %}>all</option>
+            <option value="ready_for_operator_authorization" {% if state == 'ready_for_operator_authorization' %}selected{% endif %}>ready_for_operator_authorization</option>
+            <option value="ready_with_warnings" {% if state == 'ready_with_warnings' %}selected{% endif %}>ready_with_warnings</option>
+            <option value="needs_paper_binding" {% if state == 'needs_paper_binding' %}selected{% endif %}>needs_paper_binding</option>
+            <option value="blocked_by_live_guard" {% if state == 'blocked_by_live_guard' %}selected{% endif %}>blocked_by_live_guard</option>
+            <option value="blocked" {% if state == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="invalid" {% if state == 'invalid' %}selected{% endif %}>invalid</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter preflight</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Reviewed intents</span></div>
+      <div><strong>{{ summary.ready_for_operator_authorization or 0 }}</strong><span>Ready review</span></div>
+      <div><strong>{{ summary.ready_with_warnings or 0 }}</strong><span>Ready w/ warnings</span></div>
+      <div><strong>{{ summary.needs_paper_binding or 0 }}</strong><span>Need binding</span></div>
+      <div><strong>{{ summary.market_data_missing or 0 }}</strong><span>Market data missing</span></div>
+      <div><strong>{{ summary.market_data_blocked or 0 }}</strong><span>Quality blocked</span></div>
+      <div><strong>{{ summary.total_blockers or 0 }}</strong><span>Total blockers</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Review board</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Intent</th><th>State</th><th>Market / token</th><th>Order</th><th>Market data</th><th>Paper binding</th><th>Current preflight</th><th>Blockers / action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/order-intents/{{ row.intent_id }}/preflight" target="_blank" rel="noreferrer">{{ row.intent_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.state }}</span><br><span class="muted small">{{ row.blocker_count }} blocker(s), {{ row.warning_count }} warning(s)</span></td>
+            <td>{{ row.market_id }}{% if row.token_id %}<br><span class="muted small">{{ row.token_id }}</span>{% endif %}</td>
+            <td>{{ row.side }} {{ row.outcome }}<br><span class="muted small">{{ row.order_type }} · {{ row.time_in_force }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td><span class="pill">{{ row.market_data_status or 'missing' }}</span>{% if row.market_data_snapshot_id %}<br><a class="muted small" href="/market-data/snapshots/{{ row.market_data_snapshot_id }}">snapshot</a>{% endif %}</td>
+            <td>Ticket: {{ row.source_ticket_id or 'missing' }} <span class="muted small">({{ row.ticket_status }})</span><br>Approval: {{ row.source_approval_id or 'missing' }} <span class="muted small">({{ row.approval_status }})</span></td>
+            <td>{{ row.paper_preflight_status }}<br><span class="muted small">approved={{ row.paper_preflight_approved }}</span></td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}No blockers{% endif %}<br><span class="muted small">{{ row.next_required_action }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live-intent preflight rows match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>What this means</h2>
+      <p class="muted"><strong>Ready</strong> means the saved intent has explicit local paper-ticket and paper-approval bindings and passes current review checks. It still does not permit execution in this build.</p>
+      <p class="muted"><strong>Needs binding</strong> means the intent is missing an explicit ticket or approval reference. This protects against silently reusing a stale or implicit approval.</p>
+    </section>
+  </main>
+</body>
+</html>

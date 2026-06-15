@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Paper Exit Tickets - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { max-width: 1240px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
+    .muted { color: #666; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .pill { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin: 2px; font-size: 12px; }
+    .exit_ready { border-left: 4px solid #3a7; }
+    .blocked { border-left: 4px solid #c97; }
+    .paper_executed { border-left: 4px solid #77a; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    form.inline { display: inline; }
+    input, select, button { margin: 2px 0; }
+    .small { font-size: 12px; }
+  </style>
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <h1>Paper Exit Tickets</h1>
+  <p class="muted">Human-in-the-loop simulated exit review for open paper positions. These tickets never place live orders.</p>
+  <p><a href="/">Dashboard</a> · <a href="/positions">Positions</a> · <a href="/trade-tickets">Entry Tickets</a> · <a href="/settlements">Settlements</a> · <a href="/audit">Audit</a> · <a href="/review-report">Review</a> · <a href="/api/exit-tickets">JSON</a></p>
+
+  <div class="cards">
+    <div class="card"><strong>{{ summary.count }}</strong><br><span class="muted">Exit Tickets</span></div>
+    <div class="card"><strong>{{ summary.exit_ready }}</strong><br><span class="muted">Exit Ready</span></div>
+    <div class="card"><strong>{{ summary.blocked }}</strong><br><span class="muted">Blocked</span></div>
+    <div class="card"><strong>{{ summary.paper_executed }}</strong><br><span class="muted">Paper Executed</span></div>
+    <div class="card"><strong>${{ '{:,.2f}'.format(summary.potential_proceeds) }}</strong><br><span class="muted">Potential Proceeds</span></div>
+    <div class="card"><strong>{{ '{:+,.2f}'.format(summary.potential_realized_pnl) }}</strong><br><span class="muted">Potential Realized P&amp;L</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Market</th>
+        <th>Ticket</th>
+        <th>Exit Plan</th>
+        <th>Checks</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ticket in items %}
+      <tr class="{{ ticket.status }}">
+        <td><span class="pill">{{ ticket.status }}</span><br><span class="muted small">{{ ticket.operator_decision }}</span></td>
+        <td>
+          <a href="/markets/{{ ticket.market_id }}">{{ ticket.title }}</a><br>
+          <span class="muted small">{{ ticket.market_id }}</span>
+        </td>
+        <td>
+          <span class="small">{{ ticket.ticket_id }}</span><br>
+          <span class="muted small">created {{ ticket.created_at }}</span><br>
+          {% if ticket.paper_trade_id %}<span class="muted small">paper trade {{ ticket.paper_trade_id }}</span>{% endif %}
+        </td>
+        <td>
+          Outcome: <strong>{{ ticket.outcome }}</strong><br>
+          Price: {{ "%.4f"|format(ticket.price) }}<br>
+          Shares: {{ "%.4f"|format(ticket.shares) }} / {{ "%.4f"|format(ticket.open_shares_at_creation) }}<br>
+          Proceeds: ${{ "%.2f"|format(ticket.estimated_proceeds) }}<br>
+          Est. realized P&amp;L: {{ "%+.2f"|format(ticket.estimated_realized_pnl) }}<br>
+          <span class="muted small">Reason: {{ ticket.exit_reason }}</span>
+        </td>
+        <td>
+          {% for check in ticket.checklist %}
+            <div>{{ "✓" if check.passed else "•" }} {{ check.name }} <span class="muted small">{{ check.detail }}</span></div>
+          {% endfor %}
+          {% if ticket.blockers %}
+            <div class="muted small"><strong>Blockers:</strong></div>
+            {% for blocker in ticket.blockers[:3] %}<div class="muted small">• {{ blocker }}</div>{% endfor %}
+          {% endif %}
+        </td>
+        <td>
+          {% if ticket.execution_allowed and ticket.status != "paper_executed" %}
+            <form class="inline" method="post" action="/exit-tickets/{{ ticket.ticket_id }}/paper-sell">
+              <button type="submit">Execute Paper Sell</button>
+            </form><br>
+          {% endif %}
+          <form method="post" action="/exit-tickets/{{ ticket.ticket_id }}/status">
+            <select name="status">
+              <option value="draft_review">draft_review</option>
+              <option value="exit_ready">exit_ready</option>
+              <option value="blocked">blocked</option>
+              <option value="rejected">rejected</option>
+              <option value="archived">archived</option>
+            </select><br>
+            <input name="decision" placeholder="decision" value="{{ ticket.operator_decision }}"><br>
+            <input name="note" placeholder="operator note" value="{{ ticket.operator_note }}"><br>
+            <button type="submit">Update</button>
+          </form>
+          <a href="/api/exit-tickets/{{ ticket.ticket_id }}">JSON</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="muted">No exit tickets yet. Create one from the Positions page when a paper position needs review or closure.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

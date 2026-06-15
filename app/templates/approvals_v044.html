@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Paper Approvals - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Approvals</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Paper execution approvals · {{ app_version_short }} · local simulation only</p>
+    <div class="page-title-row">
+      <h1>Paper Execution Approval Log</h1>
+      <span class="status-badge tone-paper">PAPER ONLY</span>
+      <span class="status-badge tone-neutral">NO LIVE ORDERS</span>
+    </div>
+    <p class="page-subtitle">Records why simulated entry-ticket execution was approved, blocked, rejected, or executed. Approval records snapshot latest preflight state and remain local.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter approvals">
+    <label>Approval ID <input name="approval_id" value="{{ approval_id }}" placeholder="optional detail"></label>
+    <label>Ticket ID <input name="ticket_id" value="{{ ticket_id }}" placeholder="optional filter"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+    <label>Status
+      <select name="status">
+        <option value="" {% if not status %}selected{% endif %}>all</option>
+        <option value="approved" {% if status == 'approved' %}selected{% endif %}>approved</option>
+        <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+        <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>rejected</option>
+        <option value="executed" {% if status == 'executed' %}selected{% endif %}>executed</option>
+      </select>
+    </label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter approvals</button>
+  </form>
+</section>
+
+<section class="callout info">
+  <h3>Approval Guardrail</h3>
+  <p>{{ guardrail }}</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.count or 0 }}</strong><span>Records</span></article>
+  <article class="metric-card"><strong>{{ summary.approved or 0 }}</strong><span>Approved</span></article>
+  <article class="metric-card"><strong>{{ summary.blocked or 0 }}</strong><span>Blocked</span></article>
+  <article class="metric-card"><strong>{{ summary.rejected or 0 }}</strong><span>Rejected</span></article>
+  <article class="metric-card"><strong>{{ summary.executed or 0 }}</strong><span>Executed</span></article>
+  <article class="metric-card"><strong>{{ summary.market_count or 0 }}</strong><span>Markets</span></article>
+</section>
+
+{% if detail %}
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Approval Detail</h2>
+      <p class="muted">{{ detail.approval_id }} · {{ detail.created_at }}</p>
+    </div>
+    <span class="status-badge tone-{{ detail.status|status_tone }}">{{ detail.status }}</span>
+  </div>
+  <p><strong><a href="/markets/{{ detail.market_id }}">{{ detail.title or detail.market_id }}</a></strong></p>
+  <div class="metadata-grid">
+    <div><dt>Ticket</dt><dd><a href="/preflight?ticket_id={{ detail.ticket_id }}">{{ detail.ticket_id }}</a></dd></div>
+    <div><dt>Preflight</dt><dd>{{ detail.preflight_status or 'n/a' }}</dd></div>
+    <div><dt>Stake</dt><dd>${{ '{:,.2f}'.format(detail.stake or 0) }}</dd></div>
+    <div><dt>Price</dt><dd>{{ '%.4f'|format(detail.price or 0) }}</dd></div>
+    <div><dt>Blockers</dt><dd>{{ detail.blocker_count or 0 }}</dd></div>
+    <div><dt>Warnings</dt><dd>{{ detail.warning_count or 0 }}</dd></div>
+  </div>
+  {% if detail.reason or detail.note or detail.blocker_summary or detail.warning_summary %}
+  <div class="callout warning">
+    {% if detail.note %}<p><strong>Note:</strong> {{ detail.note }}</p>{% endif %}
+    {% if detail.reason %}<p><strong>Reason:</strong> {{ detail.reason }}</p>{% endif %}
+    {% if detail.blocker_summary %}<p><strong>Blockers:</strong> {{ detail.blocker_summary }}</p>{% endif %}
+    {% if detail.warning_summary %}<p><strong>Warnings:</strong> {{ detail.warning_summary }}</p>{% endif %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Approval Records</h2>
+      <p class="muted">Use these records to understand why simulated execution was allowed or blocked.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/trade-tickets">Prior: tickets</a>
+      <a class="button-link quiet" href="/preflight">Next: preflight</a>
+      <a class="button-link quiet" href="/api/paper/approvals">JSON</a>
+      <a class="button-link quiet" href="/api/paper/approvals.csv">CSV</a>
+    </div>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Time</th><th>Status</th><th>Ticket</th><th>Market</th><th class="numeric">Stake</th><th>Preflight</th><th>Notes / Issues</th><th>Links</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><span class="muted small">{{ row.created_at }}</span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">{{ row.source }}</span></td>
+          <td><a href="/preflight?ticket_id={{ row.ticket_id }}"><strong title="{{ row.ticket_id }}">{{ row.ticket_id|compact_id }}</strong></a><br><span class="muted small">{{ row.outcome or 'YES' }} @ {{ '%.4f'|format(row.price or 0) }}</span></td>
+          <td><a href="/markets/{{ row.market_id }}"><strong>{{ row.title or row.market_id }}</strong></a><br><span class="muted small">{{ row.market_id }}</span></td>
+          <td class="numeric">${{ '{:,.2f}'.format(row.stake or 0) }}</td>
+          <td>{{ row.preflight_status or 'n/a' }}<br><span class="muted small">approved={{ row.preflight_approved }}</span></td>
+          <td>
+            {% if row.note %}<strong>Note:</strong> {{ row.note }}<br>{% endif %}
+            {% if row.reason %}<strong>Reason:</strong> {{ row.reason }}<br>{% endif %}
+            {% if row.blocker_summary %}<span class="muted small">BLOCK: {{ row.blocker_summary }}</span><br>{% endif %}
+            {% if row.warning_summary %}<span class="muted small">WARN: {{ row.warning_summary }}</span>{% endif %}
+            {% if not row.note and not row.reason and not row.blocker_summary and not row.warning_summary %}<span class="muted">clear</span>{% endif %}
+          </td>
+          <td><a href="/approvals?approval_id={{ row.approval_id }}">detail</a><br><a href="/api/paper/approvals/{{ row.approval_id }}">JSON</a><br><a href="/audit?market_id={{ row.market_id }}">audit</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Approval Records</h3>
+    <p>No paper approval records match this filter. Approvals are created from paper tickets after preflight review.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

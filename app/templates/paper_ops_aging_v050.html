@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Ops Aging Review - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper ops aging · v0.5.11 · local workflow hygiene</p>
+        <h1>Paper Ops Aging Review</h1>
+        <p class="muted">Read-only stale-workload review across unresolved briefing items and saved operator handoffs.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/paper-handoffs">Handoffs</a> <a href="/paper-handoff-reconciliation">Reconciliation</a> <a href="/runbook">Runbook</a> <a href="/paper-ops-escalations">Escalations</a> <a href="/api/paper/ops-aging">JSON</a> <a href="/api/paper/ops-aging.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Item ID <input name="item_id" value="{{ detail.item.aging_item_id if detail else '' }}" placeholder="optional detail"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Section
+          <select name="section">
+            <option value="" {% if not section %}selected{% endif %}>all</option>
+            <option value="runbook" {% if section == 'runbook' %}selected{% endif %}>runbook</option>
+            <option value="entry_execution" {% if section == 'entry_execution' %}selected{% endif %}>entry_execution</option>
+            <option value="risk_budget" {% if section == 'risk_budget' %}selected{% endif %}>risk_budget</option>
+            <option value="post_trade_review" {% if section == 'post_trade_review' %}selected{% endif %}>post_trade_review</option>
+            <option value="playbook_performance" {% if section == 'playbook_performance' %}selected{% endif %}>playbook_performance</option>
+            <option value="portfolio_health" {% if section == 'portfolio_health' %}selected{% endif %}>portfolio_health</option>
+          </select>
+        </label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all unresolved</option>
+            <option value="ready" {% if status == 'ready' %}selected{% endif %}>ready</option>
+            <option value="action_required" {% if status == 'action_required' %}selected{% endif %}>action_required</option>
+            <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="review" {% if status == 'review' %}selected{% endif %}>review</option>
+            <option value="watch" {% if status == 'watch' %}selected{% endif %}>watch</option>
+          </select>
+        </label>
+        <label>Severity
+          <select name="severity">
+            <option value="" {% if not severity %}selected{% endif %}>all</option>
+            <option value="critical" {% if severity == 'critical' %}selected{% endif %}>critical</option>
+            <option value="stale" {% if severity == 'stale' %}selected{% endif %}>stale</option>
+            <option value="followup" {% if severity == 'followup' %}selected{% endif %}>followup</option>
+            <option value="repeat" {% if severity == 'repeat' %}selected{% endif %}>repeat</option>
+            <option value="fresh" {% if severity == 'fresh' %}selected{% endif %}>fresh</option>
+            <option value="unknown_age" {% if severity == 'unknown_age' %}selected{% endif %}>unknown_age</option>
+          </select>
+        </label>
+        <label>Min age hours <input type="number" name="min_age_hours" min="0" step="0.25" value="{{ min_age_hours }}"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Refresh aging review</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Aging rows</span></div>
+      <div><strong>{{ summary.critical or 0 }}</strong><span>Critical</span></div>
+      <div><strong>{{ summary.stale or 0 }}</strong><span>Stale</span></div>
+      <div><strong>{{ summary.followup or 0 }}</strong><span>Follow-up</span></div>
+      <div><strong>{{ summary.repeat or 0 }}</strong><span>Repeated</span></div>
+      <div><strong>{{ summary.unknown_age or 0 }}</strong><span>Unknown age</span></div>
+      <div><strong>{{ summary.market_count or 0 }}</strong><span>Markets</span></div>
+      <div><strong>{{ '%.1f'|format(summary.max_age_hours or 0) }}</strong><span>Max hours</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Aging thresholds</h2>
+      <p class="muted">Rows become stale at: ready {{ thresholds.ready }}h, action_required {{ thresholds.action_required }}h, blocked {{ thresholds.blocked }}h, review {{ thresholds.review }}h, watch {{ thresholds.watch }}h. Repeated saved handoffs can also elevate a row even when source timestamps are missing.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Unresolved paper-ops aging rows</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Severity</th><th>Age</th><th>Status</th><th>Section</th><th>Item</th><th>Handoffs</th><th>Recommended action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><span class="pill">{{ row.severity }}</span></td>
+            <td>{% if row.age_hours is not none %}{{ '%.1f'|format(row.age_hours) }}h<br><span class="muted small">from {{ row.origin_source }}</span>{% else %}<span class="muted">unknown</span>{% endif %}</td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">priority {{ row.priority }}</span></td>
+            <td>{{ row.section }}</td>
+            <td><strong><a href="/paper-ops-aging?item_id={{ row.aging_item_id }}">{{ row.title }}</a></strong><br><span class="muted small">{{ row.aging_item_id }}</span>{% if row.market_id %}<br><a href="/markets/{{ row.market_id }}">market</a>{% endif %}</td>
+            <td>{{ row.handoff_count }}<br><span class="muted small">open {{ row.open_handoff_count }} · follow-up {{ row.needs_followup_handoff_count }}</span></td>
+            <td>{{ row.recommended_action }}<br><span class="muted small">{{ row.detail }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No unresolved paper-ops aging rows match this filter.</p>{% endif %}
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Aging detail: {{ detail.item.aging_item_id }}</h2>
+      <section class="stats mini">
+        <div><strong>{{ detail.item.severity }}</strong><span>Severity</span></div>
+        <div><strong>{% if detail.item.age_hours is not none %}{{ '%.1f'|format(detail.item.age_hours) }}h{% else %}unknown{% endif %}</strong><span>Age</span></div>
+        <div><strong>{{ detail.item.handoff_count }}</strong><span>Handoffs</span></div>
+        <div><strong>{{ detail.item.status }}</strong><span>Status</span></div>
+      </section>
+      <p><strong>Recommended action:</strong> {{ detail.item.recommended_action }}</p>
+      <form method="post" action="/paper-ops-escalations/create" class="inline-form">
+        <input type="hidden" name="aging_item_id" value="{{ detail.item.aging_item_id }}">
+        <input type="hidden" name="status" value="open">
+        <input name="note" placeholder="operator escalation note">
+        <button type="submit">Create escalation</button>
+      </form>
+      <p class="muted">{{ detail.item.guardrail }}</p>
+      <table>
+        <tbody>
+          <tr><th>Title</th><td>{{ detail.item.title }}</td></tr>
+          <tr><th>Origin</th><td>{{ detail.item.origin_at or 'unknown' }} · {{ detail.item.origin_source or 'no timestamp found' }}</td></tr>
+          <tr><th>Last handoff</th><td>{{ detail.item.last_handoff_id or 'none' }} · {{ detail.item.last_handoff_at or '' }} · {{ detail.item.last_handoff_status or '' }}</td></tr>
+          <tr><th>Market</th><td>{{ detail.item.market_id or 'n/a' }}</td></tr>
+          <tr><th>Ticket</th><td>{{ detail.item.ticket_id or 'n/a' }}</td></tr>
+          <tr><th>Detail</th><td>{{ detail.item.detail }}</td></tr>
+          <tr><th>Current action</th><td>{{ detail.item.current_recommended_action }}</td></tr>
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ market.question }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · {{ user.role }} · <a href="/">Dashboard</a> · <a href="/positions">Positions</a> · <a href="/logout">Logout</a>{% if user.role == "admin" %} · <a href="/users">Manage users</a>{% endif %}</p>{% endif %}
+    <p><a href="/">← Back to dashboard</a></p>
+    <section class="panel detail">
+      <p class="eyebrow">Market detail · Gamma metadata + CLOB books + research packet + paper trading · notes · source targets · v0.5.11</p>
+      <h1>{{ market.question }}</h1>
+      <p><a href="{{ market.url }}" target="_blank" rel="noreferrer">{{ market.polymarket_url_label }}</a> <span class="muted">confidence: {{ market.polymarket_url_confidence }}</span></p>
+      <p class="muted">v0.5.11 keeps the original no-live-trading flow and turns saved evidence into conservative probability-model inputs. If Gamma does not provide a parent event slug, this button opens Polymarket search instead.</p>
+      <form method="get" action="/watchlist/add/{{ market.id }}" class="inline-form">
+        <input name="note" placeholder="optional watchlist note" value="Research candidate">
+        <button type="submit">{{ "Update watchlist" if is_watched else "Add to watchlist" }}</button>
+        {% if is_watched %}<a class="button-link danger" href="/watchlist/remove/{{ market.id }}">Remove from watchlist</a>{% endif %}
+      </form>
+      <section class="stats">
+        <div><strong>{{ market.opportunity_score }}</strong><span>Attention score</span></div>
+        <div><strong>${{ '{:,.0f}'.format(market.volume_24hr) }}</strong><span>24h volume</span></div>
+        <div><strong>${{ '{:,.0f}'.format(market.volume) }}</strong><span>Total volume</span></div>
+        <div><strong>${{ '{:,.0f}'.format(market.liquidity) }}</strong><span>Liquidity</span></div>
+      </section>
+      <h2>Outcomes</h2>
+      <div class="prices big">{% for outcome in market.outcomes %}<span>{{ outcome.name }}: {{ '%.4f'|format(outcome.price) }}</span>{% endfor %}</div>
+
+
+      <h2>Probability Model v1</h2>
+      {% set pm = market.probability_model %}
+      <section class="stats mini">
+        <div><strong>{% if pm.market_probability is not none %}{{ '%.2f'|format(pm.market_probability) }}{% else %}n/a{% endif %}</strong><span>Market odds</span></div>
+        <div><strong>{% if pm.model_probability is not none %}{{ '%.2f'|format(pm.model_probability) }}{% else %}n/a{% endif %}</strong><span>Model odds</span></div>
+        <div><strong>{% if pm.edge is not none %}{{ '%+.2f'|format(pm.edge_percent) }}%{% else %}n/a{% endif %}</strong><span>Edge</span></div>
+        <div><strong>{{ pm.confidence }}</strong><span>Confidence</span></div>
+      </section>
+      <p><span class="pill">{{ pm.signal }}</span> <span class="muted">{{ ', '.join(pm.reason_codes) }}</span></p>
+
+
+
+      <h2>Evidence-Adjusted Probability</h2>
+      {% set ep = evidence_probability %}
+      <p class="muted">Original roadmap step: data collection → evidence → probability. This does not trade and does not claim AI certainty.</p>
+      <section class="stats mini">
+        <div><strong>{% if ep.market_probability is not none %}{{ '%.2f'|format(ep.market_probability) }}{% else %}n/a{% endif %}</strong><span>Market odds</span></div>
+        <div><strong>{% if ep.base_model_probability is not none %}{{ '%.2f'|format(ep.base_model_probability) }}{% else %}n/a{% endif %}</strong><span>Base model</span></div>
+        <div><strong>{% if ep.evidence_adjusted_probability is not none %}{{ '%.2f'|format(ep.evidence_adjusted_probability) }}{% else %}n/a{% endif %}</strong><span>Evidence-adjusted</span></div>
+        <div><strong>{% if ep.evidence_adjusted_edge_percent is not none %}{{ '%+.2f'|format(ep.evidence_adjusted_edge_percent) }}%{% else %}n/a{% endif %}</strong><span>Adjusted edge</span></div>
+      </section>
+      <p><span class="pill">{{ ep.evidence_adjusted_signal }}</span> <span class="muted">confidence: {{ ep.evidence_adjusted_confidence }} · evidence delta: {{ ep.evidence_probability_delta }}</span></p>
+      <p class="muted">{{ ', '.join(ep.reason_codes) }}</p>
+      <p><a href="/api/markets/{{ market.id }}/evidence-probability" target="_blank" rel="noreferrer">Open evidence-adjusted probability JSON</a></p>
+
+      <h2>Paper Risk Check</h2>
+      <p class="muted">Default $100 paper buy pre-check: <strong>{{ "APPROVED" if risk_check.approved else "BLOCKED" }}</strong>{% if risk_check.warnings_present %} · warnings present{% endif %}</p>
+      <section class="stats mini">
+        <div><strong>${{ '{:,.0f}'.format(risk_check.exposure_after.market) }}</strong><span>Market exposure after</span></div>
+        <div><strong>${{ '{:,.0f}'.format(risk_check.exposure_after.total) }}</strong><span>Total exposure after</span></div>
+        <div><strong>{{ risk_check.exposure_after.open_positions }}</strong><span>Open positions after</span></div>
+        <div><strong>${{ '{:,.0f}'.format(risk_check.limits.max_stake_per_trade) }}</strong><span>Max stake/trade</span></div>
+      </section>
+      {% if risk_check.blocking_failures %}
+      <ul class="bad compact">{% for item in risk_check.blocking_failures %}<li>{{ item.name }}: {{ item.detail }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% if risk_check.warnings %}
+      <ul class="muted compact">{% for item in risk_check.warnings %}<li>{{ item.name }}: {{ item.detail }}</li>{% endfor %}</ul>
+      {% endif %}
+      <p><a href="/api/risk/check/{{ market.id }}?stake=100&outcome=YES" target="_blank" rel="noreferrer">Open risk check JSON</a></p>
+
+      <h2>Paper Trading</h2>
+      <p class="muted">Simulation only. This does not place Polymarket orders.</p>
+      <form method="get" action="/paper/buy/{{ market.id }}" class="inline-form">
+        <input name="stake" type="number" min="1" step="1" value="100">
+        <input name="outcome" value="YES">
+        <button type="submit">Paper buy</button>
+      </form>
+      <p class="muted">Portfolio equity: ${{ '{:,.2f}'.format(portfolio.equity) }} · cash: ${{ '{:,.2f}'.format(portfolio.cash) }} · open positions: {{ portfolio.open_position_count }}</p>
+      {% for pos in portfolio.open_positions %}
+        {% if pos.market_id == market.id|string %}
+          <div class="notice">Open paper position: {{ pos.outcome }} · {{ '%.2f'|format(pos.shares) }} shares · avg {{ '%.4f'|format(pos.avg_price) }} · P&L {{ '{:+,.2f}'.format(pos.unrealized_pnl) }} · <a href="/paper/sell/{{ market.id }}?outcome={{ pos.outcome }}">legacy paper sell all</a> · <a href="/positions">manage exit plan</a> · <a href="/exit-tickets">exit tickets</a></div>
+        {% endif %}
+      {% endfor %}
+
+
+      <h2>Local Notes</h2>
+      <p class="muted">Private local notes for research hypotheses, source checks, and paper-trade rationale. Stored in <code>data/market_notes.json</code>.</p>
+      <form method="get" action="/notes/add/{{ market.id }}" class="inline-form">
+        <input name="tag" value="research" placeholder="tag">
+        <input name="text" placeholder="note, hypothesis, or thing to verify" required>
+        <button type="submit">Add note</button>
+      </form>
+      {% if market_notes %}
+      <ul class="clean-list compact">
+        {% for note in market_notes|reverse %}
+        <li><span class="pill">{{ note.tag }}</span> {{ note.text }}<br><span class="muted">{{ note.created_at }} · <a href="/notes/delete/{{ note.id }}?market_id={{ market.id }}">delete</a></span></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">No notes for this market yet.</p>{% endif %}
+      <p><a href="/api/markets/{{ market.id }}/notes" target="_blank" rel="noreferrer">Open notes JSON</a></p>
+
+      <h2>Evidence Packets</h2>
+      <p class="muted">Create a saved evidence packet before changing your paper-trade thesis. The packet stores source targets and a manual evidence checklist in <code>data/evidence_packets/</code>.</p>
+      <section class="stats mini">
+        <div><strong>{{ evidence_score.packet_count }}</strong><span>Packets</span></div>
+        <div><strong>{{ evidence_score.best_score }}</strong><span>Best evidence score</span></div>
+        <div><strong>{{ evidence_score.best_readiness }}</strong><span>Readiness</span></div>
+        <div><strong>{{ evidence_score.readiness_counts }}</strong><span>Readiness counts</span></div>
+      </section>
+      <p><a href="/api/markets/{{ market.id }}/evidence-score" target="_blank" rel="noreferrer">Open evidence score JSON</a></p>
+      {% if user and user.role == "admin" %}
+      <form method="post" action="/markets/{{ market.id }}/evidence-packet" class="inline-form">
+        <input name="note" placeholder="optional packet note" value="Initial evidence collection">
+        <label><input type="checkbox" name="include_weak_sources" value="true"> include weak/social sources</label>
+        <button type="submit">Create evidence packet</button>
+      </form>
+      {% endif %}
+      <p><a href="/research/evidence">Evidence packets</a> · <a href="/api/evidence" target="_blank" rel="noreferrer">Open evidence JSON</a></p>
+      {% if evidence_packets %}
+      <ul class="clean-list compact">
+        {% for packet in evidence_packets %}
+        <li>{{ packet.created_at }} · {{ packet.status }} · {{ packet.source_count }} sources · <a href="/api/evidence/{{ packet.packet_id }}" target="_blank" rel="noreferrer">JSON</a></li>
+        {% endfor %}
+      </ul>
+      {% else %}<p class="muted">No saved evidence packets for this market yet.</p>{% endif %}
+
+      <h2>Data Collection Source Pack</h2>
+      <p class="muted">No-key research links generated from this market question. Use them to gather evidence before adjusting probabilities or paper trading.</p>
+      <p><a href="/api/markets/{{ market.id }}/source-pack" target="_blank" rel="noreferrer">Open source pack JSON</a> · <a href="/api/markets/{{ market.id }}/collection-targets" target="_blank" rel="noreferrer">Open collection targets JSON</a></p>
+      {% if source_pack %}
+      {% set targets = source_pack.collection_targets %}
+      <section class="notice">
+        <strong>Collection target priority:</strong> {{ targets.primary_targets|length }} primary, {{ targets.secondary_targets|length }} secondary, {{ targets.weak_signal_targets|length }} weak-signal/social.
+        <br><span class="muted">Detected topics: {% for topic in targets.topics %}<span class="pill">{{ topic.topic }}</span> {% endfor %}</span>
+      </section>
+      <h3>Primary collection targets</h3>
+      <ul class="clean-list compact">
+        {% for link in targets.primary_targets %}
+        <li><a href="{{ link.url }}" target="_blank" rel="noreferrer">{{ link.name }}</a> · <span class="muted">{{ link.role }}</span></li>
+        {% endfor %}
+      </ul>
+      <div class="book-grid">
+        {% for category, links in source_pack.categories.items() %}
+        <section class="book-card">
+          <h3>{{ category }}</h3>
+          <ul class="clean-list compact">
+            {% for link in links %}
+            <li><a href="{{ link.url }}" target="_blank" rel="noreferrer">{{ link.name }}</a><br><span class="muted">{{ link.role }}</span></li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <h2>CLOB order books</h2>
+      <p class="muted">Read-only public CLOB data. This version does not authenticate, sign orders, or trade.</p>
+      {% if order_books %}
+        <div class="book-grid">
+        {% for book in order_books %}
+          <section class="book-card">
+            <h3>Token {{ loop.index }}</h3>
+            <p class="token">{{ book.token_id }}</p>
+            {% if book.error %}
+              <p class="bad">{{ book.error }}</p>
+            {% else %}
+              <section class="stats mini">
+                <div><strong>{{ book.best_bid if book.best_bid is not none else 'n/a' }}</strong><span>Best bid</span></div>
+                <div><strong>{{ book.best_ask if book.best_ask is not none else 'n/a' }}</strong><span>Best ask</span></div>
+                <div><strong>{{ book.spread if book.spread is not none else 'n/a' }}</strong><span>Spread</span></div>
+                <div><strong>{{ book.midpoint if book.midpoint is not none else 'n/a' }}</strong><span>Midpoint</span></div>
+              </section>
+              <div class="book-columns">
+                <div>
+                  <h4>Bids</h4>
+                  <table><thead><tr><th>Price</th><th>Size</th></tr></thead><tbody>
+                  {% for row in book.bids[:8] %}<tr><td>{{ '%.4f'|format(row.price) }}</td><td>{{ '%.2f'|format(row.size) }}</td></tr>{% endfor %}
+                  </tbody></table>
+                </div>
+                <div>
+                  <h4>Asks</h4>
+                  <table><thead><tr><th>Price</th><th>Size</th></tr></thead><tbody>
+                  {% for row in book.asks[:8] %}<tr><td>{{ '%.4f'|format(row.price) }}</td><td>{{ '%.2f'|format(row.size) }}</td></tr>{% endfor %}
+                  </tbody></table>
+                </div>
+              </div>
+            {% endif %}
+          </section>
+        {% endfor %}
+        </div>
+      {% else %}
+        <p>No CLOB token IDs were found for this market in Gamma metadata.</p>
+      {% endif %}
+
+
+      <h2>Research packet</h2>
+      <p class="muted">This packet is a research workflow helper, not a probability estimate or trading signal.</p>
+      <section class="stats mini">
+        <div><strong>{{ research.keywords|length }}</strong><span>Keywords</span></div>
+        <div><strong>{{ research.search_links|length }}</strong><span>Search links</span></div>
+        <div><strong>{{ research.checklist|length }}</strong><span>Checklist items</span></div>
+        <div><strong>{{ research.edge_status }}</strong><span>Edge status</span></div>
+      </section>
+      <h3>Implied probabilities</h3>
+      <div class="prices">{% for item in research.implied_probabilities %}<span>{{ item }}</span>{% endfor %}</div>
+      <h3>Research links</h3>
+      <div class="link-row">{% for link in research.search_links %}<a class="button-link" href="{{ link.url }}" target="_blank" rel="noreferrer">{{ link.label }}</a>{% endfor %}</div>
+      <h3>Checklist</h3>
+      <ol>{% for item in research.checklist %}<li>{{ item }}</li>{% endfor %}</ol>
+      <p><a href="/api/markets/{{ market.id }}/research" target="_blank" rel="noreferrer">Open JSON research packet</a></p>
+
+      <h2>Research status</h2>
+      <p>{{ market.model_view }}</p>
+      <p><strong>Mispricing:</strong> {{ market.mispricing_status }}</p>
+      <h2>Score breakdown</h2>
+      <ul>
+        <li>Volume score: {{ market.score_breakdown.volume_score }}</li>
+        <li>Liquidity score: {{ market.score_breakdown.liquidity_score }}</li>
+        <li>Tradability score: {{ market.score_breakdown.tradability_score }}</li>
+      </ul>
+      <h2>Metadata</h2>
+      <ul>
+        <li>ID: {{ market.id }}</li>
+        <li>Slug: {{ market.slug }}</li>
+        <li>Event slug: {{ market.event_slug or 'n/a' }}</li>
+        <li>Category: {{ market.category or 'n/a' }}</li>
+        <li>End date: {{ market.end_date or 'n/a' }}</li>
+        <li>Order book enabled: {{ market.enable_order_book }}</li>
+        <li>Accepting orders: {{ market.accepting_orders }}</li>
+      </ul>
+      <h2>Polymarket link candidates</h2>
+      <ul>
+        {% for candidate in market.polymarket_url_candidates %}
+        <li><a href="{{ candidate.url }}" target="_blank" rel="noreferrer">{{ candidate.label }}</a> · {{ candidate.confidence }}</li>
+        {% endfor %}
+      </ul>
+      <p><a href="/api/markets/{{ market.id }}/links" target="_blank" rel="noreferrer">Open link diagnostics JSON</a></p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Execution Quality {{ item.simulation_id }} - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/execution-quality">Execution quality</a><span>/</span><span>{{ item.simulation_id|compact_id }}</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Simulation detail · estimate only</p>
+    <div class="page-title-row">
+      <h1>Execution-Quality Simulation</h1>
+      <span class="status-badge tone-{{ item.state|status_tone }}">{{ item.state }}</span>
+      <span class="status-badge tone-neutral">NOT A FILL GUARANTEE</span>
+    </div>
+    <p class="page-subtitle">{{ item.side }} {{ item.size }} @ {{ item.limit_price }} · {{ item.created_at }}</p>
+  </div>
+  <div class="action-bar">
+    {% if item.snapshot_id %}<a class="button-link" href="/market-data/snapshots/{{ item.snapshot_id }}">Snapshot</a>{% endif %}
+    <a class="button-link quiet" href="/api/execution-quality/{{ item.simulation_id }}">JSON</a>
+  </div>
+</section>
+
+<section class="callout warning">
+  <h3>Local Estimate</h3>
+  <p>{{ item.guardrail }}</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ item.estimated_fill_quantity }}</strong><span>Est. fill qty</span></article>
+  <article class="metric-card"><strong>{{ item.estimated_average_fill_price }}</strong><span>Est. avg fill</span></article>
+  <article class="metric-card"><strong>{{ item.estimated_notional }}</strong><span>Est. notional</span></article>
+  <article class="metric-card"><strong>{{ item.estimated_unfilled_size }}</strong><span>Unfilled</span></article>
+  <article class="metric-card"><strong>{{ item.estimated_slippage_bps }}</strong><span>Slippage bps</span></article>
+  <article class="metric-card"><strong>{{ item.liquidity_score }}</strong><span>Liquidity score</span></article>
+</section>
+
+<section class="two-col">
+  <article class="panel">
+    <h2>Order Binding</h2>
+    <div class="metadata-grid">
+      <div><dt>Market</dt><dd>{{ item.market_id }}</dd></div>
+      <div><dt>Token</dt><dd>{{ item.token_id }}</dd></div>
+      <div><dt>Snapshot</dt><dd>{{ item.snapshot_id or 'missing' }}</dd></div>
+      <div><dt>Age</dt><dd>{{ item.snapshot_age_seconds or 'n/a' }}s</dd></div>
+      <div><dt>Ticket</dt><dd>{{ item.source_ticket_id or 'n/a' }}</dd></div>
+      <div><dt>Intent</dt><dd>{{ item.source_intent_id or 'n/a' }}</dd></div>
+      <div><dt>Hash</dt><dd><code>{{ item.simulation_hash|compact_id(18) }}</code></dd></div>
+    </div>
+  </article>
+  <article class="panel">
+    <h2>Blockers / Warnings</h2>
+    {% if item.blockers or item.warnings %}
+      {% for blocker in item.blockers %}<p><span class="status-badge tone-danger">BLOCKED</span> {{ blocker }}</p>{% endfor %}
+      {% for warning in item.warnings %}<p><span class="status-badge tone-warning">WARNING</span> {{ warning }}</p>{% endfor %}
+    {% else %}
+      <p><span class="status-badge tone-ok">CLEAR</span> No local execution-quality blockers or warnings.</p>
+    {% endif %}
+    <p class="muted">{{ item.recommended_action }}</p>
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Checks</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Check</th><th>Status</th><th>Severity</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for check in item.checks %}
+        <tr><td>{{ check.name }}</td><td><span class="status-badge tone-{{ 'ok' if check.passed else 'danger' }}">{{ 'pass' if check.passed else 'fail' }}</span></td><td>{{ check.severity }}</td><td>{{ check.detail }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

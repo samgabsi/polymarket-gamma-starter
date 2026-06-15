@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+
+{% block title %}Live Configuration Readiness - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Live config</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Live readiness · {{ app_version_short }} · gated/non-executing</p>
+    <div class="page-title-row">
+      <h1>Live Configuration Readiness</h1>
+      <span class="status-badge tone-info">LIVE READINESS</span>
+      <span class="status-badge tone-neutral">LIVE DISABLED</span>
+    </div>
+    <p class="page-subtitle">Redacted configuration status for a future authenticated phase. This page does not derive credentials, sign messages, place orders, cancel orders, or automate trading.</p>
+  </div>
+  <div class="action-bar">
+    <a class="button-link" href="/live-adapter">Next: adapter readiness</a>
+    <a class="button-link quiet" href="/workflow">Workflow</a>
+    <a class="button-link quiet" href="/api/live/config/readiness">JSON</a>
+    <a class="button-link quiet" href="/api/live/config/readiness.csv">CSV</a>
+    <a class="button-link quiet" href="/api/live/config/template.env">Template</a>
+  </div>
+</section>
+
+<section class="callout warning">
+  <h3>Live Trading Remains Disabled</h3>
+  <p>Configuration fields are readiness signals only. Secrets must stay in your local <code>.env</code> and out of release ZIPs. Real submit/cancel remain unavailable in this build.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.readiness_state }}</strong><span>Readiness state</span></article>
+  <article class="metric-card"><strong>{{ summary.configured or 0 }}/{{ summary.field_count or 0 }}</strong><span>Configured fields</span></article>
+  <article class="metric-card"><strong>{{ summary.guard_warning_count or 0 }}</strong><span>Guard warnings</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if summary.l2_credentials_ready else 'no' }}</strong><span>L2 credentials present</span></article>
+  <article class="metric-card"><strong>{{ 'disabled' if not controls.order_placement_enabled else 'requested' }}</strong><span>Order placement</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Safety Controls</h2>
+      <p class="muted">Critical guard settings are visible before credential field details.</p>
+    </div>
+    {% if controls.kill_switch_active %}
+      <span class="status-badge tone-danger">KILL SWITCH ACTIVE</span>
+    {% else %}
+      <span class="status-badge tone-ok">KILL SWITCH CLEAR</span>
+    {% endif %}
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Control</th><th>Status</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td>Manual approval required</td><td><span class="status-badge tone-{{ 'ok' if controls.manual_approval_required else 'danger' }}">{{ controls.manual_approval_required }}</span></td><td>Execution-facing paths must remain human reviewed.</td></tr>
+        <tr><td>Dry-run receipt required</td><td><span class="status-badge tone-{{ 'ok' if controls.dry_run_receipt_required else 'warning' }}">{{ controls.dry_run_receipt_required }}</span></td><td>Future adapter work must bind offline dry-run receipts.</td></tr>
+        <tr><td>Submit requested</td><td><span class="status-badge tone-{{ 'warning' if controls.submit_requested else 'neutral' }}">{{ controls.submit_requested }}</span></td><td>Submit remains disabled unless every manual live gate passes.</td></tr>
+        <tr><td>Cancel requested</td><td><span class="status-badge tone-{{ 'warning' if controls.cancel_requested else 'neutral' }}">{{ controls.cancel_requested }}</span></td><td>Cancel remains disabled unless every manual live gate passes.</td></tr>
+        <tr><td>Order placement enabled</td><td><span class="status-badge tone-{{ 'danger' if controls.order_placement_enabled else 'neutral' }}">{{ controls.order_placement_enabled }}</span></td><td>Must remain disabled for this UI/UX milestone.</td></tr>
+        <tr><td>Autonomous trading enabled</td><td><span class="status-badge tone-{{ 'danger' if controls.autonomous_trading_enabled else 'neutral' }}">{{ controls.autonomous_trading_enabled }}</span></td><td>Autonomous trading is not part of this app.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  {% if summary.guard_warnings %}
+  <div class="callout warning">
+    <h3>Guard Warnings</h3>
+    <ul class="clean-list compact">{% for warning in summary.guard_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Guard Warnings</h3>
+    <p>The app remains in configuration-readiness mode. Continue to adapter readiness for a redacted capability report.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Configuration Fields</h2>
+      <p class="muted">Sensitive values are redacted. Populate real values only in local environment files.</p>
+    </div>
+    <a class="button-link quiet" href="/api/live/config/template.env">Download blank template</a>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Group</th><th>Field</th><th>Status</th><th>Redacted value</th><th>Required for</th><th>Notes</th></tr></thead>
+      <tbody>
+        {% for field in fields %}
+        <tr>
+          <td>{{ field.group }}</td>
+          <td><strong><code>{{ field.key }}</code></strong>{% if field.aliases %}<br><span class="muted small">Aliases: {{ field.aliases|join(', ') }}</span>{% endif %}</td>
+          <td><span class="status-badge tone-{{ field.status|status_tone }}">{{ field.status }}</span></td>
+          <td>{{ field.redacted_value }}</td>
+          <td>{{ field.required_for }}</td>
+          <td>{{ field.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="callout info">
+  <h3>Next Stage</h3>
+  <p>Open <a href="/live-adapter">Live Adapter Readiness</a> to inspect default-off adapter posture and optional read-only validation. Submission and cancellation remain disabled by default and require all manual live gates.</p>
+</section>
+{% endblock %}

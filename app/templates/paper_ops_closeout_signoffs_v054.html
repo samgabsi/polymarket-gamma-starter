@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Ops Closeout Signoffs - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper ops closeout signoffs · v0.5.11 · local operator snapshot</p>
+        <h1>Paper Ops Closeout Signoffs</h1>
+        <p class="muted">Record an explicit local closeout signoff after reviewing the current paper ops closeout checklist. Signoffs snapshot the review state; they do not close records or change execution controls.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/paper-ops-closeout">Closeout</a> <a href="/paper-handoffs">Handoffs</a> <a href="/paper-ops-escalations">Escalations</a> <a href="/audit?category=ops_closeout_signoff">Signoff audit</a> <a href="/api/paper/ops-closeout/signoffs">JSON</a> <a href="/api/paper/ops-closeout/signoffs.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="completed" {% if status == 'completed' %}selected{% endif %}>completed</option>
+            <option value="handed_off" {% if status == 'handed_off' %}selected{% endif %}>handed_off</option>
+            <option value="needs_followup" {% if status == 'needs_followup' %}selected{% endif %}>needs_followup</option>
+            <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="skipped" {% if status == 'skipped' %}selected{% endif %}>skipped</option>
+          </select>
+        </label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter signoffs</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Current closeout: {{ current_closeout_summary.closeout_status or 'unknown' }}</strong> — {{ current_closeout_summary.closeout_message or '' }}<br>
+      {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved signoffs</span></div>
+      <div><strong>{{ summary.latest_status or 'none' }}</strong><span>Latest status</span></div>
+      <div><strong>{{ summary.followup_signoffs or 0 }}</strong><span>Follow-up signoffs</span></div>
+      <div><strong>{{ summary.current_closeout_status or 'unknown' }}</strong><span>Current closeout</span></div>
+      <div><strong>{{ summary.current_handoff_required or 0 }}</strong><span>Current handoff required</span></div>
+      <div><strong>{{ current_signoff_preview.status or 'unknown' }}</strong><span>Recommended signoff</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Record closeout signoff</h2>
+      <p class="muted">Use this only after a human review. The saved record snapshots the current closeout rows and component summaries, but does not mutate handoffs, escalations, tickets, approvals, positions, or trades.</p>
+      <form method="post" action="/paper-ops-closeout-signoffs/record" class="stacked-form wide-form">
+        <label>Operator <input name="operator" value="{{ default_operator }}"></label>
+        <label>Status
+          <select name="status">
+            <option value="" selected>auto: {{ current_signoff_preview.status or 'recommended' }}</option>
+            <option value="completed">completed</option>
+            <option value="handed_off">handed_off</option>
+            <option value="needs_followup">needs_followup</option>
+            <option value="blocked">blocked</option>
+            <option value="skipped">skipped</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Snapshot item limit <input type="number" name="limit" min="1" max="1000" value="25"></label>
+        <label>Operator note <textarea name="note" rows="3" placeholder="What was reviewed, handed off, deferred, or blocked?"></textarea></label>
+        <button type="submit">Record local signoff snapshot</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Saved signoffs</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Time</th><th>Status</th><th>Operator</th><th>Closeout</th><th>Rows</th><th>Handoff</th><th>Gate / note</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/paper/ops-closeout/signoffs/{{ row.signoff_id }}" target="_blank" rel="noreferrer">{{ row.created_at }}</a><br><span class="muted small">{{ row.signoff_id }}</span></td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td>{{ row.operator }}</td>
+            <td>{{ row.closeout_status_snapshot }}</td>
+            <td>{{ row.item_count_snapshot }}</td>
+            <td>{{ row.handoff_required_count_snapshot }}</td>
+            <td>{{ row.closure_gate }}{% if row.note %}<br><span class="muted small">{{ row.note }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No closeout signoffs match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Current signoff preview</h2>
+      <section class="stats mini">
+        <div><strong>{{ current_signoff_preview.closeout_status_snapshot or 'unknown' }}</strong><span>Closeout status</span></div>
+        <div><strong>{{ current_signoff_preview.item_count_snapshot or 0 }}</strong><span>Rows</span></div>
+        <div><strong>{{ current_signoff_preview.handoff_required_count_snapshot or 0 }}</strong><span>Handoff required</span></div>
+        <div><strong>{{ current_signoff_preview.closure_gate or 'unknown' }}</strong><span>Closure gate</span></div>
+      </section>
+      {% if current_signoff_preview.top_handoff_required_items %}
+      <table>
+        <thead><tr><th>Source</th><th>Status</th><th>Severity</th><th>Item</th><th>Recommended action</th></tr></thead>
+        <tbody>
+          {% for row in current_signoff_preview.top_handoff_required_items[:10] %}
+          <tr>
+            <td>{{ row.source }}</td>
+            <td>{{ row.status }}</td>
+            <td>{{ row.severity }}</td>
+            <td>{% if row.link %}<a href="{{ row.link }}">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}<br><span class="muted small">{{ row.source_id }}</span></td>
+            <td>{{ row.recommended_action }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">The current preview has no handoff-required closeout rows.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Market Snapshot {{ item.snapshot_id }} - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/market-data">Market data</a><span>/</span><span>{{ item.snapshot_id|compact_id }}</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Snapshot detail · local public data</p>
+    <div class="page-title-row">
+      <h1>Market Snapshot</h1>
+      <span class="status-badge tone-{{ item.status|status_tone }}">{{ item.status }}</span>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+    </div>
+    <p class="page-subtitle">{{ item.question or item.market_id or item.token_id }} · {{ item.created_at }}</p>
+  </div>
+  <div class="action-bar">
+    <a class="button-link" href="/execution-quality?market_id={{ item.market_id }}&token_id={{ item.token_id }}">Simulations</a>
+    <a class="button-link quiet" href="/api/market-data/snapshots/{{ item.snapshot_id }}">JSON</a>
+  </div>
+</section>
+
+<section class="callout info">
+  <h3>Local Snapshot</h3>
+  <p>{{ item.guardrail }}</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ item.best_bid or 'n/a' }}</strong><span>Best bid</span></article>
+  <article class="metric-card"><strong>{{ item.best_ask or 'n/a' }}</strong><span>Best ask</span></article>
+  <article class="metric-card"><strong>{{ item.midpoint or 'n/a' }}</strong><span>Midpoint</span></article>
+  <article class="metric-card"><strong>{{ item.spread_bps or 0 }}</strong><span>Spread bps</span></article>
+  <article class="metric-card"><strong>{{ item.top_bid_size or 0 }} / {{ item.top_ask_size or 0 }}</strong><span>Top depth</span></article>
+  <article class="metric-card"><strong>{{ item.total_bid_depth or 0 }} / {{ item.total_ask_depth or 0 }}</strong><span>Total depth</span></article>
+</section>
+
+<section class="two-col">
+  <article class="panel">
+    <h2>Metadata</h2>
+    <div class="metadata-grid">
+      <div><dt>Market</dt><dd>{{ item.market_id }}</dd></div>
+      <div><dt>Condition</dt><dd>{{ item.condition_id or 'n/a' }}</dd></div>
+      <div><dt>Token</dt><dd>{{ item.token_id or 'n/a' }}</dd></div>
+      <div><dt>Source</dt><dd>{{ item.source }}</dd></div>
+      <div><dt>Active</dt><dd>{{ item.active }}</dd></div>
+      <div><dt>Accepting</dt><dd>{{ item.accepting_orders }}</dd></div>
+      <div><dt>Hash</dt><dd><code>{{ item.raw_public_fields_hash|compact_id(18) }}</code></dd></div>
+    </div>
+  </article>
+  <article class="panel">
+    <h2>Warnings / Blockers</h2>
+    {% if item.blockers or item.warnings %}
+      {% for blocker in item.blockers %}<p><span class="status-badge tone-danger">BLOCKED</span> {{ blocker }}</p>{% endfor %}
+      {% for warning in item.warnings %}<p><span class="status-badge tone-warning">WARNING</span> {{ warning }}</p>{% endfor %}
+    {% else %}
+      <p><span class="status-badge tone-ok">CLEAR</span> No local snapshot blockers or warnings.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="panel">
+  <h2>Related Execution-Quality Simulations</h2>
+  {% if related_quality %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>State</th><th>Simulation</th><th>Side</th><th class="numeric">Size</th><th class="numeric">Avg fill</th><th class="numeric">Unfilled</th></tr></thead>
+      <tbody>
+        {% for row in related_quality %}
+        <tr><td><span class="status-badge tone-{{ row.state|status_tone }}">{{ row.state }}</span></td><td><a href="/execution-quality/{{ row.simulation_id }}">{{ row.simulation_id|compact_id }}</a></td><td>{{ row.side }}</td><td class="numeric">{{ row.size }}</td><td class="numeric">{{ row.estimated_average_fill_price }}</td><td class="numeric">{{ row.estimated_unfilled_size }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><h3>No Simulations</h3><p>No recorded simulations are bound to this market/token yet.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

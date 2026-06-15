@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Paper Ops Closeout - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Closeout</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Paper ops closeout · {{ app_version_short }} · end-of-shift checklist</p>
+    <div class="page-title-row">
+      <h1>Paper Ops Closeout</h1>
+      <span class="status-badge tone-{{ summary.closeout_status|status_tone }}">{{ summary.closeout_status or 'unknown' }}</span>
+      <span class="status-badge tone-paper">PAPER ONLY</span>
+    </div>
+    <p class="page-subtitle">Consolidate briefing, aging, handoff reconciliation, escalations, and escalation review before ending an operator pass.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter closeout rows">
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+    <label>Source
+      <select name="source">
+        <option value="" {% if not source %}selected{% endif %}>all</option>
+        <option value="briefing" {% if source == 'briefing' %}selected{% endif %}>briefing</option>
+        <option value="aging" {% if source == 'aging' %}selected{% endif %}>aging</option>
+        <option value="handoff_reconciliation" {% if source == 'handoff_reconciliation' %}selected{% endif %}>handoff_reconciliation</option>
+        <option value="escalation" {% if source == 'escalation' %}selected{% endif %}>escalation</option>
+        <option value="escalation_candidate" {% if source == 'escalation_candidate' %}selected{% endif %}>escalation_candidate</option>
+        <option value="escalation_review" {% if source == 'escalation_review' %}selected{% endif %}>escalation_review</option>
+      </select>
+    </label>
+    <label>Status / state <input name="status" value="{{ status }}" placeholder="blocked, stale, active_followup..."></label>
+    <label>Handoff required
+      <select name="handoff_required">
+        <option value="" {% if handoff_required == '' %}selected{% endif %}>all</option>
+        <option value="true" {% if handoff_required == 'true' %}selected{% endif %}>yes</option>
+        <option value="false" {% if handoff_required == 'false' %}selected{% endif %}>no</option>
+      </select>
+    </label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Refresh closeout</button>
+  </form>
+</section>
+
+<section class="callout {% if summary.handoff_required or summary.briefing_blocked or summary.open_escalations %}warning{% else %}ok{% endif %}">
+  <h3>Status: {{ summary.closeout_status or 'unknown' }}</h3>
+  <p>{{ summary.closeout_message or '' }} {{ guardrail }} Generated at {{ generated_at }}.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.count or 0 }}</strong><span>Closeout rows</span></article>
+  <article class="metric-card"><strong>{{ summary.handoff_required or 0 }}</strong><span>Handoff required</span></article>
+  <article class="metric-card"><strong>{{ summary.briefing_blocked or 0 }}</strong><span>Briefing blocked</span></article>
+  <article class="metric-card"><strong>{{ summary.briefing_action_required or 0 }}</strong><span>Action required</span></article>
+  <article class="metric-card"><strong>{{ summary.aging_critical or 0 }}</strong><span>Aging critical</span></article>
+  <article class="metric-card"><strong>{{ summary.open_escalations or 0 }}</strong><span>Open escalations</span></article>
+  <article class="metric-card"><strong>{{ summary.escalation_review_required or 0 }}</strong><span>Review required</span></article>
+  <article class="metric-card"><strong>{{ summary.closed_but_reappeared or 0 }}</strong><span>Closed reappeared</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Closeout Checklist</h2>
+      <p class="muted">Rows identify what needs signoff, handoff, escalation update, or follow-up before ending a pass.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/paper-ops-briefing">Prior: briefing</a>
+      <a class="button-link quiet" href="/paper-ops-closeout-signoffs">Signoffs</a>
+      <a class="button-link quiet" href="/api/paper/ops-closeout">JSON</a>
+      <a class="button-link quiet" href="/api/paper/ops-closeout.csv">CSV</a>
+    </div>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Priority</th><th>Source</th><th>Status</th><th>Severity</th><th>Handoff</th><th>Item</th><th>Recommended action</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><strong>{{ row.priority }}</strong></td>
+          <td><span class="status-badge tone-info">{{ row.source }}</span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td>
+          <td>{{ row.severity }}</td>
+          <td>{{ 'yes' if row.handoff_required else 'no' }}<br><span class="muted small">{{ row.closure_gate }}</span></td>
+          <td><strong>{% if row.link %}<a href="{{ row.link }}">{{ row.title }}</a>{% else %}{{ row.title }}{% endif %}</strong><br><span class="muted small">{{ row.source_id|compact_id }}</span>{% if row.market_id %}<br><a href="/markets/{{ row.market_id }}">market</a>{% endif %}{% if row.ticket_id %}<br><span class="muted small">ticket {{ row.ticket_id|compact_id }}</span>{% endif %}</td>
+          <td>{{ row.recommended_action }}{% if row.detail %}<br><span class="muted small">{{ row.detail }}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Closeout Rows</h3>
+    <p>No closeout rows match this filter. Broaden filters or review briefing, aging, handoff, and escalation pages.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Component Snapshots</h2>
+  <section class="metric-grid">
+    <article class="metric-card"><strong>{{ component_summaries.briefing.count or 0 }}</strong><span>Briefing items</span></article>
+    <article class="metric-card"><strong>{{ component_summaries.aging.count or 0 }}</strong><span>Aging rows</span></article>
+    <article class="metric-card"><strong>{{ component_summaries.handoff_reconciliation.followup_required_count or 0 }}</strong><span>Handoff follow-up</span></article>
+    <article class="metric-card"><strong>{{ component_summaries.escalations.open or 0 }}</strong><span>Open escalations</span></article>
+    <article class="metric-card"><strong>{{ component_summaries.escalation_candidates.count or 0 }}</strong><span>Escalation candidates</span></article>
+    <article class="metric-card"><strong>{{ component_summaries.escalation_review.review_required or 0 }}</strong><span>Escalation reviews</span></article>
+  </section>
+  <p class="muted">This page is intentionally read-only. Record a closeout signoff, handoff, or escalation update from the dedicated workflow page after human review.</p>
+</section>
+{% endblock %}

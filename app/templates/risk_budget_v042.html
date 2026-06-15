@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Risk Budget - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper risk budget · v0.5.11 · local simulation only</p>
+        <h1>Paper Risk Budget Review</h1>
+        <p class="muted">Combines open paper exposure, pending entry tickets, market concentration, and lifecycle alerts before new simulated entries are reviewed. No wallet, no live orders, no autonomous execution.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/trade-tickets">Entry tickets</a> <a href="/preflight">Preflight</a> <a href="/positions">Positions</a> <a href="/playbook-performance">Playbook performance</a> <a href="/audit">Audit</a> <a href="/api/paper/risk-budget">JSON</a> <a href="/api/paper/risk-budget.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter</button>
+      </form>
+    </header>
+
+    <section class="notice">{{ guardrail }}</section>
+
+    <section class="stats">
+      <div><strong>{{ summary.budget_state or 'ok' }}</strong><span>Budget state</span></div>
+      <div><strong>${{ '{:,.0f}'.format(summary.open_exposure or 0) }}</strong><span>Open exposure</span></div>
+      <div><strong>${{ '{:,.0f}'.format(summary.total_budget_remaining or 0) }}</strong><span>Total room</span></div>
+      <div><strong>${{ '{:,.0f}'.format(summary.total_budget_remaining_after_pending or 0) }}</strong><span>Room after tickets</span></div>
+      <div><strong>{{ '%.1f'|format(summary.open_plus_pending_utilization_percent or 0) }}%</strong><span>Open + pending usage</span></div>
+      <div><strong>{{ summary.open_position_count or 0 }}/{{ summary.open_position_limit or 0 }}</strong><span>Position slots</span></div>
+      <div><strong>{{ summary.pending_ticket_count or 0 }}</strong><span>Pending entry tickets</span></div>
+      <div><strong>${{ '{:,.0f}'.format(summary.allocatable_next_trade_now or 0) }}</strong><span>Max next allocation now</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Configured paper limits</h2>
+      <p class="muted">These are environment-driven local simulation limits, not broker or exchange limits.</p>
+      <section class="stats mini">
+        <div><strong>${{ '{:,.0f}'.format(limits.max_stake_per_trade or 0) }}</strong><span>Max stake/trade</span></div>
+        <div><strong>${{ '{:,.0f}'.format(limits.max_market_exposure or 0) }}</strong><span>Max market exposure</span></div>
+        <div><strong>${{ '{:,.0f}'.format(limits.max_total_exposure or 0) }}</strong><span>Max total exposure</span></div>
+        <div><strong>{{ limits.max_open_positions or 0 }}</strong><span>Max open positions</span></div>
+        <div><strong>${{ '{:,.0f}'.format(limits.min_liquidity or 0) }}</strong><span>Min liquidity warning</span></div>
+        <div><strong>${{ '{:,.0f}'.format(limits.min_volume_24hr or 0) }}</strong><span>Min 24h volume warning</span></div>
+      </section>
+    </section>
+
+    {% if flags %}
+    <section class="panel">
+      <h2>Budget flags</h2>
+      <table>
+        <thead><tr><th>Level</th><th>Type</th><th>Market</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for flag in flags %}
+          <tr>
+            <td><span class="pill">{{ flag.level }}</span></td>
+            <td>{{ flag.kind }}</td>
+            <td>{% if flag.market_id %}<a href="/markets/{{ flag.market_id }}">{{ flag.question or flag.market_id }}</a>{% else %}<span class="muted">portfolio</span>{% endif %}</td>
+            <td>{{ flag.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    {% if detail and detail.item %}
+    {% set row = detail.item %}
+    <section class="panel">
+      <h2>Market detail</h2>
+      <p><strong><a href="/markets/{{ row.market_id }}">{{ row.question or row.market_id }}</a></strong></p>
+      <section class="stats mini">
+        <div><strong>{{ row.budget_state }}</strong><span>Market state</span></div>
+        <div><strong>${{ '{:,.0f}'.format(row.open_cost_basis or 0) }}</strong><span>Open cost</span></div>
+        <div><strong>${{ '{:,.0f}'.format(row.pending_ticket_stake or 0) }}</strong><span>Pending tickets</span></div>
+        <div><strong>{{ '%.1f'|format(row.combined_market_utilization_percent or 0) }}%</strong><span>Combined usage</span></div>
+        <div><strong>${{ '{:,.0f}'.format(row.market_exposure_remaining_after_pending or 0) }}</strong><span>Room after tickets</span></div>
+        <div><strong>{{ row.warning_count or 0 }}</strong><span>Warnings</span></div>
+      </section>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Market concentration</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Market</th><th>State</th><th>Open exposure</th><th>Pending tickets</th><th>Combined budget</th><th>Lifecycle</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/markets/{{ row.market_id }}"><strong>{{ row.question or row.market_id }}</strong></a><br><span class="muted small">{{ row.market_id }}</span></td>
+            <td><span class="pill">{{ row.budget_state }}</span><br><span class="muted small">{{ '%.1f'|format(row.combined_market_utilization_percent or 0) }}% combined</span></td>
+            <td>
+              cost ${{ '{:,.2f}'.format(row.open_cost_basis or 0) }}<br>
+              value ${{ '{:,.2f}'.format(row.open_market_value or 0) }}<br>
+              P&amp;L {{ '%+.2f'|format(row.unrealized_pnl or 0) }}
+            </td>
+            <td>
+              {{ row.pending_ticket_count or 0 }} pending<br>
+              ${{ '{:,.2f}'.format(row.pending_ticket_stake or 0) }} stake<br>
+              {{ row.paper_ready_ticket_count or 0 }} paper-ready
+            </td>
+            <td>
+              combined ${{ '{:,.2f}'.format(row.combined_open_and_pending or 0) }}<br>
+              room now ${{ '{:,.2f}'.format(row.market_exposure_remaining or 0) }}<br>
+              room after tickets ${{ '{:,.2f}'.format(row.market_exposure_remaining_after_pending or 0) }}
+            </td>
+            <td>
+              {{ row.open_position_count or 0 }} open outcomes<br>
+              {{ row.alert_count or 0 }} alerts · {{ row.warning_count or 0 }} warnings
+              {% for outcome in row.outcomes[:3] %}<br><span class="muted small">{{ outcome.outcome }} · {{ outcome.position_status or 'active' }} · {{ '%.4f'|format(outcome.current_price or 0) }}</span>{% endfor %}
+            </td>
+            <td><a href="/risk-budget?market_id={{ row.market_id }}">risk detail</a><br><a href="/audit?market_id={{ row.market_id }}">audit</a><br><a href="/review-report?market_id={{ row.market_id }}">review</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No open paper exposure or pending entry tickets match this filter.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

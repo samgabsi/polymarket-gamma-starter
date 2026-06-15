@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Operator Dashboard · Polymarket Gamma Starter v0.9.0</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Operator dashboard · v0.9.0 · paper/live-readiness only</p>
+        <h1>Daily Market Operator Brief</h1>
+        <p class="muted">One practical view for research targets, evidence gaps, paper candidates, alerts, portfolio status, and risk. No wallet, no live execution.</p>
+        {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · {{ user.role }} · <a href="/">Dashboard</a> · <a href="/opportunities">Opportunities</a> · <a href="/research/evidence">Evidence</a> · <a href="/research/sources">Sources</a> · <a href="/positions">Positions</a> · <a href="/exit-tickets">Exit tickets</a> · <a href="/paper-ops-briefing">Ops briefing</a> · <a href="/paper-handoffs">Handoffs</a> · <a href="/paper-handoff-reconciliation">Reconciliation</a> · <a href="/paper-ops-closeout">Closeout</a> · <a href="/paper-ops-closeout-signoffs">Signoffs</a> · <a href="/live-order-intent-preflight">Live preflight</a> · <a href="/live-order-authorizations">Authorizations</a> · <a href="/live-execution-packets">Execution packets</a> · <a href="/live-adapter">Live adapter</a> · <a href="/live-adapter-requests">Adapter requests</a> · <a href="/manual-execution-boundary">Manual boundary</a> · <a href="/live-manual-execution">Manual submit</a> · <a href="/live-execution-attempts">Attempts</a> · <a href="/live-manual-cancel">Cancel</a> · <a href="/logout">Logout</a></p>{% endif %}
+      </div>
+      <form method="get">
+        <label>Scan limit <input type="number" name="limit" min="10" max="200" value="{{ limit }}"></label>
+        <button type="submit">Refresh brief</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Status: {{ brief.health.status }}</strong> — {{ brief.health.message }}<br>
+      <span class="muted">{{ brief.note }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ brief.counts.markets_scanned }}</strong><span>Markets scanned</span></div>
+      <div><strong>{{ brief.counts.research_candidates }}</strong><span>Research targets</span></div>
+      <div><strong>{{ brief.counts.paper_recommendations }}</strong><span>Paper candidates</span></div>
+      <div><strong>{{ brief.counts.evidence_gaps }}</strong><span>Evidence gaps</span></div>
+    </section>
+
+    <section class="stats mini">
+      <div><strong>${{ '{:,.0f}'.format(brief.portfolio.cash) }}</strong><span>Paper cash</span></div>
+      <div><strong>${{ '{:,.0f}'.format(brief.portfolio.equity) }}</strong><span>Paper equity</span></div>
+      <div><strong>{{ '%+.2f'|format(brief.portfolio.total_return_percent) }}%</strong><span>Total return</span></div>
+      <div><strong>{{ brief.risk.open_positions }}/{{ brief.risk.max_open_positions }}</strong><span>Risk slots</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Action Queue</h2>
+      <p class="muted">Highest-priority items from alerts and paper recommendations. Use this as the daily triage list.</p>
+      {% if brief.action_queue %}
+      <table>
+        <thead><tr><th>Priority</th><th>Type</th><th>Action</th><th>Market</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for item in brief.action_queue %}
+          <tr>
+            <td><strong>{{ item.priority }}</strong></td>
+            <td><span class="pill">{{ item.kind }}</span></td>
+            <td>{{ item.title }}</td>
+            <td>{% if item.market_id %}<a href="/markets/{{ item.market_id }}">{{ item.question }}</a>{% else %}<span class="muted">portfolio/system</span>{% endif %}</td>
+            <td>{{ item.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No action items right now.</p>{% endif %}
+    </section>
+
+    <section class="two-col">
+      <div class="panel">
+        <h2>Research Now</h2>
+        <p class="muted">Markets worth opening first based on watchlist, score, volume, and model/market gap.</p>
+        {% if brief.research_candidates %}
+        <table>
+          <thead><tr><th>Score</th><th>Market</th><th>24h Vol</th><th>Edge</th><th>Why</th></tr></thead>
+          <tbody>
+            {% for item in brief.research_candidates %}
+            <tr>
+              <td><strong>{{ item.opportunity_score }}</strong></td>
+              <td><a href="/markets/{{ item.market_id }}">{{ item.question }}</a>{% if item.watched %}<br><span class="pill">watchlist</span>{% endif %}</td>
+              <td>${{ '{:,.0f}'.format(item.volume_24hr) }}</td>
+              <td>{{ '%+.2f'|format(item.edge_percent) }}%</td>
+              <td>{{ item.reason }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<p class="muted">No research candidates met the current operator thresholds.</p>{% endif %}
+      </div>
+
+      <div class="panel">
+        <h2>Evidence Gaps</h2>
+        <p class="muted">The model is more usable when high-interest markets have saved evidence packets.</p>
+        {% if brief.evidence_gaps %}
+        <table>
+          <thead><tr><th>Market</th><th>Packets</th><th>Readiness</th><th>Next step</th></tr></thead>
+          <tbody>
+            {% for item in brief.evidence_gaps %}
+            <tr>
+              <td><a href="/markets/{{ item.market_id }}">{{ item.question }}</a></td>
+              <td>{{ item.packet_count }}</td>
+              <td><span class="pill">{{ item.readiness }}</span></td>
+              <td>{{ item.next_step }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}<p class="muted">No obvious evidence gaps in the current scan.</p>{% endif %}
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>Paper Candidates</h2>
+      <p class="muted">Simulation-only recommendations. These buttons create paper-trading journal entries only.</p>
+      {% if brief.paper_recommendations %}
+      <table>
+        <thead><tr><th>EV/$100</th><th>Market</th><th>Market Odds</th><th>Model Odds</th><th>Confidence</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for rec in brief.paper_recommendations %}
+          <tr>
+            <td><strong>{{ '%+.2f'|format(rec.expected_value_per_100) }}</strong></td>
+            <td><a href="/markets/{{ rec.market_id }}">{{ rec.question }}</a></td>
+            <td>{{ '%.2f'|format(rec.market_probability) }}</td>
+            <td>{{ '%.2f'|format(rec.model_probability) }}</td>
+            <td>{{ rec.confidence }} · {{ rec.confidence_score }}</td>
+            <td><a class="button-link" href="/paper/buy/{{ rec.market_id }}?stake={{ rec.suggested_stake }}&outcome={{ rec.outcome }}">Paper buy ${{ '%.0f'|format(rec.suggested_stake) }}</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No paper candidates met current thresholds.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Movers</h2>
+      <p class="muted">Needs saved snapshots for best results. Save snapshots from the main dashboard.</p>
+      {% if brief.movers %}
+      <table>
+        <thead><tr><th>Market</th><th>24h Vol Δ</th><th>Liquidity Δ</th><th>Price changes</th></tr></thead>
+        <tbody>
+          {% for row in brief.movers %}
+          <tr>
+            <td><a href="/markets/{{ row.id }}">{{ row.question }}</a></td>
+            <td>{{ '{:+,.0f}'.format(row.volume_24hr_delta) }}</td>
+            <td>{{ '{:+,.0f}'.format(row.liquidity_delta) }}</td>
+            <td>{% for p in row.price_changes %}<span class="pill">{{ p.outcome }} {{ '%+.2f'|format(p.delta) }}</span>{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No mover data yet or no previous snapshot found.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Operator Links</h2>
+      <p><a href="/api/operator/brief" target="_blank" rel="noreferrer">Open operator JSON</a> · <a href="/api/strategy/recommendations" target="_blank" rel="noreferrer">Strategy recommendations JSON</a> · <a href="/api/evidence-probabilities" target="_blank" rel="noreferrer">Evidence probabilities JSON</a> · <a href="/api/paper/ops-closeout" target="_blank" rel="noreferrer">Closeout JSON</a> · <a href="/api/live/adapter/readiness" target="_blank" rel="noreferrer">Live adapter JSON</a> · <a href="/api/live/execution-control/readiness" target="_blank" rel="noreferrer">Execution control JSON</a></p>
+    </section>
+  </main>
+</body>
+</html>

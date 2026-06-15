@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Live CLOB Adapter Boundary{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/live-trading">Live trading</a> / <span>CLOB adapter</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">v1.0.0 manual-live adapter</p><h1>Live CLOB adapter boundary</h1><p class="page-subtitle">Fail-closed inspection of Polymarket CLOB SDK dependency, credential presence, network gates, and submit/cancel readiness. This page is status-only; actual submit/cancel remain limited to manual record actions after every gate passes.</p></div></section>
+<div class="callout danger"><strong>Fail-closed:</strong> this page and verification center are no-network by default. Real submit/cancel remain limited to manual control-plane actions after every operator gate passes.</div>
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ report.overall_status }}</strong><span>Adapter status</span></article>
+  <article class="metric-card"><strong>{{ report.config.kill_switch_active }}</strong><span>Kill switch</span></article>
+  <article class="metric-card"><strong>{{ report.dependency.status }}</strong><span>SDK dependency</span></article>
+  <article class="metric-card"><strong>{{ report.credentials.l2_credentials_present }}</strong><span>L2 credentials present</span></article>
+</section>
+<section class="content-card"><h2>Adapter gates</h2><div class="metadata-grid">
+  <div><span>Live mode</span><strong>{{ report.config.live_mode }}</strong></div>
+  <div><span>Real network allowed</span><strong>{{ report.config.allow_real_network }}</strong></div>
+  <div><span>Submit enabled</span><strong>{{ report.config.enable_submit }}</strong></div>
+  <div><span>Cancel enabled</span><strong>{{ report.config.enable_cancel }}</strong></div>
+  <div><span>Real submit implemented</span><strong>{{ report.real_submit_implemented }}</strong></div>
+  <div><span>Real cancel implemented</span><strong>{{ report.real_cancel_implemented }}</strong></div>
+  <div><span>Network attempted</span><strong>{{ report.network_attempted }}</strong></div>
+  <div><span>Signed payload present</span><strong>{{ report.signed_payload_present }}</strong></div>
+</div></section>
+
+<section class="content-card"><h2>SDK method contract</h2><div class="metadata-grid">
+  <div><span>SDK mapping completed</span><strong>{{ report.sdk_mapping_completed }}</strong></div>
+  <div><span>Adapter method signatures defined</span><strong>{{ report.adapter_method_signatures_defined }}</strong></div>
+  <div><span>Preferred family</span><strong>{{ report.dependency.preferred_family or 'not detected' }}</strong></div>
+  <div><span>Smoke guard enabled</span><strong>{{ report.real_live_smoke_test_guard.enabled }}</strong></div>
+</div><p class="help-text">Candidate SDK families and method names are exposed in the JSON API. Real submit/cancel stay behind the manual control plane and are not exercised by normal validation.</p></section>
+<section class="content-card"><h2>Verification center</h2><p class="help-text">Offline/default-safe report for dependency, credential, gate, fake-adapter, and smoke-test readiness. No real network, submit, cancel, signing, or wallet action is performed by default.</p><div class="metadata-grid"><div><span>Status</span><strong>{{ verification.overall_status }}</strong></div><div><span>Network attempted</span><strong>{{ verification.network_attempted }}</strong></div><div><span>Real submit attempted</span><strong>{{ verification.real_submit_attempted }}</strong></div><div><span>Real cancel attempted</span><strong>{{ verification.real_cancel_attempted }}</strong></div></div><div class="table-wrap"><table><thead><tr><th>Level</th><th>Status</th><th>Detail</th><th>Remediation</th></tr></thead><tbody>{% for row in verification.levels %}<tr><td>{{ row.level }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.detail }}</td><td>{{ row.remediation }}</td></tr>{% endfor %}</tbody></table></div><div class="action-bar"><a class="button-link quiet" href="/api/live/clob-adapter/verification">JSON</a><a class="button-link quiet" href="/api/live/clob-adapter/verification.csv">CSV</a></div></section>
+<section class="content-card"><h2>Blockers</h2>{% if report.blockers %}<ul>{% for item in report.blockers %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">No blockers reported by the adapter boundary.</p>{% endif %}</section>
+<section class="content-card"><h2>Warnings</h2>{% if report.warnings %}<ul>{% for item in report.warnings %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<p class="empty-state">No warnings.</p>{% endif %}</section>
+<section class="content-card"><h2>Next action</h2><p>{{ report.recommended_next_action }}</p><div class="action-bar"><a class="button-link" href="/live-trading">Live trading status</a><a class="button-link quiet" href="/live-adapter-requests">Adapter requests</a><a class="button-link quiet" href="/live-manual-execution">Manual submit boundary</a></div></section>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+
+{% block title %}Paper Trade Tickets - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Paper tickets</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Paper workflow · {{ app_version_short }} · local simulation only</p>
+    <div class="page-title-row">
+      <h1>Paper Trade Tickets</h1>
+      <span class="status-badge tone-paper">PAPER ONLY</span>
+      <span class="status-badge tone-neutral">NO WALLET</span>
+    </div>
+    <p class="page-subtitle">Human-in-the-loop tickets between readiness review and simulated paper execution. Simulated buys require preflight and execution-queue approval.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter paper trade tickets">
+    <label>Status <input name="status" value="{{ status }}" placeholder="optional"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="500" value="{{ limit }}"></label>
+    <button type="submit">Filter tickets</button>
+  </form>
+</section>
+
+<section class="callout info">
+  <h3>Ticket Boundary</h3>
+  <p>Tickets prepare local paper decisions only. They do not sign, submit, cancel, touch wallets, or bypass risk and approval gates.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.count }}</strong><span>Tickets</span></article>
+  <article class="metric-card"><strong>{{ summary.paper_ready }}</strong><span>Paper ready</span></article>
+  <article class="metric-card"><strong>{{ summary.blocked }}</strong><span>Blocked</span></article>
+  <article class="metric-card"><strong>{{ summary.paper_executed }}</strong><span>Paper executed</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Ticket Queue</h2>
+      <p class="muted">Review ticket status, checks, blockers, and available paper-only actions.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/readiness">Prior: readiness</a>
+      <a class="button-link quiet" href="/approvals">Next: approvals</a>
+      <a class="button-link quiet" href="/preflight">Preflight</a>
+      <a class="button-link quiet" href="/api/trade-tickets">JSON</a>
+    </div>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Market</th>
+          <th>Ticket</th>
+          <th>Plan</th>
+          <th>Checks</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in items %}
+        <tr>
+          <td><span class="status-badge tone-{{ ticket.status|status_tone }}">{{ ticket.status }}</span><br><span class="muted small">{{ ticket.operator_decision }}</span></td>
+          <td>
+            <a href="/markets/{{ ticket.market_id }}">{{ ticket.title }}</a><br>
+            <span class="muted small">{{ ticket.market_id }}</span>
+            {% if ticket.market_snapshot.polymarket_url %}<br><a href="{{ ticket.market_snapshot.polymarket_url }}" target="_blank" rel="noreferrer">Polymarket</a>{% endif %}
+          </td>
+          <td>
+            <span class="mono" title="{{ ticket.ticket_id }}">{{ ticket.ticket_id|compact_id }}</span><br>
+            <span class="muted small">created {{ ticket.created_at }}</span><br>
+            {% if ticket.paper_trade_id %}<span class="muted small">paper trade {{ ticket.paper_trade_id }}</span>{% endif %}
+          </td>
+          <td>
+            Outcome: <strong>{{ ticket.outcome }}</strong><br>
+            Price: {{ "%.4f"|format(ticket.price) }}<br>
+            Stake: ${{ "%.2f"|format(ticket.stake) }}<br>
+            Shares: {{ "%.4f"|format(ticket.estimated_shares) }}<br>
+            Readiness: {{ "%.1f"|format(ticket.readiness.readiness_score * 100) }}%
+          </td>
+          <td>
+            {% for check in ticket.checklist %}
+              <div>{{ "passed" if check.passed else "needs review" }}: {{ check.name }} <span class="muted small">{{ check.detail }}</span></div>
+            {% endfor %}
+            {% if ticket.blockers %}
+              <div class="callout danger"><strong>Blockers:</strong><br>{% for blocker in ticket.blockers[:3] %}{{ blocker }}<br>{% endfor %}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if ticket.status != "paper_executed" %}
+              <form class="stacked-form" method="post" action="/trade-tickets/{{ ticket.ticket_id }}/approval" aria-label="Approve {{ ticket.ticket_id }} through preflight">
+                <label>Approval note <input name="note" placeholder="approval note" value="{{ ticket.operator_note }}"></label>
+                <label><input type="checkbox" name="strict_playbook" value="true"> Strict playbook</label>
+                <button type="submit">Approve via preflight</button>
+              </form>
+              <form class="stacked-form" method="post" action="/trade-tickets/{{ ticket.ticket_id }}/reject" aria-label="Reject {{ ticket.ticket_id }}">
+                <label>Rejection note <input name="note" placeholder="rejection note"></label>
+                <button class="danger-button" type="submit">Reject</button>
+              </form>
+            {% endif %}
+            {% if ticket.execution_allowed and ticket.status != "paper_executed" %}
+              <form method="post" action="/trade-tickets/{{ ticket.ticket_id }}/paper-buy">
+                <button type="submit">Execute paper buy</button>
+              </form>
+            {% endif %}
+            <form class="stacked-form" method="post" action="/trade-tickets/{{ ticket.ticket_id }}/status" aria-label="Update {{ ticket.ticket_id }}">
+              <label>Status
+                <select name="status">
+                  <option value="draft_review">draft_review</option>
+                  <option value="paper_ready">paper_ready</option>
+                  <option value="blocked">blocked</option>
+                  <option value="rejected">rejected</option>
+                  <option value="archived">archived</option>
+                </select>
+              </label>
+              <label>Decision <input name="decision" placeholder="decision" value="{{ ticket.operator_decision }}"></label>
+              <label>Operator note <input name="note" placeholder="operator note" value="{{ ticket.operator_note }}"></label>
+              <button type="submit">Update</button>
+            </form>
+            <p class="small"><a href="/api/trade-tickets/{{ ticket.ticket_id }}">JSON</a> · <a href="/approvals?ticket_id={{ ticket.ticket_id }}">Approvals</a> · <a href="/preflight?ticket_id={{ ticket.ticket_id }}">Preflight</a> · <a href="/execution-queue?ticket_id={{ ticket.ticket_id }}">Queue</a></p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Paper Tickets</h3>
+    <p>Create a paper ticket from the readiness board after researching a market and checking sources. Tickets are local preparation records and do not submit orders.</p>
+    <p><a href="/readiness">Open readiness board</a> · <a href="/workflow">View workflow map</a></p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

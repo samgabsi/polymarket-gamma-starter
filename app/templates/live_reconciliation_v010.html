@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Live Reconciliation{% endblock %}
+{% block breadcrumbs %}<a href="/live-trading">Live trading</a> / <span>Reconciliation</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Read-only</p><h1>Live reconciliation</h1><p class="page-subtitle">Compares local order events to the currently available adapter state. Remote reconciliation degrades safely when credentials/network are unavailable.</p></div><div class="action-bar"><a class="button-link" href="/api/live/reconciliation.csv">Export CSV</a></div></section>
+<section class="metric-grid"><article class="metric-card"><strong>{{ report.overall_status }}</strong><span>Status</span></article><article class="metric-card"><strong>{{ report.remote_network_attempted }}</strong><span>Remote network attempted</span></article><article class="metric-card"><strong>{{ report["items"]|length }}</strong><span>Rows</span></article></section>
+<div class="table-wrap"><table><thead><tr><th>Order event</th><th>Attempt</th><th>Status</th><th>State</th><th>Exchange ID</th></tr></thead><tbody>{% for row in report["items"] %}<tr><td>{{ row.order_event_id|compact_id }}</td><td>{{ row.execution_attempt_id|compact_id }}</td><td>{{ row.adapter_status }}</td><td><span class="status-badge tone-{{ row.state|status_tone }}">{{ row.state }}</span></td><td>{{ row.exchange_order_id }}</td></tr>{% else %}<tr><td colspan="5" class="empty-state">No local live order events to reconcile.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

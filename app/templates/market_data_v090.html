@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Market Data Intelligence - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><span>Market data</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Market data intelligence · {{ app_version_short }} · local snapshots</p>
+    <div class="page-title-row">
+      <h1>Market Data Intelligence</h1>
+      <span class="status-badge tone-local">LOCAL</span>
+      <span class="status-badge tone-neutral">NO NETWORK BY DEFAULT</span>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+    </div>
+    <p class="page-subtitle">Local public/fixture order-book snapshots, spread/depth metrics, and freshness checks. Snapshots contain no credentials and do not submit or cancel orders.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter market-data snapshots">
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+    <label>Token ID <input name="token_id" value="{{ token_id }}" placeholder="optional"></label>
+    <label>Status <input name="status" value="{{ status }}" placeholder="liquid, thin, wide_spread"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter snapshots</button>
+  </form>
+</section>
+
+<section class="callout info">
+  <h3>Fixture-First Boundary</h3>
+  <p>{{ guardrail }} Public fetch status: <strong>{{ fetch_boundary.status }}</strong>. Use manual JSON or local fixtures unless a future fetch path is explicitly implemented and enabled.</p>
+</section>
+
+<section class="metric-grid" aria-label="Market-data summary">
+  <article class="metric-card"><strong>{{ summary.count or 0 }}</strong><span>Snapshots</span></article>
+  <article class="metric-card"><strong>{{ summary.stale or 0 }}</strong><span>Stale</span></article>
+  <article class="metric-card"><strong>{{ summary.wide_spread or 0 }}</strong><span>Wide spread</span></article>
+  <article class="metric-card"><strong>{{ summary.thin or 0 }}</strong><span>Thin</span></article>
+  <article class="metric-card"><strong>{{ summary.closed or 0 }}</strong><span>Closed</span></article>
+  <article class="metric-card"><strong>{{ quality_summary.blocked_total or 0 }}</strong><span>Quality blocked</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Record Snapshot</h2>
+      <p class="muted">Paste normalized local JSON with `market_id`, `token_id`, `bids`, and `asks`. This records public/fixture data only.</p>
+    </div>
+    <a class="button-link quiet" href="/api/market-data/snapshots.csv">Export CSV</a>
+  </div>
+  <form method="post" action="/api/market-data/snapshots" class="stacked-form">
+    <label>Source <input name="source" value="manual_json"></label>
+    <label>Snapshot JSON <textarea name="orderbook_json" rows="8" placeholder='{"market_id":"demo","token_id":"yes","bids":[["0.49","100"]],"asks":[["0.51","100"]]}'></textarea></label>
+    <p class="helper-text">The API returns JSON after recording. No public network fetch is attempted by this form.</p>
+    <button type="submit">Record local snapshot</button>
+  </form>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Snapshots</h2>
+      <p class="muted">Spread, midpoint, and depth are computed deterministically with decimal arithmetic.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/execution-quality">Execution quality</a>
+      <a class="button-link quiet" href="/api/market-data/snapshots">JSON</a>
+    </div>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Snapshot</th><th>Market / token</th><th class="numeric">Bid / ask</th><th class="numeric">Spread</th><th class="numeric">Depth</th><th>Warnings / blockers</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td>
+          <td><a href="/market-data/snapshots/{{ row.snapshot_id }}">{{ row.snapshot_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+          <td>{{ row.market_id or 'unknown' }}<br><span class="muted small">{{ row.token_id or 'no token' }}</span></td>
+          <td class="numeric">{{ row.best_bid or 'n/a' }} / {{ row.best_ask or 'n/a' }}</td>
+          <td class="numeric">{{ row.spread_bps or 0 }} bps</td>
+          <td class="numeric">top {{ row.top_bid_size or 0 }} / {{ row.top_ask_size or 0 }}<br><span class="muted small">total {{ row.total_bid_depth or 0 }} / {{ row.total_ask_depth or 0 }}</span></td>
+          <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}{{ row.warnings[0] }}{% else %}<span class="muted">clear</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Snapshots</h3>
+    <p>No local market-data snapshots match this filter. Record a fixture/manual snapshot before using execution-quality checks.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

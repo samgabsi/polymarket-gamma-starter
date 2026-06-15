@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Research Sources · Polymarket Gamma Starter v0.2.3</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Data collection layer · v0.2.3</p>
+        <h1>Research Source Registry</h1>
+        <p class="muted">Curated no-key source entry points for the research layer: news, social discovery, government data, and market lookup. This is not a trading signal.</p>
+        {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · <a href="/">Dashboard</a> · <a href="/logout">Logout</a></p>{% endif %}
+      </div>
+    </header>
+
+    <section class="stats">
+      <div><strong>{{ summary.count }}</strong><span>Sources</span></div>
+      <div><strong>{{ summary.categories.news or 0 }}</strong><span>News</span></div>
+      <div><strong>{{ summary.categories.government_data or 0 }}</strong><span>Gov data</span></div>
+      <div><strong>{{ 'yes' if summary.requires_keys_now else 'no' }}</strong><span>Keys required</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Source Registry</h2>
+      <p class="muted">Use these links from a market detail page or via <code>/api/source-links?q=...</code>. Social sources are weak evidence until confirmed elsewhere.</p>
+      <p><a class="button-link" href="/api/sources/status" target="_blank" rel="noreferrer">Run source availability check JSON</a></p>
+      <table>
+        <thead><tr><th>Source</th><th>Category</th><th>Role</th><th>Key?</th><th>Notes</th></tr></thead>
+        <tbody>
+          {% for source in sources %}
+          <tr>
+            <td><strong>{{ source.name }}</strong><br><code>{{ source.id }}</code></td>
+            <td><span class="pill">{{ source.category }}</span></td>
+            <td>{{ source.role }}</td>
+            <td>{{ 'yes' if source.requires_key else 'no' }}</td>
+            <td>{{ source.notes }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="panel">
+      <h2>Original roadmap alignment</h2>
+      <ol class="compact">
+        <li>Data collection layer: identify sources, check availability, and prioritize market-specific collection targets.</li>
+        <li>AI/LLM analysis: later, optional key-based summarization/extraction.</li>
+        <li>Probability engine: compare evidence against market probabilities.</li>
+        <li>Risk management and paper trading remain simulation-only.</li>
+      </ol>
+    </section>
+  </main>
+</body>
+</html>

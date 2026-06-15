@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Execution Quality Simulator - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><span>Execution quality</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Execution-quality simulator · local estimate · {{ app_version_short }}</p>
+    <div class="page-title-row">
+      <h1>Execution Quality Simulator</h1>
+      <span class="status-badge tone-local">LOCAL SIMULATION</span>
+      <span class="status-badge tone-neutral">NOT A FILL GUARANTEE</span>
+    </div>
+    <p class="page-subtitle">Estimate fill price, unfilled size, slippage, spread, depth, and stale/closed-market blockers before manual review.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter execution-quality simulations">
+    <label>State <input name="state" value="{{ state }}" placeholder="quality_pass, blocked_by_wide_spread"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+    <label>Token ID <input name="token_id" value="{{ token_id }}" placeholder="optional"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter simulations</button>
+  </form>
+</section>
+
+<section class="callout warning">
+  <h3>Estimate Only</h3>
+  <p>{{ guardrail }} Estimated fills are based on saved local snapshots and are not exchange acknowledgements or fill guarantees.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ summary.count or 0 }}</strong><span>Simulations</span></article>
+  <article class="metric-card"><strong>{{ summary.quality_pass or 0 }}</strong><span>Pass</span></article>
+  <article class="metric-card"><strong>{{ summary.quality_pass_with_warnings or 0 }}</strong><span>Pass + warnings</span></article>
+  <article class="metric-card"><strong>{{ summary.blocked_total or 0 }}</strong><span>Blocked</span></article>
+  <article class="metric-card"><strong>{{ summary.blocked_by_insufficient_depth or 0 }}</strong><span>Depth blocked</span></article>
+  <article class="metric-card"><strong>{{ market_summary.count or 0 }}</strong><span>Snapshots available</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Preview Simulation</h2>
+      <p class="muted">Preview is not saved. Record through the API/CLI when you want an audit-visible local simulation.</p>
+    </div>
+    <a class="button-link quiet" href="/api/execution-quality.csv">Export CSV</a>
+  </div>
+  <form method="post" action="/api/execution-quality/preview" class="stacked-form">
+    <label>Snapshot ID <input name="snapshot_id" placeholder="optional; latest by market/token if blank"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}"></label>
+    <label>Token ID <input name="token_id" value="{{ token_id }}"></label>
+    <label>Side
+      <select name="side"><option>BUY</option><option>SELL</option></select>
+    </label>
+    <label>Limit price <input type="number" step="0.0001" name="price" value="0.5"></label>
+    <label>Size <input type="number" step="0.0001" name="size" value="1"></label>
+    <button type="submit">Preview quality</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Recorded Simulations</h2>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>State</th><th>Simulation</th><th>Market / token</th><th>Order</th><th class="numeric">Est. avg</th><th class="numeric">Unfilled</th><th class="numeric">Slippage</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><span class="status-badge tone-{{ row.state|status_tone }}">{{ row.state }}</span></td>
+          <td><a href="/execution-quality/{{ row.simulation_id }}">{{ row.simulation_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+          <td>{{ row.market_id or 'unknown' }}<br><span class="muted small">{{ row.token_id or 'no token' }}</span></td>
+          <td>{{ row.side }} {{ row.order_type }}<br><span class="muted small">{{ row.size }} @ {{ row.limit_price }}</span></td>
+          <td class="numeric">{{ row.estimated_average_fill_price }}</td>
+          <td class="numeric">{{ row.estimated_unfilled_size }}</td>
+          <td class="numeric">{{ row.estimated_slippage_bps }} bps</td>
+          <td>{{ row.recommended_action }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><h3>No Simulations</h3><p>No execution-quality simulations are recorded yet. Record a market snapshot, then preview or record a local quality simulation.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

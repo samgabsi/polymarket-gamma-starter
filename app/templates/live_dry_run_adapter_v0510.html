@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Dry-Run Adapter - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live dry-run adapter · v0.5.11 · offline validation only</p>
+        <h1>Live Dry-Run Adapter Receipts</h1>
+        <p class="muted">Validate unsigned execution packets against an offline adapter-shaped request/response contract. This page never signs, submits, cancels, touches wallets, sends network requests, or automates trading.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/live-order-intents">Intents</a> <a href="/live-order-intent-preflight">Preflight</a> <a href="/live-order-authorizations">Authorizations</a> <a href="/live-execution-packets">Execution packets</a> <a href="/live-dry-run-review">Dry-run review</a> <a href="/live-adapter">Live adapter</a> <a href="/live-adapter-requests">Adapter requests</a> <a href="/audit?category=live_dry_run_adapter">Dry-run audit</a> <a href="/api/live/dry-run-adapter">JSON</a> <a href="/api/live/dry-run-adapter.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="dry_run_validated" {% if status == 'dry_run_validated' %}selected{% endif %}>dry_run_validated</option>
+            <option value="dry_run_validated_with_warnings" {% if status == 'dry_run_validated_with_warnings' %}selected{% endif %}>dry_run_validated_with_warnings</option>
+            <option value="blocked_by_packet" {% if status == 'blocked_by_packet' %}selected{% endif %}>blocked_by_packet</option>
+            <option value="blocked_by_guard" {% if status == 'blocked_by_guard' %}selected{% endif %}>blocked_by_guard</option>
+            <option value="invalid" {% if status == 'invalid' %}selected{% endif %}>invalid</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Packet ID <input name="packet_id" value="{{ packet_id }}" placeholder="optional"></label>
+        <label>Intent ID <input name="intent_id" value="{{ intent_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter receipts</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved receipts</span></div>
+      <div><strong>{{ summary.ready_total or 0 }}</strong><span>Validated</span></div>
+      <div><strong>{{ summary.blocked_total or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>${{ '%.2f'|format(summary.total_dry_run_notional or 0) }}</strong><span>Validated notional</span></div>
+      <div><strong>{{ 'no' if not summary.network_available else 'yes' }}</strong><span>Network available</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Validate ready packets offline</h2>
+      <p class="muted">Only previously saved unsigned packets with ready packet statuses are offered here. Recording a receipt creates a local adapter dry-run snapshot; it does not generate signatures or exchange orders.</p>
+      {% if packet_candidates %}
+      <table>
+        <thead><tr><th>Packet</th><th>Intent / authorization</th><th>Wire preview</th><th>Status</th><th>Dry-run</th></tr></thead>
+        <tbody>
+          {% for row in packet_candidates %}
+          <tr>
+            <td><a href="/api/live/execution-packets/{{ row.packet_id }}" target="_blank" rel="noreferrer">{{ row.packet_id }}</a><br><span class="muted small"><code>{{ row.packet_hash[:16] if row.packet_hash else '' }}</code></span></td>
+            <td>{{ row.intent_id }}<br><span class="muted small">auth={{ row.authorization_id or 'missing' }} · preflight={{ row.preflight_state_snapshot }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">asset={{ row.token_id or 'missing' }} · {{ row.side }} {{ row.outcome }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">signed={{ row.signed_payload_present }} · ack={{ row.exchange_acknowledgement }}</span></td>
+            <td>
+              <form method="post" action="/live-execution-packets/{{ row.packet_id }}/dry-run" class="stacked-form">
+                <input type="hidden" name="operator" value="{{ default_operator }}">
+                <label>Note <input name="note" placeholder="optional dry-run note"></label>
+                <button type="submit">Record offline dry-run</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No ready unsigned execution packets are available for dry-run validation.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved dry-run receipts</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Receipt</th><th>Status</th><th>Packet / intent</th><th>Adapter preview</th><th>Guards</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/dry-run-adapter/{{ row.receipt_id }}" target="_blank" rel="noreferrer">{{ row.receipt_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.receipt_hash[:16] if row.receipt_hash else '' }}</code></span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+            <td>{{ row.packet_id }}<br><span class="muted small">intent={{ row.intent_id or 'missing' }}<br>auth={{ row.authorization_id or 'missing' }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · {{ row.time_in_force }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>offline={{ row.offline_only }}<br>network={{ row.network_attempted }}<br>execution={{ row.execution_allowed }}</td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live dry-run adapter receipts match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>What this does not do</h2>
+      <p class="muted">A dry-run receipt is not an exchange order, not a CLOB acknowledgement, not a signature request, and not a permission slip for automated trading. It is local evidence that the packet shape and guard posture were reviewed offline.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Operator Authorizations - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live operator authorizations · v0.5.11 · local snapshot only</p>
+        <h1>Live Operator Authorization Ledger</h1>
+        <p class="muted">Record explicit human decisions against saved live-intent preflight snapshots. These records document review only; they never sign, submit, cancel, automate, or touch wallets.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/live-order-intents">Intent previews</a> <a href="/live-order-intent-preflight">Preflight</a> <a href="/live-execution-packets">Execution packets</a> <a href="/audit?category=live_order_authorization">Authorization audit</a> <a href="/api/live/order-intents/authorizations">JSON</a> <a href="/api/live/order-intents/authorizations.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="authorized_dry_run" {% if status == 'authorized_dry_run' %}selected{% endif %}>authorized_dry_run</option>
+            <option value="authorized_with_warnings" {% if status == 'authorized_with_warnings' %}selected{% endif %}>authorized_with_warnings</option>
+            <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>rejected</option>
+            <option value="deferred" {% if status == 'deferred' %}selected{% endif %}>deferred</option>
+            <option value="blocked_by_preflight" {% if status == 'blocked_by_preflight' %}selected{% endif %}>blocked_by_preflight</option>
+            <option value="invalid" {% if status == 'invalid' %}selected{% endif %}>invalid</option>
+          </select>
+        </label>
+        <label>Decision
+          <select name="decision">
+            <option value="" {% if not decision %}selected{% endif %}>all</option>
+            <option value="authorize" {% if decision == 'authorize' %}selected{% endif %}>authorize</option>
+            <option value="reject" {% if decision == 'reject' %}selected{% endif %}>reject</option>
+            <option value="defer" {% if decision == 'defer' %}selected{% endif %}>defer</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Intent ID <input name="intent_id" value="{{ intent_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter authorizations</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved authorizations</span></div>
+      <div><strong>{{ summary.authorized_total or 0 }}</strong><span>Authorized snapshots</span></div>
+      <div><strong>{{ summary.blocked_by_preflight or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>{{ summary.rejected or 0 }}</strong><span>Rejected</span></div>
+      <div><strong>${{ '%.2f'|format(summary.total_authorized_notional or 0) }}</strong><span>Authorized notional</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Record authorization from current preflight rows</h2>
+      <p class="muted">Only preflight rows in <code>ready_for_operator_authorization</code> or <code>ready_with_warnings</code> can produce an authorized snapshot. Other states are recorded as blocked unless you reject or defer them.</p>
+      {% if preflight_items %}
+      <table>
+        <thead><tr><th>Intent</th><th>Preflight</th><th>Market / order</th><th>Paper binding</th><th>Decision</th></tr></thead>
+        <tbody>
+          {% for row in preflight_items %}
+          <tr>
+            <td><a href="/api/live/order-intents/{{ row.intent_id }}/preflight" target="_blank" rel="noreferrer">{{ row.intent_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.state }}</span><br><span class="muted small">{{ row.blocker_count }} blocker(s), {{ row.warning_count }} warning(s)</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · {{ row.order_type }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>Ticket: {{ row.source_ticket_id or 'missing' }}<br>Approval: {{ row.source_approval_id or 'missing' }}</td>
+            <td>
+              <form method="post" action="/live-order-intents/{{ row.intent_id }}/authorization" class="stacked-form">
+                <input type="hidden" name="operator" value="{{ default_operator }}">
+                <label>Decision
+                  <select name="decision"><option value="authorize">authorize</option><option value="reject">reject</option><option value="defer">defer</option></select>
+                </label>
+                <label>Note <input name="note" placeholder="optional review note"></label>
+                <label class="check"><input type="checkbox" name="acknowledged" value="true"> I acknowledge this is non-executing</label>
+                <button type="submit">Record snapshot</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live-intent preflight rows are available for this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved authorization snapshots</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Authorization</th><th>Status / decision</th><th>Intent</th><th>Market / order</th><th>Snapshot</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/order-intents/authorizations/{{ row.authorization_id }}" target="_blank" rel="noreferrer">{{ row.authorization_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">{{ row.decision }} · {{ row.operator }}</span></td>
+            <td>{{ row.intent_id }}<br><span class="muted small">preflight={{ row.preflight_state_snapshot }}</span></td>
+            <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} {{ row.outcome }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td><code>{{ row.authorization_hash[:16] if row.authorization_hash else '' }}</code><br><span class="muted small">ack={{ row.acknowledgement }} · execution={{ row.execution_allowed }}</span></td>
+            <td>{% if row.blockers_snapshot %}<strong>{{ row.blockers_snapshot[0] }}</strong>{% elif row.warnings_snapshot %}<strong>{{ row.warnings_snapshot[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live operator authorization snapshots match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>What this does not do</h2>
+      <p class="muted">An authorization snapshot is not an exchange order, not an order acknowledgement, and not permission for this build to trade. It is a local audit record that a human reviewed a specific preflight snapshot.</p>
+    </section>
+  </main>
+</body>
+</html>

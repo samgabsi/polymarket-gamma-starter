@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Deployment Configuration</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main class="container">
+    <h1>Deployment Configuration</h1>
+    <p><a href="/">Dashboard</a> · <a href="/users">Users</a> · <a href="/administration/maintenance">Maintenance</a> · <a href="/live-config">Live config readiness</a> · <a href="/logout">Logout</a></p>
+
+    <section class="card">
+      <h2>Access URLs</h2>
+      <p><strong>Local:</strong> <a href="{{ deployment.urls.local }}">{{ deployment.urls.local }}</a></p>
+      <p><strong>Bind:</strong> {{ deployment.host }}:{{ deployment.port }}</p>
+      {% if deployment.urls.lan %}
+        <ul>
+          {% for url in deployment.urls.lan %}
+          <li><a href="{{ url }}">{{ url }}</a></li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p>No LAN IP detected.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Startup Checks</h2>
+      <table>
+        <tr><th>Check</th><th>Status</th><th>Detail</th></tr>
+        {% for check in deployment.checks %}
+        <tr>
+          <td>{{ check.name }}</td>
+          <td>{% if check.ok %}PASS{% else %}WARN{% endif %}</td>
+          <td>{{ check.detail }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Warnings</h2>
+      {% if deployment.warnings %}
+        <ul>{% for warning in deployment.warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+      {% else %}
+        <p>No warnings.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Runtime Environment</h2>
+      <table>
+        <tr><th>Key</th><th>Set</th><th>Value</th></tr>
+        {% for row in deployment.config %}
+        <tr>
+          <td>{{ row.key }}</td>
+          <td>{{ row.set }}</td>
+          <td>{% if row.sensitive and row.set %}{{ row.value }}{% else %}{{ row.value or '' }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </table>
+    </section>
+  </main>
+</body>
+</html>

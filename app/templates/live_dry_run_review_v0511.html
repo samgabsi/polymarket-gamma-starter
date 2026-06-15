@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Dry-Run Review - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live dry-run review · v0.5.11 · read-only reconciliation</p>
+        <h1>Live Dry-Run Review Board</h1>
+        <p class="muted">Reconcile saved unsigned execution packets against their latest offline dry-run receipts. The board highlights missing receipts, stale receipt snapshots, packet blockers, and validated offline review state without creating orders or touching network paths.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/live-order-intents">Intents</a> <a href="/live-order-intent-preflight">Preflight</a> <a href="/live-order-authorizations">Authorizations</a> <a href="/live-execution-packets">Execution packets</a> <a href="/live-dry-run-adapter">Dry-run adapter</a> <a href="/live-adapter">Live adapter</a> <a href="/live-adapter-requests">Adapter requests</a> <a href="/api/live/dry-run-review">JSON</a> <a href="/api/live/dry-run-review.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>State
+          <select name="state">
+            <option value="" {% if not state %}selected{% endif %}>all</option>
+            <option value="validated_ready" {% if state == 'validated_ready' %}selected{% endif %}>validated_ready</option>
+            <option value="validated_with_warnings" {% if state == 'validated_with_warnings' %}selected{% endif %}>validated_with_warnings</option>
+            <option value="needs_dry_run_receipt" {% if state == 'needs_dry_run_receipt' %}selected{% endif %}>needs_dry_run_receipt</option>
+            <option value="stale_dry_run_receipt" {% if state == 'stale_dry_run_receipt' %}selected{% endif %}>stale_dry_run_receipt</option>
+            <option value="dry_run_blocked" {% if state == 'dry_run_blocked' %}selected{% endif %}>dry_run_blocked</option>
+            <option value="packet_blocked" {% if state == 'packet_blocked' %}selected{% endif %}>packet_blocked</option>
+            <option value="invalid" {% if state == 'invalid' %}selected{% endif %}>invalid</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Packet ID <input name="packet_id" value="{{ packet_id }}" placeholder="optional"></label>
+        <label>Intent ID <input name="intent_id" value="{{ intent_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter review</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_packet_count or 0 }}</strong><span>Saved packets</span></div>
+      <div><strong>{{ summary.reviewed_total or 0 }}</strong><span>Current receipts</span></div>
+      <div><strong>{{ summary.action_required_total or 0 }}</strong><span>Action required</span></div>
+      <div><strong>{{ summary.stale_dry_run_receipt or 0 }}</strong><span>Stale receipts</span></div>
+      <div><strong>{{ 'no' if not summary.network_available else 'yes' }}</strong><span>Network available</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Packet receipt review</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Packet</th><th>Review state</th><th>Latest receipt</th><th>Order snapshot</th><th>Safety flags</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/execution-packets/{{ row.packet_id }}" target="_blank" rel="noreferrer">{{ row.packet_id }}</a><br><span class="muted small">{{ row.packet_created_at }}<br><code>{{ row.packet_hash[:16] if row.packet_hash else '' }}</code></span></td>
+            <td><span class="pill">{{ row.state }}</span><br><span class="muted small">packet={{ row.packet_status }} · receipts={{ row.receipt_count }}</span></td>
+            <td>{% if row.latest_receipt_id %}<a href="/api/live/dry-run-adapter/{{ row.latest_receipt_id }}" target="_blank" rel="noreferrer">{{ row.latest_receipt_id }}</a><br><span class="muted small">{{ row.latest_receipt_status }} · {{ row.latest_receipt_created_at }}<br><code>{{ row.latest_receipt_hash[:16] if row.latest_receipt_hash else '' }}</code></span>{% else %}<span class="muted">missing</span>{% endif %}</td>
+            <td>{{ row.market_id }}<br><span class="muted small">intent={{ row.intent_id or 'missing' }} · auth={{ row.authorization_id or 'missing' }}<br>{{ row.side }} {{ row.outcome }} · {{ row.time_in_force }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+            <td>offline={{ row.offline_only }}<br>network={{ row.network_attempted }}<br>execution={{ row.execution_allowed }}<br>signed={{ row.signed_payload_present }}</td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No live dry-run review rows match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>State meanings</h2>
+      <ul class="clean-list compact">
+        <li><strong>validated_ready:</strong> latest receipt matches the packet hash and has no warnings.</li>
+        <li><strong>validated_with_warnings:</strong> latest receipt matches the packet hash, but packet or receipt warnings need human review.</li>
+        <li><strong>needs_dry_run_receipt:</strong> packet exists and is packageable, but no receipt has been saved.</li>
+        <li><strong>stale_dry_run_receipt:</strong> latest receipt no longer matches the current packet hash, status, intent, or authorization snapshot.</li>
+        <li><strong>dry_run_blocked:</strong> latest receipt is blocked or reports unsafe dry-run flags.</li>
+        <li><strong>packet_blocked:</strong> saved packet is not currently suitable for dry-run review.</li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>What this does not do</h2>
+      <p class="muted">This review board is a derived local report. It does not save approvals, does not authorize trading, does not sign payloads, does not submit or cancel orders, does not call Polymarket, and does not automate execution.</p>
+    </section>
+  </main>
+</body>
+</html>

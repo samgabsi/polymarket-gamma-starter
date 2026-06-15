@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Strategy Signals{% endblock %}
+{% block breadcrumbs %}<a href="/autonomous-trading">Autonomous</a> / <span>Strategy signals</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Deterministic inputs</p><h1>Strategy signals</h1><p class="page-subtitle">Explicit local signal records for guarded autonomous previews. The engine does not invent trades from LLM output.</p></div><div class="action-bar"><a class="button-link" href="/api/strategy-signals.csv">Export CSV</a></div></section>
+<div class="table-wrap"><table><thead><tr><th>Signal</th><th>Strategy</th><th>Status</th><th>Market</th><th>Token</th><th>Side</th><th>Price</th><th>Size</th><th>Confidence</th></tr></thead><tbody>{% for row in board["items"] %}<tr><td>{{ row.signal_id|compact_id }}</td><td>{{ row.strategy_id }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.market_id|compact_id }}</td><td>{{ row.token_id|compact_id }}</td><td>{{ row.side }}</td><td>{{ row.limit_price }}</td><td>{{ row.size }}</td><td>{{ row.confidence }}</td></tr>{% else %}<tr><td colspan="9" class="empty-state">No strategy signals yet. Create one through the API or CLI before autonomous dry-run evaluation.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

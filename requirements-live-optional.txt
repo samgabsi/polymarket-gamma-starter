@@ -1,0 +1,4 @@
+# Optional runtime dependency for the v1.0.0 manual-live CLOB adapter.
+# The core app does not require this package for local/paper/fake-adapter validation.
+# Install only in an operator-controlled environment after reviewing the current Polymarket docs.
+py-clob-client==0.34.6

@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Live Execution - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Manual submit</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Manual execution control · {{ app_version_short }} · default blocked</p>
+    <div class="page-title-row">
+      <h1>Manual Live Execution</h1>
+      <span class="status-badge tone-{{ readiness.overall_status|status_tone }}">{{ readiness.overall_status }}</span>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+    </div>
+    <p class="page-subtitle">Final operator control plane for adapter requests, fake-local submit receipts, and blocked real-live attempts. This is not autonomous trading.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter submit attempts">
+    <label>Status <input name="status" value="{{ status }}" placeholder="optional"></label>
+    <label>Adapter mode <input name="adapter_mode" value="{{ adapter_mode }}" placeholder="fake_local"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+    <label>Adapter request <input name="adapter_request_id" value="{{ adapter_request_id }}" placeholder="optional"></label>
+    <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter</button>
+  </form>
+</section>
+
+<section class="callout warning">
+  <h3>Execution Boundary</h3>
+  <p>{{ readiness.recommended_next_action }} Real live submit implemented: {{ readiness.real_submit_implemented }}. Real live cancel implemented: {{ readiness.real_cancel_implemented }}. Kill switch blocks all execution attempts when active.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ 'active' if readiness.kill_switch_active else 'clear' }}</strong><span>Kill switch</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if readiness.submit_enabled else 'no' }}</strong><span>Manual submit</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if readiness.cancel_enabled else 'no' }}</strong><span>Manual cancel</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if readiness.fake_adapter_enabled else 'no' }}</strong><span>Fake adapter</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if readiness.final_confirmation_phrase_configured else 'no' }}</strong><span>Phrase configured</span></article>
+  <article class="metric-card"><strong>{{ readiness.ready_adapter_request_count or 0 }}</strong><span>Ready requests</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Submit from Adapter Request</h2>
+      <p class="muted">Recording an attempt always writes a local audit record. Only fake-local mode can simulate a receipt, and fake receipts are not exchange acknowledgements.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/live-adapter-requests">Prior: adapter requests</a>
+      <a class="button-link quiet" href="/live-execution-attempts">Attempts</a>
+      <a class="button-link quiet" href="/api/live/execution-control/readiness">Readiness JSON</a>
+      <a class="button-link quiet" href="/api/live/execution-attempts.csv">CSV</a>
+    </div>
+  </div>
+  {% if adapter_request_candidates %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Request</th><th>Status</th><th>Order</th><th>Manual submit attempt</th></tr></thead>
+      <tbody>
+        {% for row in adapter_request_candidates %}
+        <tr>
+          <td><a href="/api/live/adapter/requests/{{ row.request_id }}">{{ row.request_id|compact_id }}</a><br><span class="muted small">packet={{ row.packet_id|compact_id }}<br><code>{{ row.request_hash[:16] if row.request_hash else '' }}</code></span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">dry-run={{ row.dry_run_receipt_status or 'missing' }}</span></td>
+          <td>{{ row.market_id }}<br><span class="muted small">asset={{ row.token_id or 'missing' }} · {{ row.side }} {{ row.outcome }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+          <td>
+            <form method="post" action="/live-adapter-requests/{{ row.request_id }}/manual-submit" class="stacked-form" aria-label="Record manual submit attempt for {{ row.request_id }}">
+              <input type="hidden" name="operator" value="{{ default_operator }}">
+              <label>Adapter mode
+                <select name="adapter_mode">
+                  <option value="blocked">blocked - record no-submit audit only</option>
+                  <option value="fake_local">fake_local - local fake receipt only</option>
+                  <option value="real_live">real_live - gated SDK submit</option>
+                </select>
+              </label>
+              <label>Final confirmation <input type="password" name="final_confirmation" autocomplete="off" placeholder="required only when enabled"></label>
+              <label>Note <input name="note" placeholder="optional local note"></label>
+              <p class="helper-text">This button records an audited attempt. It does not bypass kill switch, authorization, dry-run, risk, or confirmation gates.</p>
+              <button type="submit">Record manual submit attempt</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Adapter Requests Available</h3>
+    <p>Create a validated adapter request from an unsigned execution packet after live intent, live preflight, authorization, and offline dry-run receipt stages. This does not submit an order.</p>
+    <p><a href="/live-adapter-requests">Open adapter requests</a> · <a href="/workflow">View workflow map</a></p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Recent Submit Attempts</h2>
+      <p class="muted">Includes blocked, fake-local, and gated real-live requests.</p>
+    </div>
+    <a class="button-link quiet" href="/audit?category=live_manual_submit_attempt">Submit audit</a>
+  </div>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attempt</th><th>Status</th><th>Adapter</th><th>Order</th><th>Receipt</th><th>Next action</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><a href="/live-execution-attempts?attempt_id={{ row.attempt_id }}">{{ row.attempt_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.attempt_hash[:16] if row.attempt_hash else '' }}</code></span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+          <td>{{ row.adapter_mode }}<br><span class="muted small">network={{ row.real_network_attempted }} · signed={{ row.signed_payload_present }}</span></td>
+          <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+          <td>{{ row.fake_submit_receipt_id or row.fake_order_id or 'none' }}</td>
+          <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.recommended_next_action }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Submit Attempts</h3>
+    <p>No manual submit attempts match this filter. Attempts are local audit records and can include safe blocked outcomes.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

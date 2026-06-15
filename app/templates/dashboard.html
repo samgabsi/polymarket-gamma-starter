@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+
+{% block title %}Operator Overview - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Operator console · {{ app_version_short }} · local-first</p>
+    <div class="page-title-row">
+      <h1>Operator Overview</h1>
+      <span class="status-badge tone-local">LOCAL</span>
+      <span class="status-badge tone-paper">PAPER ONLY</span>
+      <span class="status-badge tone-neutral">LIVE DISABLED</span>
+    </div>
+    <p class="page-subtitle">Research, paper workflow, risk review, ops closeout, audit, and staged live-readiness in one console. No wallet actions, live orders, or autonomous execution.</p>
+    <div class="action-bar" aria-label="Primary actions">
+      <a class="button-link" href="/workflow">Open workflow map</a>
+      <a class="button-link quiet" href="/operator">Operator brief</a>
+      <a class="button-link quiet" href="/audit">Audit ledger</a>
+      <a class="button-link quiet" href="/live-manual-execution">Manual execution control</a>
+    </div>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Refresh market scan">
+    <label>Market scan limit <input type="number" name="limit" min="1" max="100" value="{{ limit }}"></label>
+    <label><input type="checkbox" name="save" value="true"> Save snapshot on refresh</label>
+    <button type="submit">Refresh overview</button>
+  </form>
+</section>
+
+{% if snapshot %}
+<section class="callout ok" role="status">
+  <h3>Snapshot Saved</h3>
+  <p>Saved snapshot: <code>{{ snapshot.path }}</code></p>
+</section>
+{% endif %}
+
+<section class="callout info">
+  <h3>Safety Posture</h3>
+  <p>Live submit/cancel are implemented only through the manual CLOB adapter boundary; fake adapter receipts are local simulations only, and execution controls remain gated by kill switch, manual confirmation, authorization, dry-run, risk, and audit boundaries.</p>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div>
+      <h2>Operator next steps</h2>
+      <p class="muted">Mobile-friendly workflow shortcuts. These links navigate only; they do not enable trading, network ingestion, or autonomous execution.</p>
+    </div>
+  </div>
+  <div class="operator-next-steps">
+    <a href="/live-trading"><strong>Check live readiness</strong><br><span class="muted">Review kill switch, submit/cancel gates, and CLOB status.</span></a>
+    <a href="/live-clob-adapter"><strong>Verify adapter</strong><br><span class="muted">Run safe offline verification before any live consideration.</span></a>
+    <a href="/data"><strong>Prepare data</strong><br><span class="muted">Register sources, ingest locally, normalize, and label.</span></a>
+    <a href="/training"><strong>Train and evaluate</strong><br><span class="muted">Build datasets, run baselines, backtest, and queue signals.</span></a>
+    <a href="/operator-runbook"><strong>Open runbook</strong><br><span class="muted">Follow the guarded operator sequence step by step.</span></a>
+  </div>
+</section>
+
+<section class="metric-grid" aria-label="System health summary">
+  <article class="metric-card"><strong>{{ summary.count }}</strong><span>Markets scanned</span></article>
+  <article class="metric-card"><strong>{{ alert_summary.count or 0 }}</strong><span>Local alerts</span></article>
+  <article class="metric-card"><strong>{{ ticket_summary.count or 0 }}</strong><span>Paper tickets</span></article>
+  <article class="metric-card"><strong>{{ approval_summary.blocked or 0 }}</strong><span>Approval blocks</span></article>
+  <article class="metric-card"><strong>{{ preflight_summary.blocked or 0 }}</strong><span>Preflight blocked</span></article>
+  <article class="metric-card"><strong>{{ ops_closeout_summary.closeout_status or 'unknown' }}</strong><span>Closeout status</span></article>
+  <article class="metric-card"><strong>{{ live_config_summary.readiness_state or 'unknown' }}</strong><span>Live readiness</span></article>
+  <article class="metric-card"><strong>{{ 'active' if live_execution_control_summary.kill_switch_active else 'clear' }}</strong><span>Kill switch</span></article>
+  <article class="metric-card"><strong>{{ market_data_summary.count or 0 }}</strong><span>Market snapshots</span></article>
+  <article class="metric-card"><strong>{{ execution_quality_summary.blocked_total or 0 }}</strong><span>Quality blocked</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Next Operator Actions</h2>
+      <p class="muted">Highest-signal checks based on current local summaries.</p>
+    </div>
+    <a class="button-link quiet" href="/workflow">See full workflow</a>
+  </div>
+  <div class="priority-list">
+    {% if approval_summary.blocked or preflight_summary.blocked or execution_queue_summary.blocked %}
+      <article class="priority-item danger">
+        <span class="status-badge tone-danger">BLOCKED</span>
+        <strong>Resolve paper approval or preflight blockers before any simulated entry work.</strong>
+        <span><a href="/approvals">Approvals</a> · <a href="/preflight">Preflight</a> · <a href="/execution-queue">Execution queue</a></span>
+      </article>
+    {% endif %}
+    {% if ops_closeout_summary.handoff_required or ops_escalation_summary.open or ops_escalation_review_summary.review_required %}
+      <article class="priority-item warning">
+        <span class="status-badge tone-warning">NEEDS REVIEW</span>
+        <strong>Ops handoff, escalation, or closeout work needs operator attention.</strong>
+        <span><a href="/paper-ops-closeout">Closeout</a> · <a href="/paper-handoffs">Handoffs</a> · <a href="/paper-ops-escalations">Escalations</a></span>
+      </article>
+    {% endif %}
+    {% if live_execution_control_summary.overall_status and live_execution_control_summary.overall_status != 'manual_submit_disabled_safe_default' %}
+      <article class="priority-item warning">
+        <span class="status-badge tone-warning">LIVE READINESS</span>
+        <strong>{{ live_execution_control_summary.overall_status }}: {{ live_execution_control_summary.recommended_next_action }}</strong>
+        <span><a href="/live-manual-execution">Manual submit</a> · <a href="/live-execution-attempts">Attempts</a> · <a href="/api/live/execution-control/readiness">Readiness JSON</a></span>
+      </article>
+    {% endif %}
+    {% if market_data_summary.stale or market_data_summary.wide_spread or execution_quality_summary.blocked_total %}
+      <article class="priority-item warning">
+        <span class="status-badge tone-warning">MARKET DATA</span>
+        <strong>Market data or execution-quality checks need review before manual boundary work.</strong>
+        <span><a href="/market-data">Snapshots</a> · <a href="/execution-quality">Execution quality</a></span>
+      </article>
+    {% endif %}
+    {% if not approval_summary.blocked and not preflight_summary.blocked and not ops_closeout_summary.handoff_required and not market_data_summary.stale and not market_data_summary.wide_spread and not execution_quality_summary.blocked_total and live_execution_control_summary.overall_status == 'manual_submit_disabled_safe_default' %}
+      <article class="priority-item ok">
+        <span class="status-badge tone-ok">CLEAR</span>
+        <strong>No critical local blockers surfaced in the overview. Continue research, paper review, or closeout hygiene.</strong>
+        <span><a href="/opportunities">Opportunities</a> · <a href="/trade-tickets">Tickets</a> · <a href="/audit">Audit</a></span>
+      </article>
+    {% endif %}
+  </div>
+</section>
+
+<section class="grid">
+  <article class="card">
+    <h2>Research</h2>
+    <p class="muted">Scan markets, review sources, save evidence, and classify candidates.</p>
+    <div class="metadata-grid">
+      <div><dt>Watchlist</dt><dd>{{ watchlist|length }}</dd></div>
+      <div><dt>Notes</dt><dd>{{ notes_summary.count or 0 }}</dd></div>
+      <div><dt>Evidence packets</dt><dd>{{ evidence_summary.count or 0 }}</dd></div>
+    </div>
+    <p><a href="/opportunities">Opportunities</a> · <a href="/readiness">Readiness</a> · <a href="/playbooks">Playbooks</a> · <a href="/research/sources">Sources</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Paper Workflow</h2>
+    <p class="muted">Paper-only tickets, approvals, preflight, and execution queue.</p>
+    <div class="metadata-grid">
+      <div><dt>Tickets</dt><dd>{{ ticket_summary.count or 0 }}</dd></div>
+      <div><dt>Approved ready</dt><dd>{{ execution_queue_summary.approved_ready or 0 }}</dd></div>
+      <div><dt>Needs approval</dt><dd>{{ execution_queue_summary.needs_approval or 0 }}</dd></div>
+    </div>
+    <p><a href="/trade-tickets">Tickets</a> · <a href="/approvals">Approvals</a> · <a href="/preflight">Preflight</a> · <a href="/execution-queue">Queue</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Risk / Portfolio</h2>
+    <p class="muted">Paper exposure and local risk budget only.</p>
+    <div class="metadata-grid">
+      <div><dt>Paper equity</dt><dd>${{ '{:,.0f}'.format(portfolio.equity) }}</dd></div>
+      <div><dt>Open positions</dt><dd>{{ portfolio.open_position_count }}</dd></div>
+      <div><dt>Return</dt><dd>{{ '%+.2f'|format(portfolio.total_return_percent) }}%</dd></div>
+    </div>
+    <p><a href="/risk-budget">Risk budget</a> · <a href="/positions">Positions</a> · <a href="/exit-tickets">Exit tickets</a> · <a href="/settlements">Settlements</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Ops / Closeout</h2>
+    <p class="muted">Runbook, briefing, handoff, aging, escalation, and closeout status.</p>
+    <div class="metadata-grid">
+      <div><dt>Briefing actions</dt><dd>{{ briefing_summary.action_required or 0 }}</dd></div>
+      <div><dt>Handoff required</dt><dd>{{ ops_closeout_summary.handoff_required or 0 }}</dd></div>
+      <div><dt>Open escalations</dt><dd>{{ ops_escalation_summary.open or 0 }}</dd></div>
+    </div>
+    <p><a href="/paper-ops-briefing">Briefing</a> · <a href="/paper-handoffs">Handoffs</a> · <a href="/paper-ops-closeout">Closeout</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Market Data</h2>
+    <p class="muted">Local order-book snapshots, spread, depth, stale data, and execution-quality estimates.</p>
+    <div class="metadata-grid">
+      <div><dt>Snapshots</dt><dd>{{ market_data_summary.count or 0 }}</dd></div>
+      <div><dt>Stale</dt><dd>{{ market_data_summary.stale or 0 }}</dd></div>
+      <div><dt>Wide spread</dt><dd>{{ market_data_summary.wide_spread or 0 }}</dd></div>
+      <div><dt>Quality blocked</dt><dd>{{ execution_quality_summary.blocked_total or 0 }}</dd></div>
+    </div>
+    <p><a href="/market-data">Snapshots</a> · <a href="/execution-quality">Execution quality</a> · <a href="/api/market-data/snapshots">JSON</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Live Readiness</h2>
+    <p class="muted">Redacted readiness, intent review, packets, dry-run receipts, and adapter validation. Not live trading.</p>
+    <div class="metadata-grid">
+      <div><dt>Config</dt><dd>{{ live_config_summary.readiness_state or 'unknown' }}</dd></div>
+      <div><dt>Intents</dt><dd>{{ live_order_intent_summary.saved_count or 0 }}</dd></div>
+      <div><dt>Adapter requests</dt><dd>{{ live_adapter_request_summary.saved_count or 0 }}</dd></div>
+    </div>
+    <p><a href="/live-config">Config</a> · <a href="/live-order-intents">Intents</a> · <a href="/live-adapter">Adapter</a> · <a href="/live-adapter-requests">Requests</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Manual Boundary</h2>
+    <p class="muted">Manual-only, default-off control plane. Fake receipts are not exchange acknowledgements.</p>
+    <div class="metadata-grid">
+      <div><dt>Status</dt><dd>{{ live_execution_control_summary.overall_status or 'unknown' }}</dd></div>
+      <div><dt>Attempts</dt><dd>{{ live_execution_attempt_summary.saved_count or 0 }}</dd></div>
+      <div><dt>Fake submits</dt><dd>{{ live_execution_attempt_summary.submitted_fake_adapter_only or 0 }}</dd></div>
+    </div>
+    <p><a href="/manual-execution-boundary">Manual review</a> · <a href="/live-manual-execution">Submit</a> · <a href="/live-execution-attempts">Attempts</a> · <a href="/live-manual-cancel">Cancel</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Training Lab</h2>
+    <p class="muted">Offline training, backtests, model registry, and manual-review signal queues. Training outputs do not directly live-trade.</p>
+    <div class="metadata-grid">
+      <div><dt>Datasets</dt><dd>{{ training_status.dataset_count or 0 }}</dd></div>
+      <div><dt>Training runs</dt><dd>{{ training_status.training_run_count or 0 }}</dd></div>
+      <div><dt>Pending signals</dt><dd>{{ training_status.pending_generated_signals or 0 }}</dd></div>
+    </div>
+    <p><a href="/training">Overview</a> · <a href="/training/datasets">Datasets</a> · <a href="/training/runs">Runs</a> · <a href="/training/signals">Signals</a></p>
+  </article>
+
+  <article class="card">
+    <h2>Data Lab</h2>
+    <p class="muted">Local-first ingestion, normalization, labels, and dataset manifests. Network ingestion remains disabled by default.</p>
+    <div class="metadata-grid">
+      <div><dt>Sources</dt><dd>{{ data_status.source_count or 0 }}</dd></div>
+      <div><dt>Snapshots</dt><dd>{{ data_status.raw_snapshot_count or 0 }}</dd></div>
+      <div><dt>Labels</dt><dd>{{ data_status.label_count or 0 }}</dd></div>
+    </div>
+    <p><a href="/data">Overview</a> · <a href="/data/sources">Sources</a> · <a href="/data/ingestion">Ingestion</a> · <a href="/training/dataset-builder">Dataset builder</a></p>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Local Alerts</h2>
+      <p class="muted">Workflow alerts are local signals, not trade advice.</p>
+    </div>
+    <a class="button-link quiet" href="/api/alerts">Alerts JSON</a>
+  </div>
+  {% if alerts %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Level</th><th>Type</th><th>Alert</th><th>Market</th><th>Detail</th></tr></thead>
+      <tbody>
+        {% for alert in alerts[:12] %}
+        <tr>
+          <td><span class="status-badge tone-{{ alert.level|status_tone }}">{{ alert.level }}</span></td>
+          <td>{{ alert.kind }}</td>
+          <td><strong>{{ alert.title }}</strong></td>
+          <td>{% if alert.market_id %}<a href="/markets/{{ alert.market_id }}">{{ alert.question }}</a>{% else %}<span class="muted">portfolio</span>{% endif %}</td>
+          <td>{{ alert.detail }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Alerts</h3>
+    <p>No local workflow alerts are active right now. Continue with market research, ticket review, or end-of-shift closeout.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Market Scan</h2>
+      <p class="muted">Top markets by current scan. Use these as research entry points only.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/api/markets">Markets JSON</a>
+      <a class="button-link quiet" href="/research/sources">Source registry</a>
+    </div>
+  </div>
+  {% if markets %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Score</th><th>Question</th><th class="numeric">24h Volume</th><th class="numeric">Liquidity</th><th>Outcome Prices</th><th>Why Analyze</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for market in markets %}
+        <tr>
+          <td class="numeric"><strong>{{ market.opportunity_score }}</strong></td>
+          <td><a href="/markets/{{ market.id }}">{{ market.question }}</a><br><a class="small" href="{{ market.url }}" target="_blank" rel="noreferrer">{{ market.polymarket_url_label }}</a></td>
+          <td class="numeric">${{ '{:,.0f}'.format(market.volume_24hr) }}</td>
+          <td class="numeric">${{ '{:,.0f}'.format(market.liquidity) }}</td>
+          <td>{% for outcome in market.outcomes %}<span class="pill">{{ outcome.name }} {{ '%.2f'|format(outcome.price) }}</span>{% endfor %}</td>
+          <td>{{ '; '.join(market.why_analyze) }}</td>
+          <td><span class="status-badge tone-{{ market.mispricing_status|status_tone }}">{{ market.mispricing_status }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Markets Loaded</h3>
+    <p>Refresh the dashboard to pull public Gamma market data. This does not make authenticated or live-order calls.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="two-col">
+  <article class="panel">
+    <h2>Recent Paper Activity</h2>
+    {% if recent_trades %}
+    <ul class="clean-list compact">
+      {% for trade in recent_trades[:8] %}
+      <li><span class="pill">{{ trade.side }}</span> <a href="/markets/{{ trade.market_id }}">{{ trade.question }}</a><br><span class="muted">{{ trade.timestamp }} · {{ trade.reason }}</span></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="empty-state">
+      <h3>No Paper Trades</h3>
+      <p>Paper trades appear after ticket, approval, and execution-queue gates. Start from readiness or trade tickets.</p>
+    </div>
+    {% endif %}
+  </article>
+
+  <article class="panel">
+    <h2>Snapshot and Audit</h2>
+    <div class="metadata-grid">
+      <div><dt>Latest snapshot</dt><dd>{{ latest_snapshot.created_at if latest_snapshot else 'none' }}</dd></div>
+      <div><dt>Audit rows</dt><dd>{{ audit_summary.count or 0 }}</dd></div>
+      <div><dt>Markets touched</dt><dd>{{ audit_summary.market_count or 0 }}</dd></div>
+    </div>
+    <p><a href="/audit">Open audit ledger</a> · <a href="/api/paper/audit.csv">Export audit CSV</a> · <a href="/api/paper/trades.csv">Export trades CSV</a></p>
+    {% if snapshots %}
+    <ul class="clean-list compact">
+      {% for snap in snapshots[:5] %}
+      <li><code>{{ snap.filename }}</code> · {{ snap.count }} markets · {{ snap.created_at }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">No saved snapshots yet.</p>
+    {% endif %}
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Live Trading Status{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Live trading</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">LIVE GUARDED · MANUAL CONTROL · MOBILE READY</p>
+    <h1>Live trading status</h1>
+    <p class="page-subtitle">Consolidated fail-closed status for guarded manual live submit/cancel and autonomous-blocked operation. This page is diagnostic and does not submit or cancel orders.</p>
+    <div class="action-bar">
+      <a class="button-link" href="/live-clob-adapter">Verify CLOB adapter</a>
+      <a class="button-link quiet" href="/live-orders">Review orders</a>
+      <a class="button-link quiet" href="/live-reconciliation">Run reconciliation</a>
+      <a class="button-link quiet" href="/operator-runbook">Operator runbook</a>
+    </div>
+  </div>
+</section>
+
+<div class="callout danger"><strong>Safety posture:</strong> real submit/cancel code paths are behind backend gates. The UI does not bypass kill switch, credential, allowlist, confirmation, audit, or notional controls.</div>
+
+<section class="metric-grid" aria-label="Live safety summary">
+  <article class="metric-card"><strong>{{ status.overall_status }}</strong><span>Overall status</span></article>
+  <article class="metric-card"><strong>{{ status.config.kill_switch_active }}</strong><span>Kill switch active</span></article>
+  <article class="metric-card"><strong>{{ status.config.submit_enabled }}</strong><span>Submit enabled</span></article>
+  <article class="metric-card"><strong>{{ status.config.cancel_enabled }}</strong><span>Cancel enabled</span></article>
+  <article class="metric-card"><strong>{{ status.config.autonomous_enabled }}</strong><span>Autonomous enabled</span></article>
+  <article class="metric-card"><strong>{{ status.clob_adapter_boundary.overall_status }}</strong><span>CLOB boundary</span></article>
+</section>
+
+<section class="content-card">
+  <div class="section-header"><div><h2>Operator readiness checklist</h2><p class="help-text">Diagnostic only. This checklist never flips live flags or performs network calls.</p></div></div>
+  <div class="metadata-grid">
+    <div><dt>Checklist status</dt><dd>{{ checklist.overall_status }}</dd></div>
+    <div><dt>Ready for manual live</dt><dd>{{ checklist.ready_for_manual_live }}</dd></div>
+    <div><dt>Ready for autonomous live</dt><dd>{{ checklist.ready_for_autonomous_live }}</dd></div>
+  </div>
+  <div class="table-wrap"><table><thead><tr><th>Area</th><th>Requirement</th><th>Current</th><th>Expected</th><th>Status</th><th>Remediation</th></tr></thead><tbody>{% for row in checklist.rows %}<tr><td>{{ row.area }}</td><td>{{ row.requirement }}</td><td>{{ row.current_value }}</td><td>{{ row.expected_value }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.remediation_hint }}</td></tr>{% endfor %}</tbody></table></div>
+  <div class="action-bar"><a class="button-link quiet" href="/api/live/trading/readiness-checklist">Checklist JSON</a><a class="button-link quiet" href="/api/live/trading/readiness-checklist.csv">Checklist CSV</a></div>
+</section>
+
+<section class="two-col">
+  <article class="content-card"><h2>Blockers</h2>{% if status.blockers %}<ul class="clean-list">{% for item in status.blockers %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<div class="empty-state"><h3>No blockers reported</h3><p>No blockers were reported by the bridge status layer. Continue with adapter verification and runbook review before any live consideration.</p></div>{% endif %}</article>
+  <article class="content-card"><h2>Warnings</h2>{% if status.warnings %}<ul class="clean-list">{% for item in status.warnings %}<li>{{ item }}</li>{% endfor %}</ul>{% else %}<div class="empty-state"><h3>No warnings</h3><p>No warnings were reported. This is not permission to trade; backend gates and explicit confirmations still apply.</p></div>{% endif %}</article>
+</section>
+
+<section class="content-card">
+  <h2>Readiness details</h2>
+  <div class="metadata-grid">
+    <div><dt>Credential summary</dt><dd>L2 present: {{ status.credentials.l2_credentials_present }}</dd></div>
+    <div><dt>Real submit implemented</dt><dd>{{ status.real_live_submit_implemented }}</dd></div>
+    <div><dt>Real cancel implemented</dt><dd>{{ status.real_live_cancel_implemented }}</dd></div>
+    <div><dt>Autonomous live implemented</dt><dd>{{ status.autonomous_live_mode_implemented }}</dd></div>
+  </div>
+</section>
+{% endblock %}

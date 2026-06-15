@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Execution Queue - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper execution queue · v0.5.11 · local simulation only</p>
+        <h1>Paper Execution Queue</h1>
+        <p class="muted">Separates approved-ready, needs-approval, stale-approval, blocked, rejected, and executed entry tickets. Simulated buys now require both preflight approval and a current local approval record.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/preflight">Preflight</a> <a href="/approvals">Approvals</a> <a href="/trade-tickets">Entry tickets</a> <a href="/risk-budget">Risk budget</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/audit?category=execution_approval">Approval audit</a> <a href="/api/paper/execution-queue">JSON</a> <a href="/api/paper/execution-queue.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Ticket ID <input name="ticket_id" value="{{ ticket_id }}" placeholder="optional detail/filter"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="approved_ready" {% if status == 'approved_ready' %}selected{% endif %}>approved_ready</option>
+            <option value="needs_approval" {% if status == 'needs_approval' %}selected{% endif %}>needs_approval</option>
+            <option value="stale_approval" {% if status == 'stale_approval' %}selected{% endif %}>stale_approval</option>
+            <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="rejected" {% if status == 'rejected' %}selected{% endif %}>rejected</option>
+            <option value="executed" {% if status == 'executed' %}selected{% endif %}>executed</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <label class="check"><input type="checkbox" name="strict_playbook" value="true" {% if strict_playbook %}checked{% endif %}> require playbook decision in preflight</label>
+        <button type="submit">Review queue</button>
+      </form>
+    </header>
+
+    <section class="notice">{{ guardrail }}</section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Tickets</span></div>
+      <div><strong>{{ summary.approved_ready or 0 }}</strong><span>Approved ready</span></div>
+      <div><strong>{{ summary.needs_approval or 0 }}</strong><span>Needs approval</span></div>
+      <div><strong>{{ summary.stale_approval or 0 }}</strong><span>Stale approval</span></div>
+      <div><strong>{{ summary.blocked or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>${{ '{:,.2f}'.format(summary.executable_stake or 0) }}</strong><span>Executable stake</span></div>
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Queue detail: {{ detail.ticket_id }}</h2>
+      <p><strong><a href="/markets/{{ detail.market_id }}">{{ detail.title or detail.market_id }}</a></strong></p>
+      <section class="stats mini">
+        <div><strong>{{ detail.queue_status }}</strong><span>Queue status</span></div>
+        <div><strong>{{ 'yes' if detail.paper_buy_executable else 'no' }}</strong><span>Executable</span></div>
+        <div><strong>{{ detail.preflight_status or 'n/a' }}</strong><span>Preflight</span></div>
+        <div><strong>{{ detail.latest_approval_status or 'none' }}</strong><span>Approval</span></div>
+        <div><strong>${{ '{:,.2f}'.format(detail.stake or 0) }}</strong><span>Stake</span></div>
+        <div><strong>{{ detail.warning_count or 0 }}</strong><span>Warnings</span></div>
+      </section>
+      {% if detail.reason_summary %}<p><strong>Reason:</strong> {{ detail.reason_summary }}</p>{% endif %}
+      <p class="muted">Recommended action: <strong>{{ detail.recommended_action }}</strong></p>
+      <p class="muted">Latest approval: {% if detail.latest_approval_id %}<a href="/approvals?approval_id={{ detail.latest_approval_id }}">{{ detail.latest_approval_id }}</a>{% else %}none{% endif %} · Preflight: <a href="/preflight?ticket_id={{ detail.ticket_id }}">{{ detail.ticket_id }}</a> · Audit: <a href="/audit?market_id={{ detail.market_id }}">market audit</a></p>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Queue</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Status</th><th>Ticket</th><th>Market</th><th>Stake</th><th>Preflight</th><th>Approval</th><th>Action / Reason</th><th>Controls</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><span class="pill">{{ row.queue_status }}</span><br><span class="muted small">ticket: {{ row.ticket_status }}</span></td>
+            <td><a href="/execution-queue?ticket_id={{ row.ticket_id }}"><strong>{{ row.ticket_id }}</strong></a><br><span class="muted small">{{ row.outcome or 'YES' }} @ {{ '%.4f'|format(row.price or 0) }}</span></td>
+            <td><a href="/markets/{{ row.market_id }}"><strong>{{ row.title or row.market_id }}</strong></a><br><span class="muted small">{{ row.market_id }}</span></td>
+            <td>${{ '{:,.2f}'.format(row.stake or 0) }}</td>
+            <td>{{ row.preflight_status or 'n/a' }}<br><span class="muted small">blockers={{ row.blocker_count or 0 }} · warnings={{ row.warning_count or 0 }}</span></td>
+            <td>{% if row.latest_approval_id %}<a href="/approvals?approval_id={{ row.latest_approval_id }}">{{ row.latest_approval_status }}</a><br><span class="muted small">{{ row.latest_approval_id }}</span>{% else %}<span class="muted">none</span>{% endif %}</td>
+            <td><strong>{{ row.recommended_action }}</strong><br><span class="muted small">{{ row.reason_summary or 'clear' }}</span></td>
+            <td>
+              <a href="/preflight?ticket_id={{ row.ticket_id }}">preflight</a><br>
+              <a href="/approvals?ticket_id={{ row.ticket_id }}">approvals</a><br>
+              {% if row.queue_status in ['needs_approval', 'stale_approval'] %}
+              <form method="post" action="/trade-tickets/{{ row.ticket_id }}/approval" class="inline-form"><input type="hidden" name="note" value="approved from execution queue"><button type="submit">Approve</button></form>
+              {% endif %}
+              {% if row.paper_buy_executable %}
+              <form method="post" action="/trade-tickets/{{ row.ticket_id }}/paper-buy" class="inline-form"><button type="submit">Paper buy</button></form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No entry tickets match this queue filter yet.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

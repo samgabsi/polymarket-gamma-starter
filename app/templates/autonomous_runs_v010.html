@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Autonomous Runs{% endblock %}
+{% block breadcrumbs %}<a href="/autonomous-trading">Autonomous</a> / <span>Runs</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Run ledger</p><h1>Autonomous runs</h1><p class="page-subtitle">Local previews/runs for deterministic signals. Automated tests never submit real orders.</p></div><div class="action-bar"><a class="button-link" href="/api/autonomous-runs.csv">Export CSV</a></div></section>
+<div class="table-wrap"><table><thead><tr><th>Run</th><th>Created</th><th>Mode</th><th>Signals</th><th>Fake</th><th>Real</th><th>Network</th></tr></thead><tbody>{% for row in items %}<tr><td>{{ row.run_id|compact_id }}</td><td>{{ row.created_at }}</td><td><span class="status-badge tone-{{ row.mode|status_tone }}">{{ row.mode }}</span></td><td>{{ row.signals_considered }}</td><td>{{ row.fake_orders_submitted }}</td><td>{{ row.real_orders_submitted }}</td><td>{{ row.real_network_attempted }}</td></tr>{% else %}<tr><td colspan="7" class="empty-state">No autonomous run records yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

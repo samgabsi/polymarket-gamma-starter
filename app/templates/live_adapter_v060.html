@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+
+{% block title %}Live Adapter Readiness - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Live adapter</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Live adapter readiness · {{ app_version_short }} · manual boundary</p>
+    <div class="page-title-row">
+      <h1>Live Adapter Readiness</h1>
+      <span class="status-badge tone-{{ report.overall_status|status_tone }}">{{ report.overall_status }}</span>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+    </div>
+    <p class="page-subtitle">Redacted capability report for the future Polymarket CLOB boundary. Optional read-only validation is default-off. Order submission, cancellation, signing, wallet operations, and automation remain unavailable.</p>
+  </div>
+  <form method="post" action="/live-adapter/readonly-validation" class="stacked-form" aria-label="Record read-only validation">
+    <input type="hidden" name="operator" value="{{ default_operator }}">
+    <label>Validation note <input name="note" placeholder="optional read-only note"></label>
+    <p class="helper-text">Records a local validation receipt only when read-only network validation is explicitly enabled.</p>
+    <button type="submit">Record read-only validation</button>
+  </form>
+</section>
+
+<section class="callout warning">
+  <h3>Default-Off Guardrail</h3>
+  <p>{{ report.guardrail }} Generated at {{ report.generated_at }}.</p>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ report.overall_status }}</strong><span>Overall status</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if report.live_mode_enabled else 'no' }}</strong><span>Live mode</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if report.read_only_network_validation_enabled else 'no' }}</strong><span>Read-only network</span></article>
+  <article class="metric-card"><strong>{{ 'active' if report.kill_switch_active else 'clear' }}</strong><span>Kill switch</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if report.order_submission_enabled else 'no' }}</strong><span>Submission enabled</span></article>
+  <article class="metric-card"><strong>{{ 'yes' if report.order_cancellation_enabled else 'no' }}</strong><span>Cancel enabled</span></article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Capability Report</h2>
+      <p class="muted">Public adapter posture and local risk controls.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/live-adapter-requests">Next: adapter requests</a>
+      <a class="button-link quiet" href="/api/live/adapter/readiness">JSON</a>
+      <a class="button-link quiet" href="/api/live/adapter/readiness.csv">CSV</a>
+    </div>
+  </div>
+  <div class="metadata-grid">
+    <div><dt>Configured host</dt><dd>{{ report.configured_host }}</dd></div>
+    <div><dt>Chain ID</dt><dd>{{ report.configured_chain_id }}</dd></div>
+    <div><dt>CLOB dependency</dt><dd>{{ report.dependency_present }}</dd></div>
+    <div><dt>Manual auth</dt><dd>{{ report.manual_auth_required }}</dd></div>
+    <div><dt>Dry-run receipt</dt><dd>{{ report.dry_run_receipt_required }}</dd></div>
+    <div><dt>Max order notional</dt><dd>{{ report.max_order_notional }}</dd></div>
+    <div><dt>Allowed markets</dt><dd>{{ report.allowed_market_count }}</dd></div>
+    <div><dt>Next action</dt><dd>{{ report.recommended_next_action }}</dd></div>
+  </div>
+  {% if report.blockers %}
+  <div class="callout danger">
+    <h3>Blockers</h3>
+    <ul class="clean-list compact">{% for item in report.blockers %}<li>{{ item }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+  {% if report.warnings %}
+  <div class="callout warning">
+    <h3>Warnings</h3>
+    <ul class="clean-list compact">{% for item in report.warnings %}<li>{{ item }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Redacted Credential Presence</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Field</th><th>Present</th><th>Redacted public value</th><th>Source</th></tr></thead>
+      <tbody>
+        <tr><td>Wallet address</td><td>{{ credential_presence.wallet_address_present }}</td><td>{{ credential_presence.wallet_address_redacted }}</td><td>{{ credential_presence.wallet_address_source }}</td></tr>
+        <tr><td>Funder address</td><td>{{ credential_presence.funder_address_present }}</td><td>{{ credential_presence.funder_address_redacted }}</td><td>{{ credential_presence.funder_address_source }}</td></tr>
+        <tr><td>CLOB API key</td><td>{{ credential_presence.api_key_present }}</td><td>redacted</td><td>{{ credential_presence.api_key_source }}</td></tr>
+        <tr><td>CLOB secret</td><td>{{ credential_presence.secret_present }}</td><td>redacted</td><td>{{ credential_presence.secret_source }}</td></tr>
+        <tr><td>CLOB passphrase</td><td>{{ credential_presence.passphrase_present }}</td><td>redacted</td><td>{{ credential_presence.passphrase_source }}</td></tr>
+        <tr><td>Private signing key</td><td>{{ credential_presence.private_key_present }}</td><td>redacted</td><td>{{ credential_presence.private_key_source }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="two-col">
+  <article class="panel">
+    <h2>Allowed Locally</h2>
+    <ul class="clean-list compact">{% for item in report.allowed_operations %}<li>{{ item }}</li>{% endfor %}</ul>
+  </article>
+  <article class="panel">
+    <h2>Blocked</h2>
+    <ul class="clean-list compact">{% for item in report.blocked_operations %}<li>{{ item }}</li>{% endfor %}</ul>
+  </article>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Read-Only Validation Receipts</h2>
+      <p class="muted">Receipts are local audit records. They do not submit or cancel orders.</p>
+    </div>
+    <a class="button-link quiet" href="/api/live/adapter/readonly-validations.csv">CSV</a>
+  </div>
+  {% if validations %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Validation</th><th>Status</th><th>Network</th><th>Dependency</th><th>Next action</th></tr></thead>
+      <tbody>
+        {% for row in validations %}
+        <tr>
+          <td><a href="/api/live/adapter/readonly-validations/{{ row.validation_id }}">{{ row.validation_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.validation_hash[:16] if row.validation_hash else '' }}</code></span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+          <td>{{ row.network_attempted }}</td>
+          <td>{{ row.dependency_present }}</td>
+          <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.next_required_action }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Validation Receipts</h3>
+    <p>Optional read-only validation receipts appear here only after the operator explicitly enables read-only network validation and records a receipt.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="callout danger">
+  <h3>What This Does Not Do</h3>
+  <p>This page does not submit orders, cancel orders, sign payloads, derive credentials, expose secrets, touch wallets, or run autonomous execution.</p>
+</section>
+{% endblock %}

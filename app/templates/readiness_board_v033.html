@@ -1,0 +1,87 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Paper Readiness Board - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { max-width: 1240px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
+    .muted { color: #666; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .pill { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin: 2px; font-size: 12px; }
+    .ready { border-color: #3a7; }
+    .blocked { border-color: #c97; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+  </style>
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <h1>Paper Readiness Board</h1>
+  <p class="muted">Decision gate before simulated paper trades: edge + confidence + evidence + thesis + risk.</p>
+  <p><a href="/">Dashboard</a> · <a href="/opportunities">Opportunities</a> · <a href="/review-queue">Review Queue</a> · <a href="/evidence-workbench">Evidence Workbench</a> · <a href="/playbooks">Playbooks</a> · <a href="/trade-tickets">Trade Tickets</a> · <a href="/positions">Positions</a> · <a href="/api/readiness-board">JSON</a></p>
+
+  <div class="cards">
+    <div class="card"><strong>{{ summary.total }}</strong><br><span class="muted">Total Reviewed</span></div>
+    <div class="card"><strong>{{ summary.paper_trade_ready }}</strong><br><span class="muted">Paper Ready</span></div>
+    <div class="card"><strong>{{ summary.needs_evidence }}</strong><br><span class="muted">Needs Evidence</span></div>
+    <div class="card"><strong>{{ summary.needs_thesis }}</strong><br><span class="muted">Needs Thesis</span></div>
+    <div class="card"><strong>{{ summary.risk_review }}</strong><br><span class="muted">Risk Review</span></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Readiness</th>
+        <th>Market</th>
+        <th>Status</th>
+        <th>Signals</th>
+        <th>Next Action</th>
+        <th>Blockers</th>
+        <th>Ticket</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+      <tr class="{{ 'ready' if item.paper_trade_ready else 'blocked' }}">
+        <td>{{ "%.1f"|format(item.readiness_score * 100) }}%</td>
+        <td><a href="/markets/{{ item.market_id }}">{{ item.title }}</a><br><span class="muted">{{ item.market_id }}</span></td>
+        <td><span class="pill">{{ item.status }}</span></td>
+        <td>
+          Edge: {{ "%.1f"|format(item.edge * 100) }}%<br>
+          Confidence: {{ "%.1f"|format(item.confidence * 100) }}%<br>
+          Evidence: {{ "%.1f"|format(item.evidence_score * 100) }}%<br>
+          Thesis: {{ "%.1f"|format(item.thesis_score * 100) }}%<br>
+          Risk: {{ "%.1f"|format(item.risk_score * 100) }}%
+        </td>
+        <td>{{ item.suggested_next_action }}</td>
+        <td>
+          {% for blocker in item.blockers %}
+            <div>• {{ blocker }}</div>
+          {% else %}
+            <span class="muted">No blockers.</span>
+          {% endfor %}
+        </td>
+        <td>
+          <form method="post" action="/markets/{{ item.market_id }}/trade-ticket">
+            <input name="stake" placeholder="auto stake" style="width: 92px;">
+            <input name="outcome" value="YES" style="width: 52px;">
+            <input name="note" placeholder="operator note" style="width: 140px;">
+            <button type="submit">Create ticket</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</body>
+</html>

@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Review Report - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper-only post-trade review · v0.5.11</p>
+        <h1>Paper Review Report</h1>
+        <p class="muted">Market-level lessons from the local paper audit ledger: entries, exits, settlements, lifecycle plans, realized/unrealized P&amp;L, and discipline flags. No wallet, no live trading, no advice.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/audit">Audit ledger</a> <a href="/playbooks">Playbooks</a> <a href="/trade-tickets">Entry tickets</a> <a href="/positions">Positions</a> <a href="/exit-tickets">Exit tickets</a> <a href="/settlements">Settlements</a> <a href="/api/paper/review-report">JSON</a> <a href="/api/paper/review-report.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional" style="width: 260px"></label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            {% for s in ['open','settled','closed_by_exit','entry_only_closed_unknown','review_only'] %}
+            <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter</button>
+      </form>
+    </header>
+
+    <section class="stats">
+      <div><strong>{{ summary.market_count or 0 }}</strong><span>Markets reviewed</span></div>
+      <div><strong>{{ summary.warning_count or 0 }}</strong><span>Discipline warnings</span></div>
+      <div><strong>{{ '{:+,.2f}'.format(summary.net_pnl or 0) }}</strong><span>Net paper P&amp;L</span></div>
+      <div><strong>{{ summary.win_count or 0 }}/{{ summary.loss_count or 0 }}</strong><span>Profitable/loss markets</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Review summary</h2>
+      <p>
+        {% for status_name, count in (summary.status_counts or {}).items() %}
+          <span class="pill">{{ status_name }}: {{ count }}</span>
+        {% else %}
+          <span class="muted">No paper review rows yet.</span>
+        {% endfor %}
+      </p>
+      <p>
+        {% for flag, count in (summary.flag_counts or {}).items() %}
+          <span class="pill">{{ flag }}: {{ count }}</span>
+        {% endfor %}
+      </p>
+      <p class="muted small">{{ guardrail or summary.guardrail }}</p>
+    </section>
+
+    <section class="panel">
+      <h2>Market review rows</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Market</th><th>Status</th><th>Paper P&amp;L</th><th>Process</th><th>Primary lesson</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/markets/{{ row.market_id }}">{{ row.question or row.market_id }}</a><br><span class="muted small">{{ row.market_id }} · {{ row.outcomes|join(', ') }}</span></td>
+            <td><span class="pill">{{ row.lifecycle_status }}</span><br><span class="muted small">{{ row.outcome_label }} · {{ row.last_event_at }}</span></td>
+            <td>
+              realized {{ '{:+,.2f}'.format(row.realized_pnl) }}<br>
+              unrealized {{ '{:+,.2f}'.format(row.unrealized_pnl) }}<br>
+              <strong>net {{ '{:+,.2f}'.format(row.net_pnl) }}</strong>
+            </td>
+            <td>
+              buys {{ row.buy_count }} · sells {{ row.sell_count }} · settles {{ row.settlement_count }}<br>
+              entry {{ row.entry_ticket_count }} · exit {{ row.exit_ticket_count }} · plans {{ row.position_plan_count }} · playbooks {{ row.playbook_decision_count or 0 }}<br>
+              <span class="muted small">readiness {{ '%.2f'|format(row.avg_entry_readiness_score) }} · evidence {{ '%.2f'|format(row.avg_entry_evidence_score) }} · thesis {{ '%.2f'|format(row.avg_entry_thesis_score) }}</span>
+            </td>
+            <td>
+              {{ row.lesson }}
+              {% if row.discipline_flags %}
+                <br>
+                {% for flag in row.discipline_flags[:4] %}
+                  <span class="pill">{{ flag.level }}: {{ flag.code }}</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td><a href="/review-report?market_id={{ row.market_id }}">review</a> · <a href="/audit?market_id={{ row.market_id }}">audit</a> · <a href="/api/paper/review-report/{{ row.market_id }}">json</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+        <p class="muted">No paper review rows match the current filter. Create paper trades, lifecycle plans, exit tickets, or settlements to populate the report.</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

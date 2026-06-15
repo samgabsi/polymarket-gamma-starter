@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Workflow Map - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><span>Workflow map</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Workflow navigator · read-only · {{ app_version_short }}</p>
+    <div class="page-title-row">
+      <h1>Workflow Map</h1>
+      <span class="status-badge tone-local">LOCAL</span>
+      <span class="status-badge tone-neutral">NOT SUBMITTED</span>
+    </div>
+    <p class="page-subtitle">End-to-end operator stages from market research through paper operations, staged live-readiness, manual execution boundary, and audit closeout.</p>
+  </div>
+  <div class="action-bar">
+    <a class="button-link" href="/">Dashboard</a>
+    <a class="button-link quiet" href="/api/ui/workflow">Workflow JSON</a>
+    <a class="button-link quiet" href="/ui-system">UI system</a>
+  </div>
+</section>
+
+<section class="callout info">
+  <h3>Read-Only Map</h3>
+  <p>{{ guardrail }} Generated at {{ generated_at }}. Stage cards show local counts/status only; they do not create approvals, submit orders, cancel orders, or call live execution paths.</p>
+</section>
+
+<section class="metric-grid" aria-label="Workflow summary">
+  <article class="metric-card"><strong>{{ summary.stage_count }}</strong><span>Mapped stages</span></article>
+  <article class="metric-card"><strong>{{ summary.blockers }}</strong><span>Blocker signals</span></article>
+  <article class="metric-card"><strong>{{ summary.warnings }}</strong><span>Warning signals</span></article>
+  <article class="metric-card"><strong>{{ 'no' if not summary.live_submit_implemented else 'yes' }}</strong><span>Real submit implemented</span></article>
+  <article class="metric-card"><strong>{{ 'no' if not summary.autonomous_trading_enabled else 'yes' }}</strong><span>Autonomous trading</span></article>
+</section>
+
+{% for group in groups %}
+<section class="workflow-group">
+  <div class="workflow-group-header">
+    <div>
+      <h2>{{ group.name }}</h2>
+      <p class="muted">{{ group.stages|length }} stages · {{ group.blockers }} blockers · {{ group.warnings }} warnings</p>
+    </div>
+    {% if group.blockers %}
+      <span class="status-badge tone-danger">BLOCKED</span>
+    {% elif group.warnings %}
+      <span class="status-badge tone-warning">NEEDS REVIEW</span>
+    {% else %}
+      <span class="status-badge tone-ok">CLEAR</span>
+    {% endif %}
+  </div>
+  <div class="workflow-grid">
+    {% for stage in group.stages %}
+    <article class="stage-card">
+      <div class="stage-meta">
+        <span class="status-badge tone-{{ stage.tone }}">{{ stage.status }}</span>
+        <span class="status-badge {% if stage.mode == 'PAPER ONLY' %}tone-paper{% elif stage.mode == 'LOCAL' %}tone-local{% elif stage.mode == 'LIVE READINESS' %}tone-info{% else %}tone-neutral{% endif %}">{{ stage.mode }}</span>
+      </div>
+      <h3>{{ stage.title }}</h3>
+      <p class="muted">{{ stage.description }}</p>
+      <div class="metadata-grid">
+        <div><dt>Current signal</dt><dd>{{ stage.metric }}</dd></div>
+        <div><dt>Warnings</dt><dd>{{ stage.warnings }}</dd></div>
+        <div><dt>Blockers</dt><dd>{{ stage.blockers }}</dd></div>
+      </div>
+      <div class="stage-links">
+        <a href="{{ stage.href }}">Open stage</a>
+        {% if stage.next_href %}<a href="{{ stage.next_href }}">Next stage</a>{% endif %}
+        {% if stage.api_href %}<a href="{{ stage.api_href }}">API</a>{% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}

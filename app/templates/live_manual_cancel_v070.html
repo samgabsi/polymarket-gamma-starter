@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Cancel - Polymarket Gamma Starter{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><a href="/workflow">Workflow</a><span>/</span><span>Manual cancel</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Manual cancel control · {{ app_version_short }} · default disabled</p>
+    <div class="page-title-row">
+      <h1>Manual Cancel</h1>
+      <span class="status-badge tone-neutral">LIVE CANCEL UNIMPLEMENTED</span>
+      <span class="status-badge tone-info">FAKE LOCAL ONLY</span>
+    </div>
+    <p class="page-subtitle">Manual cancel boundary for fake-local receipts, blocked attempts, and gated real-live cancel attempts.</p>
+  </div>
+  <form method="get" class="stacked-form" aria-label="Filter cancel attempts">
+    <label>Status <input name="status" value="{{ status }}" placeholder="optional"></label>
+    <label>Adapter mode <input name="adapter_mode" value="{{ adapter_mode }}" placeholder="optional"></label>
+    <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+    <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+    <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+    <button type="submit">Filter</button>
+  </form>
+</section>
+
+<section class="callout warning">
+  <h3>Cancel Guardrail</h3>
+  <p>{{ guardrail }} Generated at {{ generated_at }}. Real live cancel is gated through the manual adapter boundary; fake-local cancel receipts are not exchange acknowledgements.</p>
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Fake-Local Cancel Candidates</h2>
+      <p class="muted">Only fake-local submit receipts can be cancelled by the fake adapter. This never reaches Polymarket.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/live-manual-execution">Manual submit</a>
+      <a class="button-link quiet" href="/live-execution-attempts?action=cancel">Cancel attempts</a>
+      <a class="button-link quiet" href="/api/live/execution-attempts.csv?action=cancel">CSV</a>
+    </div>
+  </div>
+  {% if fake_submits %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Submit attempt</th><th>Fake order</th><th>Order</th><th>Cancel attempt</th></tr></thead>
+      <tbody>
+        {% for row in fake_submits %}
+        <tr>
+          <td><a href="/live-execution-attempts?attempt_id={{ row.attempt_id }}">{{ row.attempt_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+          <td>{{ row.fake_order_id }}<br><span class="muted small">{{ row.fake_submit_receipt_id }}</span></td>
+          <td>{{ row.market_id }}<br><span class="muted small">{{ row.side }} · ${{ '%.2f'|format(row.notional or 0) }}</span></td>
+          <td>
+            <form method="post" action="/live-manual-cancel" class="stacked-form" aria-label="Record fake-local cancel for {{ row.attempt_id }}">
+              <input type="hidden" name="original_attempt_id" value="{{ row.attempt_id }}">
+              <input type="hidden" name="fake_order_id" value="{{ row.fake_order_id }}">
+              <input type="hidden" name="operator" value="{{ default_operator }}">
+              <label>Adapter mode
+                <select name="adapter_mode">
+                  <option value="blocked">blocked - record no-cancel audit only</option>
+                  <option value="fake_local">fake_local - local fake receipt only</option>
+                  <option value="real_live">real_live - gated SDK cancel</option>
+                </select>
+              </label>
+              <label>Final confirmation <input type="password" name="final_confirmation" autocomplete="off" placeholder="required only when enabled"></label>
+              <label>Reason <input name="reason" placeholder="required human reason"></label>
+              <label>Note <input name="note" placeholder="optional local note"></label>
+              <p class="helper-text">This records a local attempt and never cancels an exchange order.</p>
+              <button type="submit">Record manual cancel attempt</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Fake-Local Submit Receipts</h3>
+    <p>Fake-local cancel simulation requires a prior fake-local submit attempt. Create one from a ready adapter request on the manual submit page.</p>
+  </div>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Saved Cancel Attempts</h2>
+  {% if items %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Attempt</th><th>Status</th><th>Adapter</th><th>Target</th><th>Receipt</th><th>Next action</th></tr></thead>
+      <tbody>
+        {% for row in items %}
+        <tr>
+          <td><a href="/live-execution-attempts?attempt_id={{ row.attempt_id }}">{{ row.attempt_id|compact_id }}</a><br><span class="muted small">{{ row.created_at }}<br><code>{{ row.attempt_hash[:16] if row.attempt_hash else '' }}</code></span></td>
+          <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted small">{{ row.operator }}</span></td>
+          <td>{{ row.adapter_mode }}<br><span class="muted small">network={{ row.real_network_attempted }}</span></td>
+          <td>{{ row.original_attempt_id or row.fake_order_id or 'none' }}</td>
+          <td>{{ row.fake_cancel_receipt_id or 'none' }}</td>
+          <td>{% if row.blockers %}<strong>{{ row.blockers[0] }}</strong>{% elif row.warnings %}<strong>{{ row.warnings[0] }}</strong>{% else %}{{ row.recommended_next_action }}{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state">
+    <h3>No Cancel Attempts</h3>
+    <p>No manual cancel attempts match this filter. Cancel remains disabled by default and real live cancel requires all gates.</p>
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

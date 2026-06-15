@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Autonomous Trading{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Autonomous trading</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Guarded bridge</p><h1>Autonomous trading status</h1><p class="page-subtitle">Explicit-run autonomous scaffold. Default mode is off; no background scheduler starts on import.</p></div></section>
+<div class="callout warning"><strong>Default-off:</strong> autonomous live trading is not implemented in this bridge release. Dry-run/fake-adapter modes consume only deterministic strategy signals.</div>
+<section class="metric-grid"><article class="metric-card"><strong>{{ status.overall_status }}</strong><span>Status</span></article><article class="metric-card"><strong>{{ status.enabled }}</strong><span>Enabled</span></article><article class="metric-card"><strong>{{ status.scheduler_enabled }}</strong><span>Scheduler configured</span></article><article class="metric-card"><strong>{{ status.scheduler_starts_on_import }}</strong><span>Starts on import</span></article></section>
+<section class="content-card"><h2>Off-mode preview</h2><p>Signals considered: {{ preview.signals_considered }}. Real network attempted: {{ preview.real_network_attempted }}.</p></section>
+{% endblock %}

@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Ops Escalations - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper ops escalations · v0.5.11 · local operator follow-up</p>
+        <h1>Paper Ops Escalation Register</h1>
+        <p class="muted">Track stale, blocked, repeated, or follow-up paper-ops items without changing execution state.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/paper-ops-aging">Aging</a> <a href="/paper-ops-escalation-review">Escalation review</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/paper-handoffs">Handoffs</a> <a href="/runbook">Runbook</a> <a href="/audit?category=operator_escalation">Audit</a> <a href="/api/paper/ops-escalations">JSON</a> <a href="/api/paper/ops-escalations.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Escalation ID <input name="escalation_id" value="{{ detail.escalation_id if detail else '' }}" placeholder="optional detail"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Owner <input name="owner" value="{{ owner }}" placeholder="optional filter"></label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="open" {% if status == 'open' %}selected{% endif %}>open</option>
+            <option value="investigating" {% if status == 'investigating' %}selected{% endif %}>investigating</option>
+            <option value="waiting" {% if status == 'waiting' %}selected{% endif %}>waiting</option>
+            <option value="resolved" {% if status == 'resolved' %}selected{% endif %}>resolved</option>
+            <option value="dismissed" {% if status == 'dismissed' %}selected{% endif %}>dismissed</option>
+          </select>
+        </label>
+        <label>Severity
+          <select name="severity">
+            <option value="" {% if not severity %}selected{% endif %}>all</option>
+            <option value="critical" {% if severity == 'critical' %}selected{% endif %}>critical</option>
+            <option value="high" {% if severity == 'high' %}selected{% endif %}>high</option>
+            <option value="medium" {% if severity == 'medium' %}selected{% endif %}>medium</option>
+            <option value="low" {% if severity == 'low' %}selected{% endif %}>low</option>
+            <option value="info" {% if severity == 'info' %}selected{% endif %}>info</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Refresh escalation register</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Saved escalations</span></div>
+      <div><strong>{{ summary.open or 0 }}</strong><span>Open / active</span></div>
+      <div><strong>{{ summary.critical or 0 }}</strong><span>Critical</span></div>
+      <div><strong>{{ summary.high or 0 }}</strong><span>High</span></div>
+      <div><strong>{{ summary.resolved or 0 }}</strong><span>Resolved</span></div>
+      <div><strong>{{ candidate_summary.count or 0 }}</strong><span>Candidates</span></div>
+      <div><strong>{{ candidate_summary.critical_or_high or 0 }}</strong><span>Candidate high+</span></div>
+      <div><strong>{{ summary.market_count or 0 }}</strong><span>Markets</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Escalation candidates from aging review</h2>
+      <p class="muted">Candidates are unresolved aging rows that are critical, stale, repeated, or marked for follow-up and do not already have an open escalation.</p>
+      {% if candidates %}
+      <table>
+        <thead><tr><th>Severity</th><th>Age</th><th>Section</th><th>Item</th><th>Action</th><th>Escalate</th></tr></thead>
+        <tbody>
+          {% for row in candidates %}
+          <tr>
+            <td><span class="pill">{{ row.recommended_escalation_severity }}</span><br><span class="muted small">from {{ row.source_severity }}</span></td>
+            <td>{% if row.age_hours is not none %}{{ '%.1f'|format(row.age_hours) }}h{% else %}unknown{% endif %}<br><span class="muted small">handoffs {{ row.handoff_count }}</span></td>
+            <td>{{ row.section }}<br><span class="muted small">{{ row.status }}</span></td>
+            <td><strong>{{ row.title }}</strong><br><span class="muted small">{{ row.aging_item_id }}</span>{% if row.market_id %}<br><a href="/markets/{{ row.market_id }}">market</a>{% endif %}</td>
+            <td>{{ row.recommended_action }}</td>
+            <td>
+              <form method="post" action="/paper-ops-escalations/create" class="inline-form">
+                <input type="hidden" name="aging_item_id" value="{{ row.aging_item_id }}">
+                <input type="hidden" name="severity" value="{{ row.recommended_escalation_severity }}">
+                <input type="hidden" name="status" value="open">
+                <input name="note" placeholder="operator note">
+                <button type="submit">Escalate</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No escalation candidates currently need attention.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved escalation records</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Status</th><th>Severity</th><th>Owner</th><th>Item</th><th>Created</th><th>Note / recommended action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td>{{ row.severity }}</td>
+            <td>{{ row.owner }}</td>
+            <td><strong><a href="/paper-ops-escalations?escalation_id={{ row.escalation_id }}">{{ row.title }}</a></strong><br><span class="muted small">{{ row.escalation_id }}</span><br><span class="muted small">{{ row.aging_item_id }}</span>{% if row.market_id %}<br><a href="/markets/{{ row.market_id }}">market</a>{% endif %}</td>
+            <td>{{ row.created_at }}<br><span class="muted small">updated {{ row.updated_at }}</span></td>
+            <td>{{ row.note or row.recommended_action_at_escalation }}<br><span class="muted small">age at escalation {{ row.age_hours_at_escalation if row.age_hours_at_escalation is not none else 'unknown' }}h · handoffs {{ row.handoff_count_at_escalation }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No saved escalations match this filter.</p>{% endif %}
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Escalation detail: {{ detail.escalation_id }}</h2>
+      <section class="stats mini">
+        <div><strong>{{ detail.status }}</strong><span>Status</span></div>
+        <div><strong>{{ detail.severity }}</strong><span>Severity</span></div>
+        <div><strong>{{ detail.owner }}</strong><span>Owner</span></div>
+        <div><strong>{{ detail.source_severity }}</strong><span>Source severity</span></div>
+      </section>
+      <p><strong>{{ detail.title }}</strong></p>
+      <p class="muted">{{ detail.guardrail }}</p>
+      <form method="post" action="/paper-ops-escalations/{{ detail.escalation_id }}/update" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="open" {% if detail.status == 'open' %}selected{% endif %}>open</option>
+            <option value="investigating" {% if detail.status == 'investigating' %}selected{% endif %}>investigating</option>
+            <option value="waiting" {% if detail.status == 'waiting' %}selected{% endif %}>waiting</option>
+            <option value="resolved" {% if detail.status == 'resolved' %}selected{% endif %}>resolved</option>
+            <option value="dismissed" {% if detail.status == 'dismissed' %}selected{% endif %}>dismissed</option>
+          </select>
+        </label>
+        <label>Severity
+          <select name="severity">
+            <option value="critical" {% if detail.severity == 'critical' %}selected{% endif %}>critical</option>
+            <option value="high" {% if detail.severity == 'high' %}selected{% endif %}>high</option>
+            <option value="medium" {% if detail.severity == 'medium' %}selected{% endif %}>medium</option>
+            <option value="low" {% if detail.severity == 'low' %}selected{% endif %}>low</option>
+            <option value="info" {% if detail.severity == 'info' %}selected{% endif %}>info</option>
+          </select>
+        </label>
+        <label>Owner <input name="owner" value="{{ detail.owner }}"></label>
+        <label>Update note <input name="note" placeholder="what changed or why this remains open"></label>
+        <button type="submit">Update escalation</button>
+      </form>
+      <table>
+        <tbody>
+          <tr><th>Aging item</th><td>{{ detail.aging_item_id }}</td></tr>
+          <tr><th>Market</th><td>{{ detail.market_id or 'n/a' }}</td></tr>
+          <tr><th>Ticket</th><td>{{ detail.ticket_id or 'n/a' }}</td></tr>
+          <tr><th>Created</th><td>{{ detail.created_at }}</td></tr>
+          <tr><th>Updated</th><td>{{ detail.updated_at }}</td></tr>
+          <tr><th>Recommended action at escalation</th><td>{{ detail.recommended_action_at_escalation }}</td></tr>
+          <tr><th>Note</th><td>{{ detail.note }}</td></tr>
+        </tbody>
+      </table>
+      {% if detail.history %}
+      <h3>History</h3>
+      <table>
+        <thead><tr><th>Time</th><th>Event</th><th>Status</th><th>Severity</th><th>Owner</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for row in detail.history|reverse %}
+          <tr><td>{{ row.timestamp }}</td><td>{{ row.event }}</td><td>{{ row.status }}</td><td>{{ row.severity }}</td><td>{{ row.owner }}</td><td>{{ row.note }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Maintenance</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main class="container">
+    <h1>Maintenance</h1>
+    <p><a href="/">Dashboard</a> · <a href="/users">Users</a> · <a href="/administration/config">Config</a> · <a href="/logout">Logout</a></p>
+
+    <section class="card">
+      <h2>Local Data Inventory</h2>
+      <p><strong>Data directory:</strong> <code>{{ maintenance.inventory.data_dir }}</code></p>
+      <section class="stats mini">
+        <div><strong>{{ maintenance.inventory.file_count }}</strong><span>Files</span></div>
+        <div><strong>{{ maintenance.inventory.total_mb }}</strong><span>MB</span></div>
+        <div><strong>{{ maintenance.backups|length }}</strong><span>Backups</span></div>
+        <div><strong>local</strong><span>Storage</span></div>
+      </section>
+      <p class="muted">Backups include local JSON/snapshot data only. They do not include your Python virtualenv or external secrets outside this project data directory.</p>
+    </section>
+
+    <section class="card">
+      <h2>Create Backup</h2>
+      <form method="post" action="/administration/maintenance/backups/create">
+        <label>Label <input name="label" value="manual"></label>
+        <button type="submit">Create backup ZIP</button>
+      </form>
+      <p class="muted">Restore is intentionally disabled in the web UI for now to avoid accidental overwrites.</p>
+    </section>
+
+    <section class="card">
+      <h2>Backups</h2>
+      {% if maintenance.backups %}
+      <table>
+        <tr><th>Filename</th><th>Size</th><th>Modified UTC</th><th>Actions</th></tr>
+        {% for backup in maintenance.backups %}
+        <tr>
+          <td><code>{{ backup.filename }}</code></td>
+          <td>{{ backup.size_mb }} MB</td>
+          <td>{{ backup.modified_at }}</td>
+          <td>
+            <a href="{{ backup.download_url }}">Download</a>
+            <form class="inline" method="post" action="/administration/maintenance/backups/delete/{{ backup.filename }}" onsubmit="return confirm('Delete this backup?');">
+              <button type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+      {% else %}
+        <p>No backups yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>API</h2>
+      <p><a href="/api/maintenance/status" target="_blank" rel="noreferrer">Open maintenance status JSON</a></p>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Preflight - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper entry preflight · v0.9.0 · local simulation only</p>
+        <h1>Paper Entry Preflight Gate</h1>
+        <p class="muted">Re-checks entry-ticket status, readiness, paper risk, risk budget, playbook discipline, ticket freshness, and local market-data quality before any simulated buy is executed from a ticket. No wallet, no live orders, no autonomous execution.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/readiness">Readiness</a> <a href="/playbooks">Playbooks</a> <a href="/trade-tickets">Entry tickets</a> <a href="/execution-queue">Execution queue</a> <a href="/risk-budget">Risk budget</a> <a href="/market-data">Market data</a> <a href="/execution-quality">Execution quality</a> <a href="/audit">Audit</a> <a href="/api/paper/preflight">JSON</a> <a href="/api/paper/preflight.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Ticket ID <input name="ticket_id" value="{{ ticket_id }}" placeholder="optional detail"></label>
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>active statuses</option>
+            <option value="paper_ready" {% if status == 'paper_ready' %}selected{% endif %}>paper_ready</option>
+            <option value="draft_review" {% if status == 'draft_review' %}selected{% endif %}>draft_review</option>
+            <option value="blocked" {% if status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="paper_executed" {% if status == 'paper_executed' %}selected{% endif %}>paper_executed</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <label class="check"><input type="checkbox" name="strict_playbook" value="true" {% if strict_playbook %}checked{% endif %}> require playbook decision</label>
+        <label class="check"><input type="checkbox" name="live" value="true" {% if live %}checked{% endif %}> refresh live market context</label>
+        <button type="submit">Run preflight</button>
+      </form>
+    </header>
+
+    <section class="notice">{{ guardrail }}</section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Tickets checked</span></div>
+      <div><strong>{{ summary.approved or 0 }}</strong><span>Approved</span></div>
+      <div><strong>{{ summary.approved_with_warnings or 0 }}</strong><span>Approved + warnings</span></div>
+      <div><strong>{{ summary.blocked or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>{{ summary.total_blockers or 0 }}</strong><span>Total blockers</span></div>
+      <div><strong>{{ summary.total_warnings or 0 }}</strong><span>Total warnings</span></div>
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Ticket detail: {{ detail.ticket_id }}</h2>
+      <p><strong><a href="/markets/{{ detail.market_id }}">{{ detail.title or detail.market_id }}</a></strong></p>
+      <section class="stats mini">
+        <div><strong>{{ detail.status }}</strong><span>Preflight status</span></div>
+        <div><strong>{{ 'yes' if detail.approved else 'no' }}</strong><span>Approved</span></div>
+        <div><strong>${{ '{:,.2f}'.format(detail.stake or 0) }}</strong><span>Stake</span></div>
+        <div><strong>{{ '%.4f'|format(detail.price or 0) }}</strong><span>Price</span></div>
+        <div><strong>{{ detail.blocker_count or 0 }}</strong><span>Blockers</span></div>
+        <div><strong>{{ detail.warning_count or 0 }}</strong><span>Warnings</span></div>
+        <div><strong>{{ detail.market_data_quality.state if detail.market_data_quality else 'missing' }}</strong><span>Market data</span></div>
+      </section>
+      <table>
+        <thead><tr><th>Check</th><th>Result</th><th>Severity</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for check in detail.checks %}
+          <tr>
+            <td>{{ check.name }}</td>
+            <td><span class="pill">{{ 'pass' if check.passed else 'fail' }}</span></td>
+            <td>{{ check.severity }}</td>
+            <td>{{ check.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="muted">API: <a href="/api/paper/preflight/{{ detail.ticket_id }}" target="_blank" rel="noreferrer">open ticket preflight JSON</a></p>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Preflight board</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Ticket</th><th>Market</th><th>Status</th><th>Market data</th><th>Stake</th><th>Blockers</th><th>Warnings</th><th>Primary issues</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><strong>{{ row.ticket_id }}</strong><br><span class="muted small">{{ row.outcome or 'YES' }} @ {{ '%.4f'|format(row.price or 0) }}</span></td>
+            <td><a href="/markets/{{ row.market_id }}"><strong>{{ row.title or row.market_id }}</strong></a><br><span class="muted small">{{ row.market_id }}</span></td>
+            <td><span class="pill">{{ row.status }}</span><br><span class="muted small">approved={{ row.approved }}</span></td>
+            <td><span class="pill">{{ row.market_data_quality.state if row.market_data_quality else 'missing' }}</span>{% if row.market_data_quality and row.market_data_quality.snapshot_id %}<br><a class="muted small" href="/market-data/snapshots/{{ row.market_data_quality.snapshot_id }}">snapshot</a>{% endif %}</td>
+            <td>${{ '{:,.2f}'.format(row.stake or 0) }}</td>
+            <td>{{ row.blocker_count or 0 }}</td>
+            <td>{{ row.warning_count or 0 }}</td>
+            <td>
+              {% if row.blockers %}
+                {% for item in row.blockers[:3] %}<span class="muted small">BLOCK: {{ item.detail }}</span><br>{% endfor %}
+              {% endif %}
+              {% if row.warnings %}
+                {% for item in row.warnings[:3] %}<span class="muted small">WARN: {{ item.detail }}</span><br>{% endfor %}
+              {% endif %}
+              {% if not row.blockers and not row.warnings %}<span class="muted">clear</span>{% endif %}
+            </td>
+            <td><a href="/preflight?ticket_id={{ row.ticket_id }}">detail</a><br><a href="/trade-tickets">tickets</a><br><a href="/risk-budget?market_id={{ row.market_id }}">risk</a><br><a href="/audit?market_id={{ row.market_id }}">audit</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No active entry tickets match this filter.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}Live Order Ledger{% endblock %}
+{% block breadcrumbs %}<a href="/live-trading">Live trading</a> / <span>Orders</span>{% endblock %}
+{% block content %}
+<section class="page-header"><div><p class="eyebrow">Local ledger</p><h1>Live order ledger</h1><p class="page-subtitle">Derived/persisted local submit/cancel events. Fake-local receipts are not exchange acknowledgements.</p></div><div class="action-bar"><a class="button-link" href="/api/live/orders.csv">Export CSV</a></div></section>
+<div class="table-wrap"><table><thead><tr><th>Event</th><th>Created</th><th>Type</th><th>Status</th><th>Market</th><th>Token</th><th>Side</th><th>Notional</th><th>Network</th></tr></thead><tbody>{% for row in board["items"] %}<tr><td>{{ row.order_event_id|compact_id }}</td><td>{{ row.created_at }}</td><td>{{ row.event_type }}</td><td><span class="status-badge tone-{{ row.adapter_status|status_tone }}">{{ row.adapter_status }}</span></td><td>{{ row.market_id|compact_id }}</td><td>{{ row.token_id|compact_id }}</td><td>{{ row.side }}</td><td>{{ row.notional }}</td><td>{{ row.network_attempted }}</td></tr>{% else %}<tr><td colspan="9" class="empty-state">No live order ledger events yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

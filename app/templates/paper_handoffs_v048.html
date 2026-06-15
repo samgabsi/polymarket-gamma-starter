@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Operator Handoffs - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper operator handoffs · v0.5.11 · local simulation only</p>
+        <h1>Paper Operator Handoffs</h1>
+        <p class="muted">Saved local handoff packets for unresolved briefing items, recent checkpoints, and next-operator focus.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/paper-handoff-reconciliation">Reconciliation</a> <a href="/runbook">Runbook</a> <a href="/execution-queue">Execution queue</a> <a href="/risk-budget">Risk budget</a> <a href="/audit?category=operator_handoff">Handoff audit</a> <a href="/api/paper/handoffs">JSON</a> <a href="/api/paper/handoffs.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Briefing section
+          <select name="section">
+            <option value="" {% if not section %}selected{% endif %}>all</option>
+            <option value="runbook" {% if section == 'runbook' %}selected{% endif %}>runbook</option>
+            <option value="entry_execution" {% if section == 'entry_execution' %}selected{% endif %}>entry_execution</option>
+            <option value="risk_budget" {% if section == 'risk_budget' %}selected{% endif %}>risk_budget</option>
+            <option value="post_trade_review" {% if section == 'post_trade_review' %}selected{% endif %}>post_trade_review</option>
+            <option value="playbook_performance" {% if section == 'playbook_performance' %}selected{% endif %}>playbook_performance</option>
+            <option value="portfolio_health" {% if section == 'portfolio_health' %}selected{% endif %}>portfolio_health</option>
+          </select>
+        </label>
+        <label>Item status
+          <select name="item_status">
+            <option value="" {% if not item_status %}selected{% endif %}>all unresolved</option>
+            <option value="ready" {% if item_status == 'ready' %}selected{% endif %}>ready</option>
+            <option value="action_required" {% if item_status == 'action_required' %}selected{% endif %}>action_required</option>
+            <option value="blocked" {% if item_status == 'blocked' %}selected{% endif %}>blocked</option>
+            <option value="review" {% if item_status == 'review' %}selected{% endif %}>review</option>
+            <option value="watch" {% if item_status == 'watch' %}selected{% endif %}>watch</option>
+          </select>
+        </label>
+        <label>Saved status
+          <select name="record_status">
+            <option value="" {% if not record_status %}selected{% endif %}>all saved</option>
+            <option value="open" {% if record_status == 'open' %}selected{% endif %}>open</option>
+            <option value="handed_off" {% if record_status == 'handed_off' %}selected{% endif %}>handed_off</option>
+            <option value="accepted" {% if record_status == 'accepted' %}selected{% endif %}>accepted</option>
+            <option value="needs_followup" {% if record_status == 'needs_followup' %}selected{% endif %}>needs_followup</option>
+            <option value="archived" {% if record_status == 'archived' %}selected{% endif %}>archived</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Refresh handoff</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.current_unresolved or 0 }}</strong><span>Current unresolved</span></div>
+      <div><strong>{{ summary.current_ready or 0 }}</strong><span>Ready</span></div>
+      <div><strong>{{ summary.current_action_required or 0 }}</strong><span>Action required</span></div>
+      <div><strong>{{ summary.current_blocked or 0 }}</strong><span>Blocked</span></div>
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved handoffs</span></div>
+      <div><strong>{{ summary.needs_followup or 0 }}</strong><span>Needs follow-up</span></div>
+      <div><strong>{{ summary.current_top_priority or 0 }}</strong><span>Top priority</span></div>
+      <div><strong>${{ '{:,.2f}'.format(summary.current_ready_entry_stake or 0) }}</strong><span>Ready entry stake</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Record handoff packet</h2>
+      <p class="muted">This saves a local snapshot of the current handoff preview. It does not acknowledge runbook items, approve tickets, or execute paper trades.</p>
+      <form method="post" action="/paper-handoffs/record" class="inline-form">
+        <input type="hidden" name="section" value="{{ section }}">
+        <input type="hidden" name="item_status" value="{{ item_status }}">
+        <input type="hidden" name="market_id" value="{{ market_id }}">
+        <select name="status">
+          <option value="open">open</option>
+          <option value="handed_off">handed_off</option>
+          <option value="accepted">accepted</option>
+          <option value="needs_followup">needs_followup</option>
+          <option value="archived">archived</option>
+        </select>
+        <input name="incoming_operator" placeholder="incoming operator">
+        <input name="note" placeholder="handoff note" style="min-width:360px">
+        <button type="submit">Save handoff</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Current handoff preview</h2>
+      {% if current.next_operator_focus %}
+      <ol class="compact">
+        {% for line in current.next_operator_focus %}
+        <li>{{ line }}</li>
+        {% endfor %}
+      </ol>
+      {% endif %}
+      {% if current.handoff_items %}
+      <table>
+        <thead><tr><th>Priority</th><th>Status</th><th>Section</th><th>Item</th><th>Market</th><th>Recommended action</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for row in current.handoff_items %}
+          <tr>
+            <td><strong>{{ row.priority }}</strong></td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td>{{ row.section }}</td>
+            <td><strong>{{ row.title }}</strong><br><span class="muted small">{{ row.briefing_item_id }}</span></td>
+            <td>{% if row.market_id %}<a href="/markets/{{ row.market_id }}">{{ row.question }}</a><br><span class="muted small">{{ row.market_id }}</span>{% else %}<span class="muted">portfolio/system</span>{% endif %}</td>
+            <td>{{ row.recommended_action }}{% if row.detail %}<br><span class="muted small">{{ row.detail }}</span>{% endif %}</td>
+            <td>{% for label, url in row.links.items() %}<a href="{{ url }}">{{ label }}</a>{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No unresolved handoff items match this filter.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved handoff packets</h2>
+      {% if handoffs %}
+      <table>
+        <thead><tr><th>Time</th><th>Status</th><th>Operators</th><th>Items</th><th>Blocked</th><th>Action required</th><th>Focus</th><th>Note</th></tr></thead>
+        <tbody>
+          {% for row in handoffs %}
+          <tr>
+            <td><a href="/paper-handoffs?handoff_id={{ row.handoff_id }}">{{ row.handoff_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td><span class="muted small">from</span> {{ row.outgoing_operator or 'local' }}<br><span class="muted small">to</span> {{ row.incoming_operator or 'unassigned' }}</td>
+            <td>{{ row.unresolved_count_snapshot }}/{{ row.item_count_snapshot }}</td>
+            <td>{{ row.blocked_snapshot }}</td>
+            <td>{{ row.action_required_snapshot }}</td>
+            <td>{% for line in row.next_operator_focus %}{{ line }}{% if not loop.last %}<br>{% endif %}{% endfor %}</td>
+            <td>{{ row.note }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No saved handoff packets match this filter.</p>{% endif %}
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Handoff detail: {{ detail.handoff_id }}</h2>
+      <section class="stats mini">
+        <div><strong>{{ detail.status }}</strong><span>Status</span></div>
+        <div><strong>{{ detail.unresolved_count_snapshot }}</strong><span>Unresolved</span></div>
+        <div><strong>{{ detail.blocked_snapshot }}</strong><span>Blocked</span></div>
+        <div><strong>{{ detail.action_required_snapshot }}</strong><span>Action required</span></div>
+      </section>
+      {% if detail.note %}<p>{{ detail.note }}</p>{% endif %}
+      {% if detail.handoff_items %}
+      <table>
+        <thead><tr><th>Priority</th><th>Status</th><th>Section</th><th>Item</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in detail.handoff_items %}
+          <tr>
+            <td>{{ row.priority }}</td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td>{{ row.section }}</td>
+            <td>{{ row.title }}<br><span class="muted small">{{ row.briefing_item_id }}</span></td>
+            <td>{{ row.recommended_action }}{% if row.detail %}<br><span class="muted small">{{ row.detail }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% endif %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

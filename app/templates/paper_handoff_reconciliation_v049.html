@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Handoff Reconciliation - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper handoff reconciliation · v0.5.11 · local simulation only</p>
+        <h1>Paper Handoff Reconciliation</h1>
+        <p class="muted">Read-only comparison between saved handoff packets and the current daily paper ops briefing.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/paper-handoffs">Handoffs</a> <a href="/paper-ops-briefing">Ops briefing</a> <a href="/runbook">Runbook</a> <a href="/audit?category=operator_handoff">Handoff audit</a> <a href="/api/paper/handoffs/reconciliation">JSON</a> <a href="/api/paper/handoffs/reconciliation.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Handoff ID <input name="handoff_id" value="{{ detail.handoff.handoff_id if detail else '' }}" placeholder="optional detail"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional filter"></label>
+        <label>Saved status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all saved</option>
+            <option value="open" {% if status == 'open' %}selected{% endif %}>open</option>
+            <option value="handed_off" {% if status == 'handed_off' %}selected{% endif %}>handed_off</option>
+            <option value="accepted" {% if status == 'accepted' %}selected{% endif %}>accepted</option>
+            <option value="needs_followup" {% if status == 'needs_followup' %}selected{% endif %}>needs_followup</option>
+            <option value="archived" {% if status == 'archived' %}selected{% endif %}>archived</option>
+          </select>
+        </label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Refresh reconciliation</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Handoffs checked</span></div>
+      <div><strong>{{ summary.followup_required_count or 0 }}</strong><span>Follow-up required</span></div>
+      <div><strong>{{ summary.still_open or 0 }}</strong><span>Still open items</span></div>
+      <div><strong>{{ summary.changed_open or 0 }}</strong><span>Changed open</span></div>
+      <div><strong>{{ summary.not_visible or 0 }}</strong><span>Not visible</span></div>
+      <div><strong>{{ summary.no_longer_unresolved or 0 }}</strong><span>No longer unresolved</span></div>
+      <div><strong>{{ summary.verify_clearance_count or 0 }}</strong><span>Verify clearance</span></div>
+      <div><strong>{{ summary.saved_item_count or 0 }}</strong><span>Saved items</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Saved handoff reconciliation</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Handoff</th><th>State</th><th>Saved status</th><th>Items</th><th>Still open</th><th>Changed</th><th>Not visible</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/paper-handoff-reconciliation?handoff_id={{ row.handoff_id }}">{{ row.handoff_id }}</a><br><span class="muted small">{{ row.created_at }}</span></td>
+            <td><span class="pill">{{ row.reconciliation_state }}</span></td>
+            <td>{{ row.handoff_status }}</td>
+            <td>{{ row.saved_item_count }}</td>
+            <td>{{ row.still_open }}</td>
+            <td>{{ row.changed_open }}</td>
+            <td>{{ row.not_visible }}</td>
+            <td>{{ row.recommended_action }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No saved handoffs match this filter.</p>{% endif %}
+    </section>
+
+    {% if detail %}
+    <section class="panel">
+      <h2>Reconciliation detail: {{ detail.handoff.handoff_id }}</h2>
+      <section class="stats mini">
+        <div><strong>{{ detail.summary.reconciliation_state }}</strong><span>State</span></div>
+        <div><strong>{{ detail.summary.followup_required }}</strong><span>Follow-up items</span></div>
+        <div><strong>{{ detail.summary.still_open }}</strong><span>Still open</span></div>
+        <div><strong>{{ detail.summary.not_visible }}</strong><span>Not visible</span></div>
+      </section>
+      <p class="muted">{{ detail.guardrail }}</p>
+      {% if detail.items %}
+      <table>
+        <thead><tr><th>Saved item</th><th>Saved</th><th>Current</th><th>Reconciliation</th><th>Recommended action</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for row in detail.items %}
+          <tr>
+            <td><strong>{{ row.title }}</strong><br><span class="muted small">{{ row.briefing_item_id }}</span></td>
+            <td><span class="pill">{{ row.saved_status }}</span><br><span class="muted small">priority {{ row.saved_priority }}</span></td>
+            <td>{% if row.current_status %}<span class="pill">{{ row.current_status }}</span><br><span class="muted small">priority {{ row.current_priority }}</span>{% else %}<span class="muted">not visible</span>{% endif %}</td>
+            <td><span class="pill">{{ row.reconciliation_status }}</span></td>
+            <td>{{ row.recommended_action }}</td>
+            <td>{{ row.detail }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">This handoff had no saved handoff items to reconcile.</p>{% endif %}
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Live Order Intent Preview - Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Live order intent preview · v0.5.11 · local dry-run only</p>
+        <h1>Live Order Intent Preview</h1>
+        <p class="muted">Populate future live-order fields and record an auditable local preview. This page never signs, submits, cancels, or automates orders.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/live-config">Live config</a> <a href="/live-order-intent-preflight">Preflight</a> <a href="/live-order-authorizations">Authorizations</a> <a href="/audit?category=live_order_intent">Intent audit</a> <a href="/api/live/order-intents">JSON</a> <a href="/api/live/order-intents.csv">CSV</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Status
+          <select name="status">
+            <option value="" {% if not status %}selected{% endif %}>all</option>
+            <option value="ready_for_manual_review" {% if status == 'ready_for_manual_review' %}selected{% endif %}>ready_for_manual_review</option>
+            <option value="blocked_by_guard" {% if status == 'blocked_by_guard' %}selected{% endif %}>blocked_by_guard</option>
+            <option value="invalid" {% if status == 'invalid' %}selected{% endif %}>invalid</option>
+            <option value="archived" {% if status == 'archived' %}selected{% endif %}>archived</option>
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional"></label>
+        <label>Operator <input name="operator" value="{{ operator }}" placeholder="optional"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="1000" value="{{ limit }}"></label>
+        <button type="submit">Filter intents</button>
+      </form>
+    </header>
+
+    <section class="notice">
+      <strong>Non-executing guardrail:</strong> {{ guardrail }}<br>
+      <span class="muted">Generated at {{ generated_at }}</span>
+    </section>
+
+    <section class="stats">
+      <div><strong>{{ summary.saved_count or 0 }}</strong><span>Saved intents</span></div>
+      <div><strong>{{ summary.ready_for_manual_review or 0 }}</strong><span>Ready for review</span></div>
+      <div><strong>{{ summary.blocked_by_guard or 0 }}</strong><span>Blocked by guards</span></div>
+      <div><strong>${{ '%.2f'|format(summary.total_preview_notional or 0) }}</strong><span>Preview notional</span></div>
+      <div><strong>{{ summary.allowed_market_count or 0 }}</strong><span>Allowlisted markets</span></div>
+      <div><strong>{{ 'no' if not summary.execution_available else 'yes' }}</strong><span>Execution available</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Record local live-order intent preview</h2>
+      <p class="muted">This creates a local ledger record only. It is a preflight-style preview for future live automation, not an order and not an approval.</p>
+      <form method="post" action="/live-order-intents/record" class="stacked-form wide-form">
+        <label>Operator <input name="operator" value="{{ default_operator }}"></label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="condition/market id" required></label>
+        <label>Token ID <input name="token_id" placeholder="future CLOB token/asset id"></label>
+        <label>Outcome <input name="outcome" value="YES"></label>
+        <label>Side
+          <select name="side"><option value="BUY">BUY</option><option value="SELL">SELL</option></select>
+        </label>
+        <label>Order type
+          <select name="order_type"><option value="limit">limit</option><option value="marketable_limit">marketable_limit</option></select>
+        </label>
+        <label>Time in force
+          <select name="time_in_force"><option value="GTC">GTC</option><option value="FOK">FOK</option><option value="FAK">FAK</option></select>
+        </label>
+        <label>Limit price <input type="number" step="0.0001" min="0.0001" max="0.9999" name="price" value="0.5"></label>
+        <label>Size / shares <input type="number" step="0.0001" min="0.0001" name="size" value="1"></label>
+        <label>Source ticket ID <input name="source_ticket_id" placeholder="optional paper ticket id"></label>
+        <label>Source approval ID <input name="source_approval_id" placeholder="optional paper approval id"></label>
+        <label>Operator note <textarea name="note" rows="3" placeholder="Why this live-intent preview exists; what still needs review?"></textarea></label>
+        <button type="submit">Record local intent preview</button>
+      </form>
+    </section>
+
+    <section class="panel">
+      <h2>Guard sample</h2>
+      <p class="muted">The sample preview below shows the current guard posture using a placeholder intent.</p>
+      <section class="stats mini">
+        <div><strong>{{ sample_preview.status or 'unknown' }}</strong><span>Sample status</span></div>
+        <div><strong>{{ sample_preview.blockers|length }}</strong><span>Blockers</span></div>
+        <div><strong>{{ sample_preview.warnings|length }}</strong><span>Warnings</span></div>
+        <div><strong>{{ 'no' if not sample_preview.execution_allowed else 'yes' }}</strong><span>Execution allowed</span></div>
+      </section>
+      {% if sample_preview.blockers %}<h3>Sample blockers</h3><ul>{% for blocker in sample_preview.blockers[:8] %}<li>{{ blocker }}</li>{% endfor %}</ul>{% endif %}
+      {% if sample_preview.warnings %}<h3>Sample warnings</h3><ul>{% for warning in sample_preview.warnings[:8] %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Saved intent previews</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Created</th><th>Status</th><th>Market / token</th><th>Side</th><th>Price</th><th>Size</th><th>Notional</th><th>Blockers / note</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/api/live/order-intents/{{ row.intent_id }}" target="_blank" rel="noreferrer">{{ row.created_at }}</a><br><span class="muted small">{{ row.intent_id }}</span></td>
+            <td><span class="pill">{{ row.status }}</span></td>
+            <td>{{ row.market_id }}{% if row.token_id %}<br><span class="muted small">{{ row.token_id }}</span>{% endif %}</td>
+            <td>{{ row.side }} {{ row.outcome }}<br><span class="muted small">{{ row.order_type }} · {{ row.time_in_force }}</span></td>
+            <td>{{ row.price }}</td>
+            <td>{{ row.size }}</td>
+            <td>${{ '%.2f'|format(row.notional or 0) }}</td>
+            <td>{% if row.blockers %}<strong>{{ row.blockers|length }} blocker(s)</strong><br><span class="muted small">{{ row.blockers[0] }}</span>{% else %}No blockers{% endif %}{% if row.note %}<br><span class="muted small">{{ row.note }}</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No saved live-order intent previews match this filter.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

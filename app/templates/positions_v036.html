@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Paper Positions v0.5.11</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Paper-only lifecycle controls · v0.5.11</p>
+        <h1>Paper Position Manager</h1>
+        <p class="muted">Set local target/stop plans, review notes, and action states for simulated positions. No orders, wallet, or live trading are connected.</p>
+        <p><a href="/">Dashboard</a> · <a href="/trade-tickets">Entry tickets</a> · <a href="/exit-tickets">Exit tickets</a> <a href="/playbooks">Playbooks</a> · <a href="/settlements">Settlements</a> · <a href="/audit">Audit</a> · <a href="/review-report">Review</a> · <a href="/api/paper/positions">Positions JSON</a> · <a href="/api/paper/position-alerts">Alerts JSON</a></p>
+      </div>
+      <form method="get">
+        <label>Market refresh limit <input type="number" name="limit" min="1" max="500" value="{{ limit }}"></label>
+        <button type="submit">Refresh</button>
+      </form>
+    </header>
+
+    <section class="stats">
+      <div><strong>{{ summary.open_position_count }}</strong><span>Open positions</span></div>
+      <div><strong>{{ summary.managed_position_count }}</strong><span>Managed</span></div>
+      <div><strong>{{ summary.unmanaged_position_count }}</strong><span>Need plan</span></div>
+      <div><strong>{{ summary.warning_count }}</strong><span>Warnings</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Lifecycle alerts</h2>
+      <p class="muted">Alerts are local workflow prompts. They help you decide what to review; they do not sell, settle, or trade.</p>
+      {% if alerts %}
+      <table>
+        <thead><tr><th>Level</th><th>Type</th><th>Market</th><th>Detail</th><th>Action</th></tr></thead>
+        <tbody>
+          {% for alert in alerts[:20] %}
+          <tr>
+            <td><span class="pill">{{ alert.level }}</span></td>
+            <td>{{ alert.kind }}</td>
+            <td><a href="/markets/{{ alert.market_id }}">{{ alert.question }}</a><br><span class="muted small">{{ alert.outcome }} · current {{ '%.4f'|format(alert.current_price) }}</span></td>
+            <td>{{ alert.detail }}</td>
+            <td>{{ alert.recommended_action }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No lifecycle alerts right now.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Open paper positions</h2>
+      {% if portfolio.open_positions %}
+      <table>
+        <thead><tr><th>Market</th><th>Position</th><th>P&amp;L</th><th>Current plan</th><th>Update plan</th><th>Actions</th></tr></thead>
+        <tbody>
+          {% for pos in portfolio.open_positions %}
+          {% set plan = pos.exit_plan if pos.exit_plan is mapping else {} %}
+          <tr>
+            <td><a href="/markets/{{ pos.market_id }}">{{ pos.question }}</a><br><span class="muted small">{{ pos.market_id }}</span></td>
+            <td><span class="pill">{{ pos.outcome }}</span><br>{{ '%.4f'|format(pos.shares) }} shares<br><span class="muted small">avg {{ '%.4f'|format(pos.avg_price) }} · current {{ '%.4f'|format(pos.current_price) }}</span></td>
+            <td>${{ '{:,.2f}'.format(pos.market_value) }} value<br>{{ '{:+,.2f}'.format(pos.unrealized_pnl) }} unrealized<br><span class="muted small">cost ${{ '{:,.2f}'.format(pos.cost_basis) }}</span></td>
+            <td>
+              <span class="pill">{{ plan.status or pos.position_status or 'active' }}</span><br>
+              target: {% if plan.target_price is not none %}{{ '%.4f'|format(plan.target_price) }}{% else %}<span class="muted">none</span>{% endif %}<br>
+              stop: {% if plan.stop_price is not none %}{{ '%.4f'|format(plan.stop_price) }}{% else %}<span class="muted">none</span>{% endif %}<br>
+              max hold: {% if plan.max_hold_days is not none %}{{ plan.max_hold_days }}d{% else %}<span class="muted">none</span>{% endif %}<br>
+              {% if plan.review_note %}<span class="muted small">{{ plan.review_note }}</span>{% endif %}
+            </td>
+            <td>
+              <form class="stacked-form" method="post" action="/paper/positions/plan">
+                <input type="hidden" name="market_id" value="{{ pos.market_id }}">
+                <input type="hidden" name="outcome" value="{{ pos.outcome }}">
+                <label>Status
+                  <select name="status">
+                    {% for s in ['active','watch','reduce','exit_planned'] %}
+                    <option value="{{ s }}" {% if (plan.status or pos.position_status or 'active') == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                  </select>
+                </label>
+                <label>Target price <input name="target_price" placeholder="0.75" value="{{ plan.target_price if plan.target_price is not none else '' }}"></label>
+                <label>Stop price <input name="stop_price" placeholder="0.35" value="{{ plan.stop_price if plan.stop_price is not none else '' }}"></label>
+                <label>Max hold days <input name="max_hold_days" placeholder="14" value="{{ plan.max_hold_days if plan.max_hold_days is not none else '' }}"></label>
+                <label>Review note <input name="review_note" style="width: 100%" placeholder="What would invalidate the thesis?" value="{{ plan.review_note or '' }}"></label>
+                <button type="submit">Save plan</button>
+              </form>
+            </td>
+            <td>
+              <form class="stacked-form" method="post" action="/paper/positions/exit-ticket">
+                <input type="hidden" name="market_id" value="{{ pos.market_id }}">
+                <input type="hidden" name="outcome" value="{{ pos.outcome }}">
+                <label>Exit shares <input name="shares" placeholder="all" value=""></label>
+                <label>Exit price <input name="price" placeholder="{{ '%.4f'|format(pos.current_price) }}" value=""></label>
+                <label>Reason <input name="reason" value="lifecycle review"></label>
+                <button type="submit">Create exit ticket</button>
+              </form>
+              <a href="/paper/sell/{{ pos.market_id }}?outcome={{ pos.outcome }}">Legacy paper sell all</a><br>
+              <a href="/settlements">Manual settle</a><br>
+              <a href="/api/paper/settlement-preview/{{ pos.market_id }}?winning_outcome={{ pos.outcome }}">Preview settlement</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No open paper positions yet.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Recent lifecycle events</h2>
+      {% if events %}
+      <table>
+        <thead><tr><th>Time</th><th>Type</th><th>Market</th><th>Plan</th></tr></thead>
+        <tbody>
+          {% for event in events[:20] %}
+          <tr>
+            <td>{{ event.timestamp }}<br><span class="muted small">{{ event.event_id }}</span></td>
+            <td>{{ event.type }}</td>
+            <td><a href="/markets/{{ event.market_id }}">{{ event.question or event.market_id }}</a><br><span class="muted small">{{ event.outcome }}</span></td>
+            <td>
+              status {{ event.plan.status }} · target {{ event.plan.target_price or 'none' }} · stop {{ event.plan.stop_price or 'none' }}<br>
+              <span class="muted small">{{ event.plan.review_note or '' }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No position plan updates yet.</p>{% endif %}
+    </section>
+  </main>
+</body>
+</html>

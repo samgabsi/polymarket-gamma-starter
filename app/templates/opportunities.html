@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Opportunity Engine · Polymarket Gamma Starter v0.5.11</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">v0.5.11 · Opportunity Engine</p>
+        <h1>Opportunity Engine</h1>
+        <p class="muted">Real-use ranking across market odds, model odds, evidence readiness, risk checks, liquidity, volume, and watchlist state.</p>
+        {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · <a href="/">Dashboard</a> · <a href="/operator">Operator brief</a> · <a href="/research/evidence">Evidence</a> · <a href="/logout">Logout</a></p>{% endif %}
+      </div>
+      <form method="get">
+        <label>Limit <input type="number" name="limit" min="10" max="200" value="{{ limit }}"></label>
+        <button type="submit">Refresh</button>
+      </form>
+    </header>
+
+    <section class="stats">
+      <div><strong>{{ summary.count }}</strong><span>Ranked markets</span></div>
+      <div><strong>{{ summary.paper_candidate_count }}</strong><span>Paper candidates</span></div>
+      <div><strong>{{ '%.1f'|format(summary.max_rank_score) }}</strong><span>Top rank score</span></div>
+      <div><strong>{{ '%.1f'|format(summary.avg_evidence_score) }}</strong><span>Avg evidence score</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Top ranked opportunities</h2>
+      <p class="notice">Paper-only. This page does not place orders, sign transactions, or use wallet credentials.</p>
+      <p><a href="/api/opportunities/engine?limit={{ limit }}" target="_blank" rel="noreferrer">Open JSON</a></p>
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Market</th><th>Market</th><th>Model</th><th>Edge</th><th>Evidence</th><th>Risk</th><th>Stage</th><th>Action</th><th>Why</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in opportunities %}
+          <tr>
+            <td><strong>{{ '%.1f'|format(row.rank_score) }}</strong></td>
+            <td><a href="/markets/{{ row.market_id }}">{{ row.question }}</a><br><span class="muted">Vol ${{ '{:,.0f}'.format(row.volume_24hr) }} · Liq ${{ '{:,.0f}'.format(row.liquidity) }}</span></td>
+            <td>{% if row.market_probability is not none %}{{ '%.1f'|format(row.market_probability * 100) }}%{% else %}n/a{% endif %}</td>
+            <td>{% if row.model_probability is not none %}{{ '%.1f'|format(row.model_probability * 100) }}%{% else %}n/a{% endif %}<br><span class="muted">{{ row.confidence }}</span></td>
+            <td>{{ '%+.2f'|format(row.edge_percent) }}%</td>
+            <td>{{ '%.0f'|format(row.evidence_score) }}/100<br><span class="muted">{{ row.evidence_readiness }}</span></td>
+            <td><span class="pill">{{ 'OK' if row.risk_ok else 'blocked' }}</span></td>
+            <td>{{ row.workflow_stage }}</td>
+            <td><span class="pill">{{ row.recommended_action }}</span></td>
+            <td>{{ '; '.join(row.reason_codes) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    <section class="two-col">
+      <div class="panel">
+        <h2>Workflow stage counts</h2>
+        <ul class="clean-list compact">
+          {% for key, value in summary.stage_counts.items() %}
+          <li><strong>{{ key }}</strong>: {{ value }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="panel">
+        <h2>Action counts</h2>
+        <ul class="clean-list compact">
+          {% for key, value in summary.action_counts.items() %}
+          <li><strong>{{ key }}</strong>: {{ value }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

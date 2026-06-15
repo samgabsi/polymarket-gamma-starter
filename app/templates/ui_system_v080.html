@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}UI System - Polymarket Gamma Starter {{ app_version_short }}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="/">Overview</a><span>/</span><span>UI system</span>
+{% endblock %}
+
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">Design system · local reference · {{ app_version_short }}</p>
+    <h1>UI System</h1>
+    <p class="page-subtitle">Reusable visual language for operator pages: badges, callouts, cards, tables, forms, empty states, and danger labels.</p>
+  </div>
+  <div class="action-bar">
+    <a class="button-link" href="/workflow">Workflow map</a>
+    <a class="button-link quiet" href="/">Dashboard</a>
+  </div>
+</section>
+
+<section class="callout info">
+  <h3>Reference Only</h3>
+  <p>{{ guardrail }} Generated at {{ generated_at }}.</p>
+</section>
+
+<section class="panel">
+  <h2>Status Badges</h2>
+  <p class="muted">Badges include both text and a dot indicator so status is not color-only.</p>
+  <div class="action-bar">
+    {% for badge in badges %}
+    <span class="status-badge tone-{{ badge.tone }}">{{ badge.label }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="grid">
+  {% for callout in callouts %}
+  <article class="callout {{ callout.tone }}">
+    <h3>{{ callout.title }}</h3>
+    <p>{{ callout.body }}</p>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="panel">
+  <div class="section-header">
+    <div>
+      <h2>Cards and Metadata</h2>
+      <p class="muted">Cards are for repeated items and framed tools; metadata grids are for quick inspection.</p>
+    </div>
+    <span class="status-badge tone-ok">EXPORT READY</span>
+  </div>
+  <div class="grid">
+    <article class="card">
+      <h3>Paper Ticket</h3>
+      <p class="muted">Use compact cards when the operator needs to compare repeated workflow objects.</p>
+      <div class="metadata-grid">
+        <div><dt>Status</dt><dd><span class="status-badge tone-warning">NEEDS REVIEW</span></dd></div>
+        <div><dt>Mode</dt><dd>PAPER ONLY</dd></div>
+      </div>
+    </article>
+    <article class="card">
+      <h3>Live Boundary</h3>
+      <p class="muted">Live-facing cards must state when a path is disabled, fake-local, or not submitted.</p>
+      <div class="metadata-grid">
+        <div><dt>Submit</dt><dd>disabled</dd></div>
+        <div><dt>Cancel</dt><dd>gated/manual only</dd></div>
+      </div>
+    </article>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Table Pattern</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Status</th><th>Stage</th><th>Mode</th><th>Next action</th></tr></thead>
+      <tbody>
+        <tr><td><span class="status-badge tone-ok">CLEAR</span></td><td>Research</td><td>LOCAL</td><td>Continue source review.</td></tr>
+        <tr><td><span class="status-badge tone-warning">NEEDS REVIEW</span></td><td>Preflight</td><td>PAPER ONLY</td><td>Resolve stale approval.</td></tr>
+        <tr><td><span class="status-badge tone-danger">BLOCKED</span></td><td>Manual execution</td><td>LIVE DISABLED</td><td>Keep blocked while kill switch is active.</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Form Pattern</h2>
+  <form class="stacked-form" aria-label="Example form">
+    <label>Operator note <input placeholder="optional local note"></label>
+    <label>Mode
+      <select>
+        <option>preview only</option>
+        <option>record local attempt</option>
+      </select>
+    </label>
+    <p class="helper-text">Buttons should explain whether they preview, record local state, or perform a dangerous action.</p>
+    <button type="button">Preview only</button>
+  </form>
+</section>
+
+<section class="empty-state">
+  <h2>Empty State</h2>
+  <p>No records yet. Explain what feeds this page, which route or CLI command can create the first record, and whether the action is paper-only, live-readiness-only, or fake-local.</p>
+</section>
+{% endblock %}

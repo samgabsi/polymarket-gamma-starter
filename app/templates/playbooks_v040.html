@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Strategy Playbooks - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <main>
+    <header>
+      <div>
+        <p class="eyebrow">Strategy playbooks · v0.5.11 · paper-only</p>
+        <h1>Strategy Playbooks</h1>
+        <p class="muted">Deterministic local rules that classify opportunities into paper-ticket, research/watchlist, avoid/review, or position-management workflows. No wallet, no live orders, no automated execution.</p>
+        <p class="top-nav"><a href="/">Dashboard</a> <a href="/readiness">Readiness</a> <a href="/trade-tickets">Entry tickets</a> <a href="/positions">Positions</a> <a href="/audit?category=playbook_decision">Playbook audit</a> <a href="/playbook-performance">Performance</a> <a href="/review-report">Review</a> <a href="/api/playbooks">JSON</a> <a href="/api/playbooks/board">Board JSON</a></p>
+      </div>
+      <form method="get" class="stacked-form">
+        <label>Playbook
+          <select name="playbook_id">
+            <option value="" {% if not playbook_id %}selected{% endif %}>all</option>
+            {% for pb in playbooks %}
+              <option value="{{ pb.playbook_id }}" {% if playbook_id == pb.playbook_id %}selected{% endif %}>{{ pb.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Market ID <input name="market_id" value="{{ market_id }}" placeholder="optional" style="width: 260px"></label>
+        <label>Limit <input type="number" name="limit" min="1" max="200" value="{{ limit }}"></label>
+        <button type="submit">Filter</button>
+      </form>
+    </header>
+
+    <section class="stats">
+      <div><strong>{{ summary.count or 0 }}</strong><span>Markets classified</span></div>
+      <div><strong>{{ summary.matched_count or 0 }}</strong><span>Playbook matches</span></div>
+      <div><strong>{{ summary.ticket_candidate_count or 0 }}</strong><span>Entry-ticket candidates</span></div>
+      <div><strong>{{ summary.research_candidate_count or 0 }}</strong><span>Research/watch candidates</span></div>
+      <div><strong>{{ decision_summary.count or 0 }}</strong><span>Decisions logged</span></div>
+    </section>
+
+    <section class="panel">
+      <h2>Playbook library</h2>
+      <p class="muted small">{{ guardrail }}</p>
+      <table>
+        <thead><tr><th>Playbook</th><th>Use</th><th>Action</th><th>Gates</th><th>Checklist</th></tr></thead>
+        <tbody>
+          {% for pb in playbooks %}
+          <tr>
+            <td><strong>{{ pb.name }}</strong><br><span class="muted small">{{ pb.playbook_id }} · {{ pb.status }}</span></td>
+            <td>{{ pb.intended_use }}<br><span class="muted small">{{ pb.guardrail }}</span></td>
+            <td><span class="pill">{{ pb.recommended_action }}</span></td>
+            <td>
+              {% for key, value in (pb.gates or {}).items() %}
+                <span class="pill">{{ key }}={{ value }}</span>
+              {% else %}<span class="muted">No gates.</span>{% endfor %}
+            </td>
+            <td>
+              {% for item in (pb.checklist or [])[:3] %}<div>• {{ item }}</div>{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+
+    {% if market_fit %}
+    <section class="panel">
+      <h2>Market playbook fit</h2>
+      <p><strong>{{ market_fit.title or market_fit.market_id }}</strong> <span class="muted small">{{ market_fit.market_id }}</span></p>
+      {% if market_fit.best_fit %}
+        {% set best = market_fit.best_fit %}
+        <p><span class="pill">best: {{ best.playbook_name }}</span> <span class="pill">fit {{ '%.1f'|format((best.fit_score or 0) * 100) }}%</span> <span class="pill">{{ best.recommended_action }}</span></p>
+        <p class="muted small">Metrics: edge {{ '%.2f'|format(best.metrics.edge_percent or 0) }}%, confidence {{ '%.1f'|format((best.metrics.confidence or 0) * 100) }}%, evidence {{ '%.1f'|format((best.metrics.evidence_score or 0) * 100) }}%, thesis {{ '%.1f'|format((best.metrics.thesis_score or 0) * 100) }}%, readiness {{ '%.1f'|format((best.metrics.readiness_score or 0) * 100) }}%.</p>
+        <form method="post" action="/markets/{{ market_fit.market_id }}/playbook-decision" class="inline-form">
+          <input type="hidden" name="playbook_id" value="{{ best.playbook_id }}">
+          <select name="status">
+            <option value="assigned">assigned</option>
+            <option value="rejected">rejected</option>
+            <option value="needs_research">needs_research</option>
+            <option value="completed">completed</option>
+          </select>
+          <input name="note" placeholder="decision note" style="width: 280px">
+          <button type="submit">Log decision</button>
+        </form>
+      {% endif %}
+      <table>
+        <thead><tr><th>Playbook</th><th>Fit</th><th>Action</th><th>Gate results</th><th>Blockers</th></tr></thead>
+        <tbody>
+          {% for fit in market_fit.items %}
+          <tr>
+            <td><strong>{{ fit.playbook_name }}</strong><br><span class="muted small">{{ fit.playbook_id }}</span></td>
+            <td>{{ '%.1f'|format((fit.fit_score or 0) * 100) }}%<br><span class="pill">{{ 'matched' if fit.matched else 'not matched' }}</span></td>
+            <td>{{ fit.recommended_action }}</td>
+            <td>{% for gate in fit.gates %}<div>{{ '✓' if gate.passed else '×' }} {{ gate.name }}: {{ gate.detail }}</div>{% endfor %}</td>
+            <td>{% for b in fit.blockers %}<div>• {{ b }}</div>{% else %}<span class="muted">No blockers.</span>{% endfor %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>Playbook board</h2>
+      {% if items %}
+      <table>
+        <thead><tr><th>Market</th><th>Best playbook</th><th>Signals</th><th>Action</th><th>Blockers</th><th>Decision</th></tr></thead>
+        <tbody>
+          {% for row in items %}
+          <tr>
+            <td><a href="/markets/{{ row.market_id }}">{{ row.title or row.market_id }}</a><br><span class="muted small">{{ row.market_id }}</span></td>
+            <td><strong>{{ row.best_playbook_name or 'none' }}</strong><br><span class="pill">fit {{ '%.1f'|format((row.fit_score or 0) * 100) }}%</span> <span class="pill">{{ 'matched' if row.matched else 'not matched' }}</span></td>
+            <td>
+              edge {{ '%.2f'|format(row.metrics.edge_percent or 0) }}%<br>
+              confidence {{ '%.1f'|format((row.metrics.confidence or 0) * 100) }}%<br>
+              evidence {{ '%.1f'|format((row.metrics.evidence_score or 0) * 100) }}% · thesis {{ '%.1f'|format((row.metrics.thesis_score or 0) * 100) }}%
+            </td>
+            <td>{{ row.recommended_action }}<br><a href="/playbooks?market_id={{ row.market_id }}{% if playbook_id %}&playbook_id={{ playbook_id }}{% endif %}">details</a></td>
+            <td>{% for b in row.blockers[:4] %}<div>• {{ b }}</div>{% else %}<span class="muted">No blockers.</span>{% endfor %}</td>
+            <td>
+              {% if row.best_playbook_id %}
+              <form method="post" action="/markets/{{ row.market_id }}/playbook-decision">
+                <input type="hidden" name="playbook_id" value="{{ row.best_playbook_id }}">
+                <input type="hidden" name="status" value="assigned">
+                <input name="note" placeholder="optional note" style="width: 160px">
+                <button type="submit">Log</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No markets available for playbook classification.</p>{% endif %}
+    </section>
+
+    <section class="panel">
+      <h2>Recent playbook decisions</h2>
+      {% if decisions %}
+      <table>
+        <thead><tr><th>Time</th><th>Market</th><th>Playbook</th><th>Status</th><th>Note</th><th>Links</th></tr></thead>
+        <tbody>
+          {% for d in decisions %}
+          <tr>
+            <td><span class="muted small">{{ d.created_at }}</span></td>
+            <td><a href="/markets/{{ d.market_id }}">{{ d.market_id }}</a></td>
+            <td>{{ d.playbook_name or d.playbook_id }}</td>
+            <td><span class="pill">{{ d.status }}</span></td>
+            <td>{{ d.note }}</td>
+            <td><a href="/audit?market_id={{ d.market_id }}&category=playbook_decision">audit</a> · <a href="/review-report?market_id={{ d.market_id }}">review</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<p class="muted">No playbook decisions logged yet.</p>{% endif %}
+    </section>
+
+    {% if user and user.role == 'admin' %}
+    <section class="panel">
+      <h2>Create a lightweight custom playbook</h2>
+      <p class="muted">This creates a local rule record with percentage gates. Use it for repeatable paper-workflow classification, not automated trading.</p>
+      <form method="post" action="/playbooks/custom" class="stacked-form">
+        <label>Name <input name="name" required placeholder="e.g. High evidence small stake"></label>
+        <label>ID <input name="playbook_id" placeholder="optional_slug"></label>
+        <label>Min edge % <input name="min_edge_percent" placeholder="3"></label>
+        <label>Min confidence % <input name="min_confidence_percent" placeholder="50"></label>
+        <label>Min evidence % <input name="min_evidence_percent" placeholder="55"></label>
+        <label>Min thesis % <input name="min_thesis_percent" placeholder="45"></label>
+        <label>Action <input name="action" value="manual_review"></label>
+        <button type="submit">Save custom playbook</button>
+      </form>
+    </section>
+    {% endif %}
+  </main>
+</body>
+</html>

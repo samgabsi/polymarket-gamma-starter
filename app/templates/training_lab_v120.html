@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Training & Evaluation Lab{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Training Lab</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">v1.7.0 · DATASET-BACKED HOST JOBS · MANUAL REVIEW ONLY · NO LIVE TRADING</p>
+    <h1>Training & Evaluation Lab</h1>
+    <p class="page-subtitle">Offline dataset registry, dataset-builder integration, feature-set builder, lightweight baseline training, backtesting, model registry, and manual-review signal queue. Model outputs never bypass operator review or live-trading gates.</p>
+  </div>
+</section>
+<div class="callout warning"><strong>Safety guardrail:</strong> {{ guardrail }}. Backtests are simulations, not guarantees. Generated signals enter manual review only.</div>
+<section class="metric-grid">
+  <article class="metric-card"><strong>{{ status.dataset_count }}</strong><span>Datasets</span></article>
+  <article class="metric-card"><strong>{{ status.feature_set_count }}</strong><span>Feature sets</span></article>
+  <article class="metric-card"><strong>{{ status.training_run_count }}</strong><span>Training runs</span></article>
+  <article class="metric-card"><strong>{{ status.model_registry_count }}</strong><span>Models</span></article>
+  <article class="metric-card"><strong>{{ status.pending_generated_signals }}</strong><span>Training signals</span></article>
+</section>
+<section class="content-card">
+  <h2>Training navigation</h2>
+  <div class="action-bar">
+    <a class="button-link" href="/training">Overview</a>
+    <a class="button-link quiet" href="/training/datasets">Datasets</a>
+    <a class="button-link quiet" href="/training/dataset-builder">Dataset builder</a>
+    <a class="button-link quiet" href="/data">Data system</a>
+    <a class="button-link quiet" href="/training/features">Features</a>
+    <a class="button-link quiet" href="/training/runs">Training runs</a>
+    <a class="button-link quiet" href="/training/host-jobs">Host jobs</a>
+    <a class="button-link quiet" href="/training/models">Models</a>
+    <a class="button-link quiet" href="/training/backtests">Backtests</a>
+    <a class="button-link quiet" href="/training/signals">Signals</a>
+  </div>
+</section>
+{% if page in ['overview','datasets'] %}
+<section class="content-card">
+  <h2>Dataset registry</h2>
+  <p class="help-text">Register metadata for local CSV/JSON datasets. Generated datasets are local runtime state and are excluded from release ZIPs.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/datasets">JSON</a><a class="button-link quiet" href="/api/training/datasets.csv">CSV</a></div>
+  {% if datasets %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Type</th><th>Rows</th><th>Columns</th><th>Status</th><th>Warnings</th></tr></thead><tbody>{% for row in datasets %}<tr><td>{{ row.dataset_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.dataset_type }}</td><td>{{ row.row_count }}</td><td>{{ row.column_count }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.warnings|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No training datasets registered yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','features'] %}
+<section class="content-card">
+  <h2>Feature sets</h2>
+  <p class="help-text">Deterministic feature-set metadata for offline strategy training. Feature previews do not train or trade.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/features">JSON</a><a class="button-link quiet" href="/api/training/features.csv">CSV</a></div>
+  {% if feature_sets %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Dataset</th><th>Groups</th><th>Features</th><th>Target</th><th>Status</th></tr></thead><tbody>{% for row in feature_sets %}<tr><td>{{ row.feature_set_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.dataset_id|compact_id }}</td><td>{{ row.feature_groups|join(', ') }}</td><td>{{ row.feature_count }}</td><td>{{ row.target_column }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No feature sets registered yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','runs'] %}
+<section class="content-card">
+  <h2>Training runs</h2>
+  <p class="help-text">Lightweight local baselines only. Metrics are diagnostic and not financial advice.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/runs">JSON</a><a class="button-link quiet" href="/api/training/runs.csv">CSV</a></div>
+  {% if training_runs %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Model</th><th>Rows</th><th>Status</th><th>F1/Accuracy</th></tr></thead><tbody>{% for row in training_runs %}<tr><td>{{ row.training_run_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.model_type }}</td><td>{{ row.train_rows + row.validation_rows + row.test_rows }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.metrics.f1 or row.metrics.accuracy }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No training runs yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','models'] %}
+<section class="content-card">
+  <h2>Model registry</h2>
+  <p class="help-text">Registered artifacts default to manual-review-only. No model may directly live-trade by default.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/models">JSON</a><a class="button-link quiet" href="/api/training/models.csv">CSV</a></div>
+  {% if models %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Name</th><th>Strategy</th><th>Approval</th><th>Deployment</th><th>Modes</th></tr></thead><tbody>{% for row in models %}<tr><td>{{ row.model_id|compact_id }}</td><td>{{ row.name }}</td><td>{{ row.strategy_id }}</td><td>{{ row.approval_status }}</td><td><span class="status-badge tone-{{ row.deployment_status|status_tone }}">{{ row.deployment_status }}</span></td><td>{{ row.allowed_modes|join(', ') }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No model registry rows yet.</p>{% endif %}
+</section>
+{% endif %}
+{% if page in ['overview','backtests'] %}
+<section class="content-card">
+  <h2>Backtests</h2>
+  <p class="help-text">Offline simulations only. They do not guarantee future performance and never place orders.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/backtests">JSON</a><a class="button-link quiet" href="/api/training/backtests.csv">CSV</a></div>
+  {% if backtests %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Strategy</th><th>Signals</th><th>Accepted</th><th>Estimated P&L</th><th>Status</th></tr></thead><tbody>{% for row in backtests %}<tr><td>{{ row.backtest_id|compact_id }}</td><td>{{ row.strategy_id }}</td><td>{{ row.signals_generated }}</td><td>{{ row.signals_accepted }}</td><td>{{ row.estimated_pnl }}</td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No backtests recorded yet.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','host_jobs'] %}
+<section class="content-card">
+  <h2>Host training job runner</h2>
+  <p class="help-text">Host training jobs are disabled by default. Starts require POLYMARKET_TRAINING_HOST_JOBS_ENABLED=true and an explicit operator confirmation phrase. Jobs now consume local dataset/category-dataset/manifest-backed rows in batches, write artifacts under runtime data directories, and cannot live-trade.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/host-jobs">JSON</a><a class="button-link quiet" href="/api/training/host-jobs.csv">CSV</a><a class="button-link quiet" href="/api/training/host-jobs/caps">Caps JSON</a><a class="button-link quiet" href="/api/data/internet-workflow">Internet-to-training workflow</a></div>
+  <div class="callout warning"><strong>Manual-review-only safety banner:</strong> enabled={{ internet_status.host_training_jobs_enabled }} · running jobs={{ internet_status.running_host_job_count }} · max rows={{ internet_status.training_caps.training_max_rows }} · hard cap={{ internet_status.training_caps.training_hard_max_rows }} · batch size={{ internet_status.training_caps.training_batch_size }} · can_live_trade=false.</div>
+  {% if host_jobs %}<div class="table-wrap"><table><thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Progress</th><th>Rows available/selected/processed</th><th>Batch</th><th>Runtime</th><th>Artifacts</th><th>Warnings</th><th>Blockers</th></tr></thead><tbody>{% for row in host_jobs %}<tr><td>{{ row.host_training_job_id|compact_id }}</td><td>{{ row.job_type }}<br><span class="muted small">{{ row.dataset_id|compact_id }} {{ row.dataset_build_id|compact_id }}</span></td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.progress_percent }}%</td><td>{{ row.rows_available or 0 }}/{{ row.rows_selected or 0 }}/{{ row.rows_processed or 0 }}<br><span class="muted small">skipped {{ row.rows_skipped or 0 }}</span></td><td>{{ row.batches_completed or 0 }}/{{ row.batches_total or 0 }}<br><span class="muted small">size {{ row.batch_size or internet_status.training_caps.training_batch_size }}</span></td><td>{{ row.runtime_seconds }}s</td><td>{{ row.artifact_refs|length }}</td><td>{{ row.warnings|length }}</td><td>{{ row.blockers|length }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No host training jobs yet. Preview a safe dataset-backed job first; starts are blocked until host jobs are explicitly enabled.</p>{% endif %}
+</section>
+{% endif %}
+
+{% if page in ['overview','signals'] %}
+<section class="content-card">
+  <h2>Generated signal queue</h2>
+  <p class="help-text">Training-generated signals are queued into the existing strategy signal ledger for manual review only. They must still pass allowlists, risk checks, approvals, and live gates before any execution path.</p>
+  <div class="action-bar"><a class="button-link quiet" href="/api/training/signals/generate-preview">Preview API</a><a class="button-link quiet" href="/strategy-signals">Strategy signal ledger</a></div>
+</section>
+{% endif %}
+<section class="content-card">
+  <h2>Training audit events</h2>
+  {% if audit_events %}<div class="table-wrap"><table><thead><tr><th>Time</th><th>Event</th><th>Source</th><th>Detail</th></tr></thead><tbody>{% for row in audit_events %}<tr><td>{{ row.timestamp }}</td><td>{{ row.event_type }}</td><td>{{ row.source_id|compact_id }}</td><td>{{ row.detail }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p class="empty-state">No training audit events yet.</p>{% endif %}
+</section>
+{% endblock %}

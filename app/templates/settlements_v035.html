@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Paper Settlements - Polymarket Intelligence</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <style>
+    body { max-width: 1240px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
+    .muted { color: #666; }
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 14px; }
+    .pill { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin: 2px; font-size: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    input, select, button { margin: 2px 0; }
+    .small { font-size: 12px; }
+    .danger { border-color: #c97; background: #fff8f3; }
+  </style>
+</head>
+<body>
+  <section class="standalone-safety-banner" aria-label="Global safety status">
+    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <nav class="standalone-mobile-links" aria-label="Quick navigation">
+      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+    </nav>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+  </section>
+
+  <h1>Manual Paper Settlements</h1>
+  <p class="muted">Close resolved local paper positions and record realized P&amp;L. This is settlement accounting only; it does not place orders, touch a wallet, or contact Polymarket for execution.</p>
+  <p><a href="/">Dashboard</a> · <a href="/trade-tickets">Trade tickets</a> · <a href="/positions">Positions</a> · <a href="/audit">Audit</a> · <a href="/review-report">Review</a> · <a href="/api/paper/settlements">Settlements JSON</a> · <a href="/api/paper/settlement-candidates">Candidates JSON</a></p>
+
+  <div class="cards">
+    <div class="card"><strong>{{ summary.count }}</strong><br><span class="muted">Settlement runs</span></div>
+    <div class="card"><strong>{{ summary.closed_position_count }}</strong><br><span class="muted">Positions closed</span></div>
+    <div class="card"><strong>${{ '{:,.2f}'.format(summary.total_payout) }}</strong><br><span class="muted">Total payout</span></div>
+    <div class="card"><strong>{{ '{:+,.2f}'.format(summary.total_realized_pnl) }}</strong><br><span class="muted">Realized P&amp;L</span></div>
+  </div>
+
+  <section class="card danger">
+    <h2>Manual settlement</h2>
+    <p class="muted">Use this after you have independently verified the real market resolution. Winning outcome pays 1.0; other outcomes pay 0.0.</p>
+    <form method="post" action="/paper/settle">
+      <label>Market ID<br><input name="market_id" required style="width: 420px" placeholder="Gamma market id"></label><br>
+      <label>Winning outcome<br><input name="winning_outcome" value="YES" required></label><br>
+      <label>Note<br><input name="note" style="width: 520px" placeholder="Resolution source / reason"></label><br>
+      <button type="submit">Settle paper position</button>
+    </form>
+  </section>
+
+  <h2>Open settlement candidates</h2>
+  {% if candidates %}
+  <table>
+    <thead><tr><th>Market</th><th>Open exposure</th><th>Outcomes held</th><th>Settle</th></tr></thead>
+    <tbody>
+      {% for row in candidates %}
+      <tr>
+        <td><a href="/markets/{{ row.market_id }}">{{ row.question }}</a><br><span class="muted small">{{ row.market_id }}</span></td>
+        <td>${{ '{:,.2f}'.format(row.cost_basis) }}<br><span class="muted small">{{ row.position_count }} position(s), {{ '%.4f'|format(row.shares) }} shares</span></td>
+        <td>{% for outcome in row.outcomes %}<span class="pill">{{ outcome }}</span>{% endfor %}</td>
+        <td>
+          <form method="post" action="/paper/settle">
+            <input type="hidden" name="market_id" value="{{ row.market_id }}">
+            <select name="winning_outcome">
+              <option value="YES">YES wins</option>
+              <option value="NO">NO wins</option>
+              {% for outcome in row.outcomes %}
+              {% if outcome not in ["YES", "NO"] %}<option value="{{ outcome }}">{{ outcome }} wins</option>{% endif %}
+              {% endfor %}
+            </select><br>
+            <input name="note" placeholder="resolution note"><br>
+            <button type="submit">Settle</button>
+          </form>
+          <a class="small" href="/api/paper/settlement-preview/{{ row.market_id }}?winning_outcome=YES">Preview YES</a> ·
+          <a class="small" href="/api/paper/settlement-preview/{{ row.market_id }}?winning_outcome=NO">Preview NO</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No open paper positions are available for settlement.</p>{% endif %}
+
+  <h2>Settlement history</h2>
+  {% if settlements %}
+  <table>
+    <thead><tr><th>Settled</th><th>Market</th><th>Winning outcome</th><th>Closed</th><th>Payout</th><th>Realized P&amp;L</th><th>Note</th></tr></thead>
+    <tbody>
+      {% for row in settlements %}
+      <tr>
+        <td>{{ row.settled_at }}<br><span class="muted small">{{ row.settlement_id }}</span></td>
+        <td><a href="/markets/{{ row.market_id }}">{{ row.market_id }}</a></td>
+        <td><span class="pill">{{ row.winning_outcome }}</span></td>
+        <td>{{ row.closed_position_count }}</td>
+        <td>${{ '{:,.2f}'.format(row.total_payout) }}</td>
+        <td>{{ '{:+,.2f}'.format(row.total_realized_pnl) }}</td>
+        <td>{{ row.note }}<br><span class="muted small">by {{ row.resolved_by }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No settlement records yet.</p>{% endif %}
+</body>
+</html>

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>First-run setup · Polymarket Gamma Starter</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <main class="auth-page">
+    <section class="panel auth-card">
+      <p class="eyebrow">First-run setup</p>
+      <h1>Create admin password</h1>
+      <p class="muted">Username is fixed to <code>admin</code> for the initial account. Choose a local password; it will be stored as a PBKDF2 hash in <code>data/users.json</code>.</p>
+      {% if error %}<p class="notice danger">{{ error }}</p>{% endif %}
+      <form method="post" action="/setup" class="stacked-form">
+        <label>Admin password <input name="password" type="password" autocomplete="new-password" required autofocus minlength="8"></label>
+        <label>Confirm password <input name="confirm_password" type="password" autocomplete="new-password" required minlength="8"></label>
+        <button type="submit">Create admin account</button>
+      </form>
+    </section>
+  </main>
+</body>
+</html>
