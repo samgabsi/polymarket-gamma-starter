@@ -107,7 +107,7 @@ def test_cancel_blocks_without_required_gates():
 
 def test_ui_preferences_schema_excludes_sensitive_values():
     schema = live_v2.build_live_v2_preferences_schema()
-    assert schema["version"] == "4.0.1-real"
+    assert schema["version"] == "4.17.0-real"
     assert schema["secret_values_allowed"] is False
     assert schema["sensitive_data_allowed"] is False
     keys = {item["key"] for item in schema["preferences"]}

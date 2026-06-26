@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Market News Odds · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/opportunities">Opportunity Review</a> / <a href="/v3/markets/{{ edge.market_id }}">Market Detail</a> / <span>News Odds</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.17.0-real · Market News Odds Panel</p>
+  <h1>{{ edge.question }}</h1>
+  <p class="notice">Draft fair odds adjustment only. Not financial advice, not trade approval, and not autonomous live trading. Browser actions return here with explicit feedback or open the saved draft adjustment record.</p>
+  <div class="link-row">
+    <a class="button-link" href="/v3/markets/{{ edge.market_id }}">Back to Market Detail</a>
+    <form method="post" action="/v3/ai/news-odds/market/{{ edge.market_id }}/plan" class="inline-form compact-form">
+      <button type="submit" class="button-link quiet">Plan search</button>
+    </form>
+    <a class="button-link quiet" href="/v3/ai/news-odds/source-weights">Source Weights</a>
+  </div>
+</section>
+<section class="stats v47-stats">
+  <div><strong>{% if preview.base_fair_yes is not none %}{{ '%.1f%%'|format(preview.base_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>Base fair YES</span></div>
+  <div><strong>{% if preview.adjusted_fair_yes is not none %}{{ '%.1f%%'|format(preview.adjusted_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>News-adjusted fair YES</span></div>
+  <div><strong>{{ '%+.1f pp'|format(preview.raw_ai_adjustment_pct or 0) }}</strong><span>Raw AI adjustment</span></div>
+  <div><strong>{{ '%+.1f pp'|format(preview.final_adjustment_pct or preview.adjustment_pp or 0) }}</strong><span>Final adjustment</span></div>
+  <div><strong>{{ preview.direction }}</strong><span>Direction</span></div>
+  <div><strong>{{ preview.confidence }}</strong><span>Confidence</span></div>
+  <div><strong>{{ preview.source_count }}</strong><span>Attached sources</span></div>
+</section>
+<section class="two-col">
+  <div class="panel"><h2>Before / after edge</h2><ul class="clean-list compact"><li><strong>Market price:</strong> {% if edge.market_yes_price is not none %}YES {{ '%.1f%%'|format(edge.market_yes_price * 100) }}{% else %}unavailable{% endif %}</li><li><strong>Model fair price:</strong> {% if preview.base_fair_yes is not none %}{{ '%.1f%%'|format(preview.base_fair_yes * 100) }}{% else %}unavailable{% endif %}</li><li><strong>AI-adjusted fair price:</strong> {% if preview.adjusted_fair_yes is not none %}{{ '%.1f%%'|format(preview.adjusted_fair_yes * 100) }}{% else %}unavailable{% endif %}</li><li><strong>Edge before adjustment:</strong> {% if preview.base_edge.yes_edge_pp is not none %}{{ '%+.1f pp'|format(preview.base_edge.yes_edge_pp) }}{% else %}unavailable{% endif %}</li><li><strong>Edge after adjustment:</strong> {% if preview.adjusted_edge.yes_edge_pp is not none %}{{ '%+.1f pp'|format(preview.adjusted_edge.yes_edge_pp) }}{% else %}unavailable{% endif %}</li><li><strong>Recommended side:</strong> {{ edge.recommended_side }}</li><li><strong>Suggested action:</strong> {{ edge.suggested_action or edge.recommendation or 'Review' }}</li></ul></div>
+  <div class="panel">
+    <h2>Actions</h2>
+    <div class="workbench-actions">
+      <form method="post" action="/v3/ai/news-odds/market/{{ edge.market_id }}/plan">
+        <button type="submit" class="button-link">Plan search</button>
+      </form>
+      <form method="post" action="/v3/ai/news-odds/market/{{ edge.market_id }}/search">
+        <button type="submit" class="button-link quiet">Run web search if enabled</button>
+      </form>
+      <form method="post" action="/v3/ai/news-odds/market/{{ edge.market_id }}/manual-evidence" class="inline-form compact-form">
+        <input name="evidence_text" placeholder="manual evidence">
+        <button type="submit" class="button-link quiet">Preview manual evidence</button>
+      </form>
+      <form method="post" action="/v3/ai/news-odds/market/{{ edge.market_id }}/adjust" class="inline-form compact-form">
+        <input name="evidence_text" placeholder="manual evidence">
+        <input type="hidden" name="write" value="true">
+        <button type="submit" class="button-link quiet">Save draft adjustment</button>
+      </form>
+    </div>
+    <p class="muted">Manual evidence preview does not persist. Saved draft adjustments write local runtime records and audit rows, both excluded from release ZIPs.</p>
+  </div>
+</section>
+<section class="panel"><h2>Explanation</h2><p>{{ preview.explanation }}</p><ul class="compact">{% for warning in preview.warnings %}<li>{{ warning }}</li>{% endfor %}<li>Cap decision: {{ preview.cap_decision }}</li><li>Old 2.5 pp warning: {{ preview.old_2_5_cap_exceeded }}</li><li>Operator confirmation required: {{ preview.operator_confirmation_required }}</li></ul></section>
+{% endblock %}

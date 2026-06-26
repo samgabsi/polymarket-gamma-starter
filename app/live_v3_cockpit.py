@@ -367,6 +367,25 @@ def update_layout(layout_id: str, payload: dict[str, Any] | None = None) -> dict
     return redact_data(update)
 
 
+def save_current_layout_copy(title: str = "") -> dict[str, Any]:
+    settings = _read_settings()
+    selected = get_layout(settings.get("selected_layout_id", "layout_daily_ops")) or default_layouts()[0]
+    safe_title = _safe_text(title, f"Saved copy of {selected.get('title', 'Cockpit Layout')}")[:180]
+    payload = {
+        "title": safe_title,
+        "description": f"Operator-saved copy of {selected.get('title', 'the current cockpit layout')}.",
+        "layout_type": selected.get("layout_type", "custom"),
+        "panel_ids": selected.get("panel_ids", []),
+        "default_focus_panel": selected.get("default_focus_panel", "panel_safe_next"),
+        "operator_notes": "Saved from the v4.15.0 cockpit layout selector. Local-only workflow layout; not a trading action.",
+        "enabled": True,
+    }
+    layout = create_layout(payload)
+    select_layout(layout["layout_id"])
+    _audit("cockpit_layout_saved_copy", "ok", {"layout_id": layout["layout_id"], "source_layout_id": selected.get("layout_id")})
+    return {"ok": True, "layout": layout, "selected_layout_id": layout["layout_id"], **_safety()}
+
+
 def select_layout(layout_id: str) -> dict[str, Any]:
     layout = get_layout(layout_id)
     if not layout:

@@ -20,7 +20,10 @@ from .research import make_research_packet
 from .watchlist import add_to_watchlist, load_watchlist, remove_from_watchlist
 from .auth_status import get_api_key_status
 from .probability import attach_probability, estimate_probability
+from .market_edge import build_market_recommendation_row, edge_recommendation_legend, enrich_markets_with_recommendations, rank_market_family
 from .paper_trading import buy as paper_buy, sell as paper_sell, reset_portfolio, summarize_portfolio, load_trades, load_portfolio
+from . import paper_automation as v416_paper
+from . import operator_os as v417_operator_os
 from .paper_settlement import list_settlements, preview_settlement, settle_market, settlement_candidates, settlement_summary
 from .paper_positions import list_position_events, position_alerts, position_control_summary, update_position_plan
 from .paper_exit_tickets import create_exit_ticket, delete_exit_ticket, executable_exit_snapshot, get_exit_ticket, list_exit_tickets, summarize_exit_tickets, update_exit_ticket
@@ -56,6 +59,19 @@ from .evidence_scoring import score_evidence_packet, score_market_evidence, scor
 from .evidence_probability import attach_evidence_probability, evidence_adjusted_probability
 from .operator_dashboard import build_operator_brief
 from .opportunity_engine import rank_opportunities, opportunity_summary
+from .opportunity_review import (
+    REVIEW_ONLY_NOTE as OPPORTUNITY_REVIEW_ONLY_NOTE,
+    build_family_comparison,
+    build_market_detail_context,
+    build_opportunity_workbench,
+    demo_markets as opportunity_demo_markets,
+    get_review_record,
+    list_operator_notes as list_opportunity_notes,
+    list_review_records,
+    opportunity_review_settings,
+    update_review_notes,
+    update_review_status,
+)
 from .live_config import build_live_config_readiness, live_config_alerts, live_config_readiness_to_csv, live_config_template
 from .live_order_intents import build_live_order_intent, build_live_order_intent_board, get_live_order_intent, list_live_order_intents, live_order_intent_alerts, live_order_intents_to_csv, record_live_order_intent
 from .live_order_preflight import build_live_order_preflight_board, live_order_preflight_alerts, live_order_preflights_to_csv, list_live_order_preflights, review_live_order_intent
@@ -312,11 +328,30 @@ from .live_v3_tasks import (
 
 from . import live_v3_workspace as v3_workspace
 from . import live_v3_cockpit as v3_cockpit
+from .feature_status import build_feature_readiness_context, build_feature_status_map, build_stub_burndown_map, list_feature_readiness_acknowledgements, record_feature_readiness_acknowledgement
 from . import platform_diagnostics as v4_platform
+from . import platform_api as v4_platform_api
+from . import platform_migrations as v4_platform_migrations
 from . import platform_plugins as v4_platform_plugins
 from . import platform_routes as v4_platform_routes
 from . import platform_storage as v4_platform_storage
 from . import platform_safety as v4_platform_safety
+from . import ai_openai_client as v4_ai_openai
+from . import ai_operator_copilot as v4_ai_copilot
+from . import ai_prompt_governance as v4_ai_prompts
+from . import ai_schemas as v4_ai_schemas
+from . import ai_suggestions as v4_ai
+from . import ai_providers as v4_ai_providers
+from . import ai_local_llm_client as v4_ai_local_llm
+from . import ai_model_recommendations as v4_ai_models
+from . import ai_edge_research as v4_ai_edge
+from . import ai_evidence as v4_ai_evidence
+from . import ai_edge_calibration as v4_ai_edge_calibration
+from . import ai_news_odds as v4_ai_news_odds
+from . import ai_news_providers as v4_ai_news_providers
+from . import cross_market_arbitrage as v4_arbitrage
+from .routers import create_ai_router, create_platform_router, create_v3_core_router
+from .navigation_registry import get_route_aliases, get_system_map, get_primary_entry_points, get_safety_explainer
 
 from .live_v3 import (
     build_command_center as v3_build_command_center,
@@ -526,6 +561,52 @@ client = GammaClient()
 clob = ClobClient()
 
 
+def _score_market_rows(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Score market rows and attach explicit v4.6 YES/NO/HOLD edge recommendations."""
+    return enrich_markets_with_recommendations(attach_probability(attach_scores(markets)))
+
+
+async def _review_market_rows(limit: int = 100, *, demo: bool = False) -> list[dict[str, Any]]:
+    """Load markets for review pages with a deterministic fixture fallback.
+
+    The fallback keeps route/template smoke tests and offline visual QA safe. It is
+    explicitly labelled demo_fixture and never represented as live market data.
+    """
+    if demo:
+        return opportunity_demo_markets()[:limit]
+    try:
+        raw = await client.list_markets(limit=limit, order="volume24hr")
+        if not raw:
+            raise RuntimeError("empty public market response")
+        scored = _score_market_rows(raw)
+        return attach_evidence_probability(scored)
+    except Exception:
+        return opportunity_demo_markets()[:limit]
+
+
+async def _review_market_by_id(market_id_or_slug: str) -> dict[str, Any] | None:
+    safe_id = str(market_id_or_slug or "")
+    for demo_market in opportunity_demo_markets():
+        identifiers = {
+            str(demo_market.get("id") or ""),
+            str(demo_market.get("market_id") or ""),
+            str(demo_market.get("slug") or ""),
+        }
+        if safe_id in identifiers:
+            return demo_market
+    try:
+        market = await client.get_market(safe_id)
+        if market:
+            return _score_market_rows([market])[0]
+    except Exception:
+        pass
+    markets = await _review_market_rows(limit=200)
+    for market in markets:
+        identifiers = {str(market.get("id") or ""), str(market.get("market_id") or ""), str(market.get("slug") or "")}
+        if safe_id in identifiers:
+            return market
+    return None
+
 
 PUBLIC_PATHS = {"/login", "/setup", "/logout", "/health"}
 
@@ -553,6 +634,13 @@ def require_admin(request: Request) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
+
+
+def _safe_return_path(value: str | None, fallback: str = "/") -> str:
+    path = str(value or "").strip()
+    if not path or "://" in path or path.startswith("//") or not path.startswith("/"):
+        return fallback
+    return path
 
 
 @app.middleware("http")
@@ -1637,15 +1725,42 @@ def _v3_template_context(request: Request, section: str) -> dict[str, Any]:
         "cockpit_source_context": {"items": [], "count": 0},
         "cockpit_review_packets": {"items": [], "count": 0},
         "cockpit_settings": {},
+        "feature_status": build_feature_status_map() if section in {"command_center", "cockpit", "platform", "settings"} else {"items": [], "count": 0, "counts": {}},
         "platform_summary": v4_platform.platform_summary(app) if section in {"command_center", "platform", "search", "graph", "workflows"} else {},
         "platform_context": {},
         "platform_health": {},
         "platform_routes": {"items": [], "count": 0, "families": {}},
         "platform_plugins": {"items": [], "count": 0},
         "platform_storage": {"items": [], "count": 0},
+        "platform_api_schema": {"items": [], "summary": {}},
+        "platform_response_envelopes": {"items": [], "summary": {}},
+        "platform_migrations": {},
+        "platform_migration_plan": {"steps": [], "runtime_namespaces": []},
+        "platform_storage_map": {"items": [], "count": 0},
         "platform_diagnostics": {},
         "platform_safety": {},
         "platform_settings": {},
+        "ai_summary": {},
+        "ai_settings": {},
+        "ai_providers": {"items": [], "count": 0},
+        "ai_provider_health": {"items": [], "count": 0},
+        "ai_local_llm": {},
+        "ai_model_recommendations": {"items": [], "count": 0},
+        "ai_prompts": {"items": [], "count": 0},
+        "ai_schemas": {"items": [], "count": 0},
+        "ai_suggestions": {"items": [], "count": 0},
+        "ai_audit": {"items": [], "count": 0},
+        "ai_review_packets": {"items": [], "count": 0},
+        "ai_chatgpt_connector": {},
+        "ai_redaction_preview": {},
+        "ai_copilot_status": {},
+        "ai_edge_summary": {},
+        "ai_edge_settings": {},
+        "ai_edge_packets": {"items": [], "count": 0},
+        "ai_edge_evidence": {"items": [], "count": 0},
+        "ai_edge_calibration": {"items": [], "count": 0},
+        "ai_edge_calibration_summary": {},
+        "ai_edge_schemas": {"items": [], "count": 0},
         "dataset_snapshots": {"items": [], "count": 0},
         "dataset_runs": {"items": [], "count": 0},
         "dataset_manifests": {"items": [], "count": 0},
@@ -1741,6 +1856,7 @@ def _v3_template_context(request: Request, section: str) -> dict[str, Any]:
         base["cockpit_source_context"] = base["cockpit_context"]["source_context"]
         base["cockpit_review_packets"] = base["cockpit_context"]["review_packets"]
         base["cockpit_settings"] = base["cockpit_context"]["settings"]
+        base["feature_status"] = build_feature_status_map()
         base["workspace_summary"] = v3_workspace.workspace_summary()
         base["tasks_summary"] = v3_tasks_summary()
         base["task_list"] = v3_tasks_list_tasks(limit=50)
@@ -1752,6 +1868,11 @@ def _v3_template_context(request: Request, section: str) -> dict[str, Any]:
         base["platform_routes"] = v4_platform_routes.route_inventory(app)
         base["platform_plugins"] = v4_platform_plugins.load_plugin_manifests()
         base["platform_storage"] = v4_platform_storage.storage_summary()
+        base["platform_api_schema"] = v4_platform_api.summarize_api_schema_consistency(app)
+        base["platform_response_envelopes"] = v4_platform_api.list_response_envelopes()
+        base["platform_migrations"] = v4_platform_migrations.migration_summary()
+        base["platform_migration_plan"] = v4_platform_migrations.migration_plan()
+        base["platform_storage_map"] = v4_platform_migrations.storage_map()
         base["platform_diagnostics"] = base["platform_context"]
         base["platform_safety"] = v4_platform_safety.safety_statements()
         base["platform_settings"] = v4_platform.build_settings()
@@ -1768,6 +1889,34 @@ def _v3_template_context(request: Request, section: str) -> dict[str, Any]:
         base["freshness_history"] = v3_freshness_list_readiness_reports(limit=50)
         base["freshness_settings"] = v3_freshness_build_settings()
         base["related_tasks"] = v3_tasks_context_for_subsystem("freshness", limit=20)
+    if section == "ai":
+        # AI page loads show local settings, templates, schemas, suggestions, packets, and audit hashes only.
+        # They do not call OpenAI, run tool calls, mutate live trading state, or accept AI suggestions automatically.
+        base["ai_summary"] = v4_ai.ai_summary()
+        base["ai_settings"] = v4_ai.ai_settings_summary()
+        base["ai_providers"] = v4_ai_providers.list_providers()
+        base["ai_provider_health"] = v4_ai_providers.providers_health(dry_run=True)
+        base["ai_local_llm"] = v4_ai_local_llm.local_llm_settings_summary()
+        base["ai_model_recommendations"] = v4_ai_models.list_model_recommendations()
+        base["ai_prompts"] = v4_ai_prompts.list_prompt_templates()
+        base["ai_schemas"] = v4_ai_schemas.schema_registry()
+        base["ai_suggestions"] = v4_ai.list_suggestions(limit=100)
+        base["ai_audit"] = v4_ai_openai.list_audit_records(limit=100)
+        base["ai_review_packets"] = v4_ai.list_review_packets(limit=100)
+        base["ai_chatgpt_connector"] = v4_ai.chatgpt_connector_blueprint()
+        base["ai_redaction_preview"] = v4_ai.redaction_preview()
+        base["ai_copilot_status"] = v4_ai_copilot.copilot_status()
+        base["ai_edge_summary"] = v4_ai_edge.edge_summary()
+        base["ai_edge_settings"] = v4_ai_edge.edge_settings_summary()
+        base["ai_edge_packets"] = v4_ai_edge.list_packets(limit=100)
+        base["ai_edge_evidence"] = v4_ai_evidence.list_evidence_sources(limit=100)
+        base["ai_edge_calibration"] = v4_ai_edge_calibration.list_records(limit=100)
+        base["ai_edge_calibration_summary"] = v4_ai_edge_calibration.calibration_summary()
+        base["ai_edge_schemas"] = v4_ai_edge.schema_registry()
+        base["ai_news_odds_summary"] = v4_ai_news_odds.summarize_news_odds()
+        base["ai_news_odds_settings"] = v4_ai_news_odds.news_odds_settings_summary()
+        base["tasks_summary"] = v3_tasks_summary()
+        base["platform_summary"] = v4_platform.platform_summary(app)
     if section == "datasets":
         base["related_tasks"] = v3_tasks_context_for_subsystem("datasets", limit=20)
     if section == "simulation":
@@ -1777,11 +1926,82 @@ def _v3_template_context(request: Request, section: str) -> dict[str, Any]:
     return base
 
 
+app.include_router(create_v3_core_router())
+app.include_router(create_platform_router(
+    templates=templates,
+    context_factory=_v3_template_context,
+    app_provider=lambda: app,
+))
+app.include_router(create_ai_router(
+    templates=templates,
+    context_factory=_v3_template_context,
+))
+
+
+# v4.4 unified navigation aliases. These are redirects only: they preserve auth,
+# protection, backend gates, confirmations, and canonical route behavior.
+for _alias_path, _target_path in get_route_aliases().items():
+    async def _navigation_alias(target: str = _target_path):
+        return RedirectResponse(url=target, status_code=307)
+    app.add_api_route(_alias_path, _navigation_alias, methods=["GET"], include_in_schema=False)
+
+
+@app.get("/system-map", response_class=HTMLResponse)
+@app.get("/routes", response_class=HTMLResponse)
+async def unified_system_map_page(request: Request):
+    return templates.TemplateResponse(
+        "system_map.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "system_map": get_system_map(),
+            "primary_entry_points": get_primary_entry_points(),
+            "navigation_safety_explainer": get_safety_explainer(),
+            "edge_recommendation_legend": edge_recommendation_legend(),
+        },
+    )
+
+
+def _operator_os_template_context(request: Request, workspace: str) -> dict[str, Any]:
+    context = v417_operator_os.build_workspace_context(workspace)
+    context.update({"request": request, "user": current_user(request)})
+    return context
+
 
 @app.get("/v3", response_class=HTMLResponse)
 @app.get("/v3/command-center", response_class=HTMLResponse)
+@app.get("/operator-os", response_class=HTMLResponse)
+@app.get("/command-center", response_class=HTMLResponse)
 async def v3_command_center_page(request: Request):
-    return templates.TemplateResponse("live_v3_dashboard.html", _v3_template_context(request, "command_center"))
+    return templates.TemplateResponse("operator_os_v417.html", _operator_os_template_context(request, "command_center"))
+
+
+@app.get("/v3/automation", response_class=HTMLResponse)
+@app.get("/automation", response_class=HTMLResponse)
+async def v3_operator_automation_page(request: Request):
+    return templates.TemplateResponse("operator_os_v417.html", _operator_os_template_context(request, "automation"))
+
+
+@app.get("/v3/review-audit", response_class=HTMLResponse)
+@app.get("/review-audit", response_class=HTMLResponse)
+async def v3_operator_review_audit_page(request: Request):
+    return templates.TemplateResponse("operator_os_v417.html", _operator_os_template_context(request, "review_audit"))
+
+
+@app.get("/v3/settings-system", response_class=HTMLResponse)
+@app.get("/settings-system", response_class=HTMLResponse)
+async def v3_operator_settings_system_page(request: Request):
+    return templates.TemplateResponse("operator_os_v417.html", _operator_os_template_context(request, "settings_system"))
+
+
+@app.get("/api/v3/operator-os")
+async def api_v3_operator_os_root():
+    return v417_operator_os.build_workspace_context("command_center")
+
+
+@app.get("/api/v3/operator-os/{workspace}")
+async def api_v3_operator_os_workspace(workspace: str):
+    return v417_operator_os.build_workspace_context(workspace)
 
 
 @app.get("/v3/search", response_class=HTMLResponse)
@@ -1814,6 +2034,128 @@ async def v3_settings_page(request: Request):
     return templates.TemplateResponse("live_v3_dashboard.html", _v3_template_context(request, "settings"))
 
 
+@app.get("/v3/paper-trading", response_class=HTMLResponse)
+async def v3_paper_trading_page(request: Request):
+    status = v416_paper.build_paper_status()
+    return templates.TemplateResponse(
+        "paper_trading_v416.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "status": status,
+            "config": status.get("config", {}),
+            "account": status.get("account", {}),
+            "positions": status.get("positions", []),
+            "recent_orders": status.get("recent_orders", []),
+            "recent_fills": status.get("recent_fills", []),
+            "recent_decisions": status.get("recent_decisions", []),
+            "last_run": status.get("last_run", {}),
+            "action_status": request.query_params.get("action_status", ""),
+            "action_detail": request.query_params.get("action_detail", ""),
+        },
+    )
+
+
+@app.post("/v3/paper-trading/run-once")
+async def v3_paper_trading_run_once_page(user: dict = Depends(require_admin)):
+    result = v416_paper.run_paper_strategy_once(source_route="/v3/paper-trading", source_component="paper_trading.run_once_form")
+    status = "paper_run_completed" if result.get("ok") else "paper_run_blocked"
+    detail = f"trades={result.get('paper_trades_placed', 0)} candidates={result.get('candidates_considered', 0)}"
+    if not result.get("ok"):
+        detail = str(result.get("disabled_reason") or result.get("status") or "blocked")[:200]
+    return _v3_action_redirect("/v3/paper-trading", action_status=status, action_detail=detail)
+
+
+@app.post("/v3/paper-trading/reset")
+async def v3_paper_trading_reset_page(starting_balance: float = Form(default=1000.0), user: dict = Depends(require_admin)):
+    v416_paper.reset_paper_account(starting_balance=starting_balance, reason="operator reset from /v3/paper-trading")
+    return _v3_action_redirect("/v3/paper-trading", action_status="paper_account_reset", action_detail=f"starting_balance={starting_balance}")
+
+
+@app.get("/api/v3/paper/config")
+async def api_v3_paper_config():
+    return v416_paper.get_paper_config().to_dict()
+
+
+@app.get("/api/v3/paper/status")
+async def api_v3_paper_status():
+    return v416_paper.build_paper_status()
+
+
+@app.get("/api/v3/paper/account")
+async def api_v3_paper_account():
+    return {"account": v416_paper.load_paper_account(), "paper_only": True, "live_execution_used": False, "can_place_real_orders": False, "can_cancel_real_orders": False, "secret_values_returned": False}
+
+
+@app.get("/api/v3/paper/orders")
+async def api_v3_paper_orders(limit: int = Query(default=100, ge=1, le=2000)):
+    return v416_paper.list_paper_orders(limit=limit)
+
+
+@app.get("/api/v3/paper/fills")
+async def api_v3_paper_fills(limit: int = Query(default=100, ge=1, le=2000)):
+    return v416_paper.list_paper_fills(limit=limit)
+
+
+@app.get("/api/v3/paper/positions")
+async def api_v3_paper_positions(limit: int = Query(default=100, ge=1, le=2000)):
+    return v416_paper.list_paper_positions(limit=limit)
+
+
+@app.get("/api/v3/paper/decisions")
+async def api_v3_paper_decisions(limit: int = Query(default=100, ge=1, le=2000)):
+    return v416_paper.list_paper_decisions(limit=limit)
+
+
+@app.get("/api/v3/paper/runs")
+async def api_v3_paper_runs(limit: int = Query(default=50, ge=1, le=1000)):
+    return v416_paper.list_paper_runs(limit=limit)
+
+
+@app.get("/api/v3/paper/audit")
+async def api_v3_paper_audit(limit: int = Query(default=100, ge=1, le=2000)):
+    return v416_paper.list_paper_audit(limit=limit)
+
+
+@app.post("/api/v3/paper/run-once")
+async def api_v3_paper_run_once(payload: dict[str, Any] | None = Body(default=None), user: dict = Depends(require_admin)):
+    return v416_paper.run_paper_strategy_once(payload or {}, source_route="/api/v3/paper/run-once", source_component="paper_strategy_runner.api")
+
+
+@app.post("/api/v3/paper/reset")
+async def api_v3_paper_reset(payload: dict[str, Any] | None = Body(default=None), user: dict = Depends(require_admin)):
+    payload = payload or {}
+    starting_balance = float(payload.get("starting_balance") or v416_paper.get_paper_config().starting_balance or 1000.0)
+    return v416_paper.reset_paper_account(starting_balance=starting_balance, reason=str(payload.get("reason") or "api reset"))
+
+
+@app.post("/api/v3/paper/orders/{order_id}/cancel-paper")
+async def api_v3_paper_cancel_order(order_id: str, payload: dict[str, Any] | None = Body(default=None), user: dict = Depends(require_admin)):
+    return v416_paper.cancel_paper_order(order_id, reason=str((payload or {}).get("reason") or "operator paper cancellation"))
+
+
+@app.post("/v3/settings/preferences")
+@app.post("/v3/settings/preferences/save")
+async def v3_settings_preferences_submit(request: Request):
+    form = await request.form()
+    payload: dict[str, Any] = {
+        "_source_route": "/v3/settings",
+        "_source_component": "v3_settings.preferences_form",
+    }
+    for key in form.keys():
+        if not str(key).startswith("setting__"):
+            continue
+        setting_key = str(key).split("setting__", 1)[1]
+        values = form.getlist(key)
+        payload[setting_key] = values[-1] if values else ""
+    result = v3_update_settings(payload)
+    status = "settings_preferences_saved" if result.get("ok") else "settings_preferences_rejected"
+    if result.get("ok"):
+        detail = ",".join(result.get("updated_keys") or []) or "no_changes"
+    else:
+        errors = result.get("errors") or []
+        detail = "; ".join(str(item.get("error") or item) for item in errors)[:220] or "validation_failed"
+    return _v3_action_redirect("/v3/settings", action_status=status, action_detail=detail)
 
 
 @app.get("/v3/tasks", response_class=HTMLResponse)
@@ -1846,6 +2188,77 @@ async def v3_workspace_page(request: Request):
     return templates.TemplateResponse("live_v3_dashboard.html", _v3_template_context(request, "workspace"))
 
 
+def _v3_action_redirect(path: str, *, action_status: str, action_detail: str = "") -> RedirectResponse:
+    query = {"action_status": action_status}
+    if action_detail:
+        query["action_detail"] = action_detail
+    separator = "&" if "?" in path else "?"
+    return RedirectResponse(url=f"{path}{separator}{urlencode(query)}", status_code=303)
+
+
+def _payload_bool(value: Any, default: bool = False) -> bool:
+    if value is None or value == "":
+        return default
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+@app.post("/v3/workspace/daily-review/start")
+async def v3_workspace_daily_review_start_form():
+    result = v3_workspace.start_daily_review({})
+    session = result.get("session", {}) if isinstance(result, dict) else {}
+    return _v3_action_redirect("/v3/workspace/daily-review", action_status="daily_review_started", action_detail=str(session.get("session_id") or "session_created"))
+
+
+@app.post("/v3/workspace/weekly-review/start")
+async def v3_workspace_weekly_review_start_form():
+    result = v3_workspace.start_weekly_review({})
+    session = result.get("session", {}) if isinstance(result, dict) else {}
+    return _v3_action_redirect("/v3/workspace/weekly-review", action_status="weekly_review_started", action_detail=str(session.get("session_id") or "session_created"))
+
+
+@app.post("/v3/workspace/task-triage/start")
+async def v3_workspace_task_triage_start_form():
+    result = v3_workspace.start_task_triage({})
+    session = result.get("session", {}) if isinstance(result, dict) else {}
+    return _v3_action_redirect("/v3/workspace/task-triage", action_status="task_triage_started", action_detail=str(session.get("session_id") or "session_created"))
+
+
+@app.post("/v3/ai/providers/test-dry-run")
+async def v3_ai_provider_test_dry_run_form(provider: str = Form(default="mock")):
+    result = v4_ai_providers.test_dry_run({"provider": provider or "mock"})
+    return _v3_action_redirect("/v3/ai/providers", action_status="provider_dry_run_completed", action_detail=str(result.get("provider") or provider or "mock"))
+
+
+@app.post("/v3/ai/edge/packets/generate")
+async def v3_ai_edge_generate_packet_form(title: str = Form(default="Browser AI Edge draft packet")):
+    result = v4_ai_edge.generate_edge_packet(
+        {
+            "title": title or "Browser AI Edge draft packet",
+            "research_question": "Browser-requested AI Edge draft packet for operator review.",
+            "write": True,
+        },
+        write=True,
+        mode="browser_draft",
+    )
+    packet = result.get("packet", {}) if isinstance(result, dict) else {}
+    return _v3_action_redirect("/v3/ai/edge/packets", action_status="ai_edge_packet_generated", action_detail=str(packet.get("packet_id") or "draft_packet"))
+
+
+@app.post("/v3/ai/edge/evidence/normalize")
+async def v3_ai_edge_normalize_evidence_form():
+    result = v4_ai_evidence.normalize_evidence({}, write=False, include_demo_when_empty=True)
+    return _v3_action_redirect("/v3/ai/edge/evidence", action_status="evidence_normalized_preview", action_detail=f"{result.get('count', 0)}_sources")
+
+
+@app.post("/v3/ai/review-packets/generate")
+async def v3_ai_review_packet_generate_form(title: str = Form(default="Browser AI review packet")):
+    result = v4_ai.generate_review_packet({"title": title or "Browser AI review packet", "write": True}, write=True)
+    packet = result.get("packet", {}) if isinstance(result, dict) else {}
+    return _v3_action_redirect("/v3/ai/review-packets", action_status="ai_review_packet_generated", action_detail=str(packet.get("packet_id") or "review_packet"))
+
+
 @app.get("/v3/cockpit", response_class=HTMLResponse)
 @app.get("/v3/cockpit/layouts", response_class=HTMLResponse)
 @app.get("/v3/cockpit/focus", response_class=HTMLResponse)
@@ -1861,16 +2274,29 @@ async def v3_cockpit_page(request: Request):
     return templates.TemplateResponse("live_v3_dashboard.html", _v3_template_context(request, "cockpit"))
 
 
-@app.get("/v3/platform", response_class=HTMLResponse)
-@app.get("/v3/platform/health", response_class=HTMLResponse)
-@app.get("/v3/platform/routes", response_class=HTMLResponse)
-@app.get("/v3/platform/plugins", response_class=HTMLResponse)
-@app.get("/v3/platform/storage", response_class=HTMLResponse)
-@app.get("/v3/platform/diagnostics", response_class=HTMLResponse)
-@app.get("/v3/platform/exports", response_class=HTMLResponse)
-@app.get("/v3/platform/settings", response_class=HTMLResponse)
-async def v3_platform_page(request: Request):
-    return templates.TemplateResponse("live_v3_dashboard.html", _v3_template_context(request, "platform"))
+@app.post("/v3/cockpit/layouts/{layout_id}/select")
+async def v3_cockpit_layout_select_form(layout_id: str):
+    result = v3_cockpit.select_layout(layout_id)
+    if result.get("ok") is False:
+        return RedirectResponse(url="/v3/cockpit?layout_error=not_found", status_code=303)
+    return RedirectResponse(url=f"/v3/cockpit?selected_layout={layout_id}", status_code=303)
+
+
+@app.post("/v3/cockpit/focus-modes/{focus_mode_id}/start")
+async def v3_cockpit_focus_start_form(focus_mode_id: str):
+    result = v3_cockpit.start_focus_mode(focus_mode_id)
+    if result.get("ok") is False:
+        return RedirectResponse(url="/v3/cockpit?focus_error=not_found", status_code=303)
+    focus = result.get("focus_mode", {})
+    route = str(focus.get("entry_route") or "/v3/cockpit")
+    return RedirectResponse(url=f"{route}?focus_mode={focus_mode_id}", status_code=303)
+
+
+@app.post("/v3/cockpit/layouts/save-selected")
+async def v3_cockpit_save_selected_layout_form(title: str = Form(default="")):
+    result = v3_cockpit.save_current_layout_copy(title)
+    layout_id = result.get("selected_layout_id") or "saved"
+    return RedirectResponse(url=f"/v3/cockpit?saved_layout={layout_id}", status_code=303)
 
 
 @app.get("/v3/docs", response_class=HTMLResponse)
@@ -1933,27 +2359,12 @@ async def v3_freshness_page(request: Request):
 
 @app.get("/api/v3")
 async def api_v3_root():
-    return {"version": APP_VERSION, "name": "v3.7 Operator Intelligence OS with Task Planner", "routes": ["/api/v3/command-center", "/api/v3/search", "/api/v3/graph", "/api/v3/workflows", "/api/v3/tasks", "/api/v3/tasks/summary", "/api/v3/tasks/inbox", "/api/v3/demo/create", "/api/v3/validation/status", "/api/v3/analytics", "/api/v3/simulation", "/api/v3/datasets", "/api/v3/freshness"], "secret_values_returned": False}
+    return {"version": APP_VERSION, "name": "Polymarket OP Console v4.17 Operator OS API", "routes": ["/api/v3/command-center", "/api/v3/operator-os", "/api/v3/operator-os/command_center", "/api/v3/operator-os/opportunities", "/api/v3/operator-os/automation", "/api/v3/operator-os/review_audit", "/api/v3/operator-os/settings_system", "/api/v3/search", "/api/v3/graph", "/api/v3/workflows", "/api/v3/tasks", "/api/v3/tasks/summary", "/api/v3/tasks/inbox", "/api/v3/ai/summary", "/api/v3/ai/settings", "/api/v3/ai/prompts", "/api/v3/ai/suggestions", "/api/v3/ai/audit", "/api/v3/ai/review-packets", "/api/v3/ai/chatgpt-connector", "/api/v3/ai/edge/summary", "/api/v3/ai/edge/packets", "/api/v3/ai/edge/evidence", "/api/v3/ai/edge/calibration", "/api/v3/ai/news-odds/config", "/api/v3/ai/news-odds/adjustments", "/api/v3/arbitrage/config", "/api/v3/arbitrage/scan", "/api/v3/arbitrage/scan/record", "/api/v3/demo/create", "/api/v3/validation/status", "/api/v3/analytics", "/api/v3/simulation", "/api/v3/datasets", "/api/v3/freshness", "/api/v3/ux/status", "/api/v3/platform/schema", "/api/v3/platform/route-registry", "/api/v3/platform/migrations/summary", "/api/v3/platform/migrations/plan", "/api/v3/platform/migrations/storage-map"], "secret_values_returned": False}
 
 
 @app.get("/api/v3/command-center")
 async def api_v3_command_center():
     return v3_build_command_center()
-
-
-@app.get("/api/v3/ux/status")
-async def api_v3_ux_status():
-    return v3_ux_release_status()
-
-
-@app.get("/api/v3/ux/design-system")
-async def api_v3_ux_design_system():
-    return v3_design_system_status()
-
-
-@app.get("/api/v3/ux/navigation")
-async def api_v3_ux_navigation():
-    return v3_navigation_groups()
 
 
 @app.get("/api/v3/search/index")
@@ -2849,6 +3260,11 @@ async def api_v3_cockpit_layouts_reset():
     return v3_cockpit.reset_default_layouts()
 
 
+@app.post("/api/v3/cockpit/layouts/save-selected")
+async def api_v3_cockpit_layout_save_selected(payload: dict[str, Any] = Body(default_factory=dict)):
+    return v3_cockpit.save_current_layout_copy(str(payload.get("title") or ""))
+
+
 @app.get("/api/v3/cockpit/layouts/{layout_id}")
 async def api_v3_cockpit_layout_get(layout_id: str):
     layout = v3_cockpit.get_layout(layout_id)
@@ -2984,6 +3400,82 @@ async def api_v3_cockpit_export_shortcuts_csv():
     return PlainTextResponse(v3_cockpit.export_csv("shortcuts"), media_type="text/csv; charset=utf-8")
 
 
+@app.get("/api/v3/features/status")
+async def api_v3_feature_status():
+    return build_feature_status_map()
+
+
+@app.get("/api/v3/features/stub-burndown")
+async def api_v3_feature_stub_burndown():
+    return build_stub_burndown_map()
+
+
+@app.get("/api/v3/features/readiness")
+async def api_v3_feature_readiness(status: str = "", area: str = "", limit: int = 50):
+    return build_feature_readiness_context(status_filter=status, area_filter=area, limit=limit)
+
+
+@app.get("/api/v3/features/readiness/acknowledgements")
+async def api_v3_feature_readiness_acknowledgements(limit: int = 50):
+    return list_feature_readiness_acknowledgements(limit=limit)
+
+
+@app.post("/api/v3/features/readiness/acknowledgements")
+async def api_v3_feature_readiness_acknowledge(payload: dict[str, Any] = Body(default_factory=dict), user: dict = Depends(require_admin)):
+    return record_feature_readiness_acknowledgement(
+        operator=str(payload.get("operator") or user.get("username", "local")),
+        status_filter=str(payload.get("status_filter") or payload.get("status") or ""),
+        area_filter=str(payload.get("area_filter") or payload.get("area") or ""),
+        note=str(payload.get("note") or payload.get("reason") or ""),
+        source_route=str(payload.get("source_route") or "/api/v3/features/readiness/acknowledgements"),
+        source_component=str(payload.get("source_component") or "feature_readiness.api_acknowledgement"),
+    )
+
+
+@app.get("/v3/feature-readiness", response_class=HTMLResponse)
+@app.get("/feature-readiness", response_class=HTMLResponse)
+async def v3_feature_readiness_page(
+    request: Request,
+    status: str = Query(default=""),
+    area: str = Query(default=""),
+    action_status: str = Query(default=""),
+    action_detail: str = Query(default=""),
+    user: dict = Depends(require_admin),
+):
+    return templates.TemplateResponse(
+        "feature_readiness.html",
+        {
+            "request": request,
+            "user": user,
+            "context": build_feature_readiness_context(status_filter=status, area_filter=area, limit=25),
+            "action_status": action_status,
+            "action_detail": action_detail,
+        },
+    )
+
+
+@app.post("/v3/feature-readiness/acknowledge")
+async def v3_feature_readiness_acknowledge_page(
+    status_filter: str = Form(default=""),
+    area_filter: str = Form(default=""),
+    operator_note: str = Form(default=""),
+    return_to: str = Form(default="/v3/feature-readiness"),
+    user: dict = Depends(require_admin),
+):
+    result = record_feature_readiness_acknowledgement(
+        operator=str(user.get("username", "local")),
+        status_filter=status_filter,
+        area_filter=area_filter,
+        note=operator_note,
+        source_route="/v3/feature-readiness/acknowledge",
+        source_component="feature_readiness.acknowledgement_form",
+    )
+    base = _safe_return_path(return_to, "/v3/feature-readiness")
+    suffix = urlencode({"action_status": "feature_readiness_acknowledged", "action_detail": result.get("item", {}).get("acknowledgement_id", "recorded")})
+    separator = "&" if "?" in base else "?"
+    return RedirectResponse(url=f"{base}{separator}{suffix}", status_code=303)
+
+
 @app.get("/api/v3/cockpit/settings")
 async def api_v3_cockpit_settings_get():
     return v3_cockpit.build_settings()
@@ -2992,56 +3484,6 @@ async def api_v3_cockpit_settings_get():
 @app.post("/api/v3/cockpit/settings")
 async def api_v3_cockpit_settings_post(payload: dict[str, Any] = Body(default_factory=dict)):
     return v3_cockpit.update_settings(payload)
-
-
-@app.get("/api/v3/platform/summary")
-async def api_v3_platform_summary():
-    return v4_platform.platform_summary(app)
-
-
-@app.get("/api/v3/platform/health")
-async def api_v3_platform_health():
-    return v4_platform.health_summary(app)
-
-
-@app.get("/api/v3/platform/routes")
-async def api_v3_platform_routes():
-    return v4_platform_routes.route_inventory(app)
-
-
-@app.get("/api/v3/platform/plugins")
-async def api_v3_platform_plugins():
-    return v4_platform_plugins.load_plugin_manifests()
-
-
-@app.get("/api/v3/platform/storage")
-async def api_v3_platform_storage():
-    return v4_platform_storage.storage_summary()
-
-
-@app.get("/api/v3/platform/diagnostics")
-async def api_v3_platform_diagnostics():
-    return v4_platform.diagnostics_summary(app)
-
-
-@app.get("/api/v3/platform/export.json", response_class=PlainTextResponse)
-async def api_v3_platform_export_json():
-    return PlainTextResponse(json.dumps(v4_platform.export_json(app), indent=2, sort_keys=True, default=str), media_type="application/json; charset=utf-8")
-
-
-@app.get("/api/v3/platform/export.md", response_class=PlainTextResponse)
-async def api_v3_platform_export_md():
-    return PlainTextResponse(v4_platform.export_markdown(app), media_type="text/markdown; charset=utf-8")
-
-
-@app.get("/api/v3/platform/settings")
-async def api_v3_platform_settings_get():
-    return v4_platform.build_settings()
-
-
-@app.post("/api/v3/platform/settings")
-async def api_v3_platform_settings_post(payload: dict[str, Any] = Body(default_factory=dict)):
-    return v4_platform.update_settings(payload)
 
 
 @app.post("/api/v3/demo/create")
@@ -5283,6 +5725,16 @@ async def dashboard_alias():
     return RedirectResponse(url="/", status_code=307)
 
 
+@app.get("/api/navigation/system-map")
+async def navigation_system_map_api():
+    return get_system_map()
+
+
+@app.get("/api/navigation/aliases")
+async def navigation_aliases_api():
+    return {"aliases": get_route_aliases(), "order_submitted": False, "order_cancelled": False, "live_trading_armed": False}
+
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(
     request: Request,
@@ -5298,7 +5750,7 @@ async def dashboard(
     except Exception:
         raw_markets = []
     previous = load_latest()
-    markets = attach_probability(attach_scores(raw_markets))
+    markets = _score_market_rows(raw_markets)
     paper_recommendations = recommend_paper_trades(markets, max_recommendations=10)
     backtests = list_backtests(limit=5)
     movers = calculate_movers(markets, previous)[:20]
@@ -5426,6 +5878,9 @@ async def dashboard(
             "training_status": training_status,
             "data_status": data_status,
             "user": current_user(request),
+            "primary_entry_points": get_primary_entry_points(),
+            "system_map": get_system_map(),
+            "navigation_safety_explainer": get_safety_explainer(),
         },
     )
 
@@ -5435,7 +5890,7 @@ async def dashboard(
 @app.get("/operator", response_class=HTMLResponse)
 async def operator_dashboard(request: Request, limit: int = Query(default=75, ge=10, le=200)):
     previous = load_latest()
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     movers = calculate_movers(markets, previous)[:50]
     portfolio_summary = summarize_portfolio(markets)
     current_risk_status = risk_status(load_portfolio())
@@ -5490,7 +5945,7 @@ async def operator_dashboard(request: Request, limit: int = Query(default=75, ge
 @app.get("/api/operator/brief")
 async def operator_brief_api(limit: int = Query(default=75, ge=10, le=200)):
     previous = load_latest()
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     movers = calculate_movers(markets, previous)[:50]
     portfolio_summary = summarize_portfolio(markets)
     current_risk_status = risk_status(load_portfolio())
@@ -5533,35 +5988,739 @@ async def operator_brief_api(limit: int = Query(default=75, ge=10, le=200)):
     )
 
 
+@app.get("/v3/opportunities", response_class=HTMLResponse)
 @app.get("/opportunities", response_class=HTMLResponse)
-async def opportunities_page(request: Request, limit: int = Query(default=100, ge=10, le=200)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
-    markets = attach_evidence_probability(markets)
+@app.get("/v3/markets", response_class=HTMLResponse)
+async def opportunities_page(request: Request, limit: int = Query(default=100, ge=10, le=200), demo: bool = Query(default=False)):
+    markets = await _review_market_rows(limit=limit, demo=demo)
     rows = rank_opportunities(markets, watchlist=load_watchlist(), max_items=50)
+    packets = v4_ai_edge.list_packets(limit=250).get("items", [])
+    workbench = build_opportunity_workbench(rows, packets, limit=50, requested_demo=demo, source_route="/v3/opportunities")
     return templates.TemplateResponse(
-        "opportunities.html",
+        "opportunity_workbench.html",
         {
             "request": request,
             "user": current_user(request),
             "limit": limit,
+            "demo_mode": demo or any(row.get("demo_fixture") for row in markets),
             "opportunities": rows,
             "summary": opportunity_summary(rows),
+            "workbench": workbench,
+            "review_settings": opportunity_review_settings(),
         },
     )
 
 
 @app.get("/api/opportunities/engine")
-async def opportunity_engine_api(limit: int = Query(default=100, ge=10, le=200), max_items: int = Query(default=50, ge=1, le=100)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
-    markets = attach_evidence_probability(markets)
+async def opportunity_engine_api(limit: int = Query(default=100, ge=10, le=200), max_items: int = Query(default=50, ge=1, le=100), demo: bool = Query(default=False)):
+    markets = await _review_market_rows(limit=limit, demo=demo)
     rows = rank_opportunities(markets, watchlist=load_watchlist(), max_items=max_items)
     return {
-        "source": "gamma+local_evidence+paper_risk",
-        "mode": "opportunity_engine_v1",
-        "note": "Research and paper-trading candidate ranking only. No live trading.",
+        "source": "gamma+local_evidence+paper_risk" if not any(row.get("demo_fixture") for row in markets) else "safe_demo_fixture+local",
+        "mode": "opportunity_review_workbench_v46",
+        "note": "Research and paper-review candidate ranking only. No live trading, no approvals, no order placement.",
         "summary": opportunity_summary(rows),
+        "workbench": build_opportunity_workbench(rows, v4_ai_edge.list_packets(limit=250).get("items", []), limit=max_items, requested_demo=demo, source_route="/api/opportunities/engine"),
         "items": rows,
+        "review_only": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+        "live_trading_armed": False,
     }
+
+
+@app.get("/api/v3/opportunities")
+async def api_v3_opportunities(limit: int = Query(default=100, ge=10, le=200), max_items: int = Query(default=50, ge=1, le=100), demo: bool = Query(default=False)):
+    markets = await _review_market_rows(limit=limit, demo=demo)
+    rows = rank_opportunities(markets, watchlist=load_watchlist(), max_items=max_items)
+    return build_opportunity_workbench(rows, v4_ai_edge.list_packets(limit=250).get("items", []), limit=max_items, requested_demo=demo, source_route="/api/v3/opportunities")
+
+
+@app.get("/api/v3/opportunities/reviews")
+async def api_v3_opportunity_reviews(limit: int = Query(default=500, ge=1, le=5000), include_archived: bool = Query(default=True)):
+    return list_review_records(limit=limit, include_archived=include_archived)
+
+
+@app.get("/api/v3/opportunities/review/{market_id_or_slug}")
+async def api_v3_opportunity_review_detail(market_id_or_slug: str):
+    return get_review_record(market_id_or_slug)
+
+
+@app.post("/api/v3/opportunities/review/{market_id_or_slug}/notes")
+async def api_v3_opportunity_review_notes(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    return update_review_notes(market_id_or_slug, payload)
+
+
+@app.post("/api/v3/opportunities/review/{market_id_or_slug}/status")
+async def api_v3_opportunity_review_status(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    return update_review_status(market_id_or_slug, payload)
+
+
+@app.post("/v3/opportunities/review/{market_id_or_slug}/notes")
+async def v3_opportunity_review_notes_page(
+    market_id_or_slug: str,
+    operator_notes: str = Form(default=""),
+    review_status: str = Form(default=""),
+    market_title: str = Form(default=""),
+    data_state: str = Form(default=""),
+    data_freshness: str = Form(default=""),
+    source_route: str = Form(default=""),
+    source_component: str = Form(default="opportunity_review.notes_form"),
+    reason: str = Form(default="Operator saved opportunity review notes."),
+    return_to: str = Form(default="/v3/opportunities"),
+    user: dict = Depends(require_admin),
+):
+    result = update_review_notes(
+        market_id_or_slug,
+        {
+            "operator_notes": operator_notes,
+            "review_status": review_status or None,
+            "market_title": market_title,
+            "data_state": data_state,
+            "data_freshness": data_freshness,
+            "source_route": source_route or return_to,
+            "source_component": source_component,
+            "reason": reason,
+            "return_to": return_to,
+            "operator": str(user.get("username") or ""),
+        },
+    )
+    suffix = urlencode({"notes": "saved" if result.get("ok") else "blocked"})
+    separator = "&" if "?" in return_to else "?"
+    return RedirectResponse(url=f"{_safe_return_path(return_to, '/v3/opportunities')}{separator}{suffix}", status_code=303)
+
+
+@app.post("/v3/opportunities/review/{market_id_or_slug}/status")
+async def v3_opportunity_review_status_page(
+    market_id_or_slug: str,
+    action: str = Form(default=""),
+    review_status: str = Form(default=""),
+    market_title: str = Form(default=""),
+    data_state: str = Form(default=""),
+    data_freshness: str = Form(default=""),
+    source_route: str = Form(default=""),
+    source_component: str = Form(default="opportunity_review.status_form"),
+    previous_state: str = Form(default=""),
+    reason: str = Form(default="Operator updated opportunity review status."),
+    return_to: str = Form(default="/v3/opportunities"),
+    user: dict = Depends(require_admin),
+):
+    requested = action or review_status
+    result = update_review_status(
+        market_id_or_slug,
+        {
+            "action": requested,
+            "review_status": review_status or None,
+            "market_title": market_title,
+            "data_state": data_state,
+            "data_freshness": data_freshness,
+            "source_route": source_route or return_to,
+            "source_component": source_component,
+            "previous_state": previous_state,
+            "reason": reason,
+            "return_to": return_to,
+            "operator": str(user.get("username") or ""),
+        },
+    )
+    status = result.get("item", {}).get("review_status") if result.get("ok") else "blocked"
+    suffix = urlencode({"review_status": status})
+    separator = "&" if "?" in return_to else "?"
+    return RedirectResponse(url=f"{_safe_return_path(return_to, '/v3/opportunities')}{separator}{suffix}", status_code=303)
+
+
+@app.get("/api/v3/opportunities/settings")
+async def api_v3_opportunity_settings():
+    return opportunity_review_settings()
+
+
+@app.get("/v3/arbitrage", response_class=HTMLResponse)
+@app.get("/arbitrage", response_class=HTMLResponse)
+async def v3_cross_market_arbitrage_page(
+    request: Request,
+    min_margin: float = Query(default=1.0, ge=0.0, le=100.0),
+    min_confidence: float = Query(default=0.72, ge=0.0, le=1.0),
+    demo: bool = Query(default=True),
+):
+    scan = await v4_arbitrage.scan_cross_market_arbitrage(min_net_margin_pct=min_margin, min_confidence=min_confidence, demo=demo, write=False)
+    feature_status_map = build_feature_status_map()
+    stub_burndown = feature_status_map.get("stub_burndown", {})
+    readiness_ids = {"arbitrage.scanner", "arbitrage.review_actions", "arbitrage.polymarket_adapter", "arbitrage.kalshi_adapter", "settings.ai_arbitrage_config"}
+    stub_ids = {"arbitrage.scanner_review", "venues.kalshi", "venues.registry", "audit.operator_log", "live.execution_controls"}
+    return templates.TemplateResponse(
+        "cross_market_arbitrage.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "scan": scan,
+            "settings": v4_arbitrage.arbitrage_settings_summary(),
+            "min_margin": min_margin,
+            "min_confidence": min_confidence,
+            "demo_mode": demo or not bool(getattr(settings, "arbitrage_scanner_enabled", False)),
+            "feature_statuses": [item for item in feature_status_map.get("items", []) if item.get("feature_id") in readiness_ids],
+            "stub_burndown_items": [item for item in stub_burndown.get("items", []) if item.get("feature_id") in stub_ids],
+            "data_state_values": v4_arbitrage.DATA_STATE_VALUES,
+        },
+    )
+
+
+@app.post("/v3/arbitrage/scan/record")
+async def v3_arbitrage_scan_record_page(
+    min_margin: float = Form(default=1.0),
+    min_confidence: float = Form(default=0.72),
+    demo: bool = Form(default=True),
+    return_to: str = Form(default="/v3/arbitrage"),
+    reason: str = Form(default="Operator recorded scan snapshot from arbitrage page."),
+    user: dict = Depends(require_admin),
+):
+    scan = await v4_arbitrage.scan_cross_market_arbitrage(
+        min_net_margin_pct=max(0.0, min(float(min_margin), 100.0)),
+        min_confidence=max(0.0, min(float(min_confidence), 1.0)),
+        demo=demo,
+        write=True,
+        source_route="/v3/arbitrage/scan/record",
+        operator=str(user.get("username", "admin")),
+        reason=reason,
+    )
+    base = _safe_return_path(return_to, "/v3/arbitrage")
+    suffix = urlencode({"action_status": "arbitrage_scan_recorded", "action_detail": scan.get("scan_id", "scan_snapshot")})
+    separator = "&" if "?" in base else "?"
+    return RedirectResponse(url=f"{base}{separator}{suffix}", status_code=303)
+
+
+@app.get("/api/v3/arbitrage/config")
+async def api_v3_arbitrage_config():
+    return v4_arbitrage.arbitrage_settings_summary()
+
+
+@app.get("/api/v3/arbitrage/opportunities")
+@app.get("/api/v3/arbitrage/scan")
+async def api_v3_arbitrage_scan(
+    limit_per_venue: int = Query(default=25, ge=1, le=200),
+    min_margin: float = Query(default=1.0, ge=0.0, le=100.0),
+    min_confidence: float = Query(default=0.72, ge=0.0, le=1.0),
+    demo: bool = Query(default=True),
+    write: bool = Query(default=False),
+):
+    return await v4_arbitrage.scan_cross_market_arbitrage(
+        limit_per_venue=limit_per_venue,
+        min_net_margin_pct=min_margin,
+        min_confidence=min_confidence,
+        demo=demo,
+        write=write,
+    )
+
+
+@app.post("/api/v3/arbitrage/scan/record")
+async def api_v3_arbitrage_scan_record(payload: dict[str, Any] = Body(default_factory=dict)):
+    try:
+        limit_per_venue = max(1, min(int(float(payload.get("limit_per_venue", 25))), 200))
+    except (TypeError, ValueError):
+        limit_per_venue = 25
+    try:
+        min_margin = max(0.0, min(float(payload.get("min_margin", 1.0)), 100.0))
+    except (TypeError, ValueError):
+        min_margin = 1.0
+    try:
+        min_confidence = max(0.0, min(float(payload.get("min_confidence", 0.72)), 1.0))
+    except (TypeError, ValueError):
+        min_confidence = 0.72
+    scan = await v4_arbitrage.scan_cross_market_arbitrage(
+        limit_per_venue=limit_per_venue,
+        min_net_margin_pct=min_margin,
+        min_confidence=min_confidence,
+        demo=_payload_bool(payload.get("demo"), True),
+        write=True,
+        source_route="/api/v3/arbitrage/scan/record",
+        operator=str(payload.get("operator") or ""),
+        reason=str(payload.get("reason") or "API caller recorded scan snapshot."),
+    )
+    return {
+        "version": APP_VERSION,
+        "ok": True,
+        "scan": scan,
+        "review_only": True,
+        "safe_review_only": True,
+        "live_disabled": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+        "live_trading_armed": False,
+        "no_live_mutation": True,
+    }
+
+
+@app.get("/api/v3/arbitrage/opportunity/{opportunity_id}/review")
+async def api_v3_arbitrage_review_action_link(opportunity_id: str, action: str = Query(default="review_requested")):
+    return {
+        "version": APP_VERSION,
+        "ok": False,
+        "opportunity_id": opportunity_id,
+        "requested_action": action,
+        "method_required": "POST",
+        "message": "Arbitrage review actions are state-changing local review records and must be submitted with POST.",
+        "review_only": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+        "live_trading_armed": False,
+        "no_live_mutation": True,
+    }
+
+
+@app.post("/api/v3/arbitrage/opportunity/{opportunity_id}/review")
+async def api_v3_arbitrage_review_action(opportunity_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    action = str(payload.get("action") or "review_requested")
+    return v4_arbitrage.record_operator_action(opportunity_id, action, payload)
+
+
+@app.post("/v3/arbitrage/opportunity/{opportunity_id}/review")
+async def v3_arbitrage_review_action_page(
+    opportunity_id: str,
+    action: str = Form(default="review_requested"),
+    operator_note: str = Form(default=""),
+    data_state: str = Form(default="unavailable"),
+    data_freshness: str = Form(default="unavailable"),
+    scan_id: str = Form(default=""),
+    target_name: str = Form(default=""),
+    return_to: str = Form(default="/v3/arbitrage"),
+    user: dict = Depends(require_admin),
+):
+    result = v4_arbitrage.record_operator_action(
+        opportunity_id,
+        action,
+        {
+            "operator_note": operator_note,
+            "operator": user.get("username", "admin"),
+            "data_state": data_state,
+            "data_freshness": data_freshness or data_state,
+            "scan_id": scan_id,
+            "target_name": target_name,
+            "source_route": "/v3/arbitrage",
+            "source_component": "cross_market_arbitrage.review_form",
+        },
+    )
+    status = "recorded" if result.get("ok", True) is not False else "blocked"
+    suffix = urlencode({"arbitrage_review": status, "action": action})
+    separator = "&" if "?" in return_to else "?"
+    return RedirectResponse(url=f"{_safe_return_path(return_to, '/v3/arbitrage')}{separator}{suffix}", status_code=303)
+
+
+@app.get("/v3/ai/news-odds", response_class=HTMLResponse)
+async def v3_ai_news_odds_page(request: Request):
+    return templates.TemplateResponse(
+        "ai_news_odds.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "summary": v4_ai_news_odds.summarize_news_odds(),
+            "settings": v4_ai_news_odds.news_odds_settings_summary(),
+            "source_weights": v4_ai_news_odds.source_weight_table(),
+            "adjustments": v4_ai_news_odds.list_adjustments(limit=25, include_archived=False),
+        },
+    )
+
+
+@app.get("/v3/ai/news-odds/run", response_class=HTMLResponse)
+async def v3_ai_news_odds_run_page(request: Request):
+    markets = await _review_market_rows(limit=25, demo=True)
+    return templates.TemplateResponse(
+        "ai_news_odds_run.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "summary": v4_ai_news_odds.summarize_news_odds(),
+            "markets": markets,
+            "settings": v4_ai_news_odds.news_odds_settings_summary(),
+        },
+    )
+
+
+@app.get("/v3/ai/news-odds/adjustments", response_class=HTMLResponse)
+async def v3_ai_news_odds_adjustments_page(request: Request, include_archived: bool = Query(default=False)):
+    return templates.TemplateResponse(
+        "ai_news_odds_adjustments.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "adjustments": v4_ai_news_odds.list_adjustments(limit=250, include_archived=include_archived),
+            "include_archived": include_archived,
+        },
+    )
+
+
+@app.get("/v3/ai/news-odds/adjustment/{adjustment_id}", response_class=HTMLResponse)
+async def v3_ai_news_odds_adjustment_detail_page(request: Request, adjustment_id: str):
+    detail = v4_ai_news_odds.get_adjustment(adjustment_id)
+    return templates.TemplateResponse(
+        "ai_news_odds_adjustment_detail.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "detail": detail,
+            "adjustment": detail.get("adjustment", {}),
+        },
+    )
+
+
+@app.get("/v3/ai/news-odds/source-weights", response_class=HTMLResponse)
+async def v3_ai_news_odds_source_weights_page(request: Request):
+    return templates.TemplateResponse(
+        "ai_news_odds_source_weights.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "source_weights": v4_ai_news_odds.source_weight_table(),
+            "settings": v4_ai_news_odds.news_odds_settings_summary(),
+        },
+    )
+
+
+@app.get("/api/v3/ai/news-odds/config")
+async def api_v3_ai_news_odds_config():
+    return v4_ai_news_odds.news_odds_settings_summary()
+
+
+@app.post("/api/v3/ai/news-odds/market/{market_id_or_slug}/plan")
+async def api_v3_ai_news_odds_market_plan(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    return v4_ai_news_odds.build_market_search_plan(market, operator_notes=payload.get("operator_notes"), prior_context=payload.get("prior_context") if isinstance(payload.get("prior_context"), dict) else None)
+
+
+@app.post("/v3/ai/news-odds/market/{market_id_or_slug}/plan")
+async def v3_ai_news_odds_market_plan_page(
+    market_id_or_slug: str,
+    operator_notes: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    plan = v4_ai_news_odds.build_market_search_plan(market, operator_notes=operator_notes)
+    return _v3_action_redirect(
+        f"/v3/markets/{market_id_or_slug}/news-odds",
+        action_status="news_odds_plan_previewed",
+        action_detail=f"{len(plan.get('queries', []))}_queries",
+    )
+
+
+@app.post("/api/v3/ai/news-odds/market/{market_id_or_slug}/search")
+async def api_v3_ai_news_odds_market_search(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    requests = v4_ai_news_providers.build_news_search_requests(market, payload)
+    return v4_ai_news_providers.run_openai_web_news_search(requests, payload)
+
+
+@app.post("/v3/ai/news-odds/market/{market_id_or_slug}/search")
+async def v3_ai_news_odds_market_search_page(
+    market_id_or_slug: str,
+    operator_notes: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    payload = {"operator_notes": operator_notes}
+    requests = v4_ai_news_providers.build_news_search_requests(market, payload)
+    result = v4_ai_news_providers.run_openai_web_news_search(requests, payload)
+    status = "news_odds_search_completed" if result.get("external_network_called") else "news_odds_search_config_required"
+    detail = result.get("message") or f"{len(requests.get('requests', []))}_requests"
+    return _v3_action_redirect(
+        f"/v3/markets/{market_id_or_slug}/news-odds",
+        action_status=status,
+        action_detail=str(detail)[:160],
+    )
+
+
+@app.post("/api/v3/ai/news-odds/market/{market_id_or_slug}/manual-evidence")
+async def api_v3_ai_news_odds_market_manual_evidence(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    evidence = payload.get("evidence") or payload.get("sources") or payload.get("items") or []
+    packet = v4_ai_news_providers.run_manual_evidence_news_analysis(evidence)
+    return {**packet, "market_id_or_slug": market_id_or_slug, "market_title": market.get("question") or market.get("title"), "review_only": True, "order_submitted": False, "order_cancelled": False, "live_trading_armed": False}
+
+
+@app.post("/v3/ai/news-odds/market/{market_id_or_slug}/manual-evidence")
+async def v3_ai_news_odds_market_manual_evidence_page(
+    market_id_or_slug: str,
+    evidence_text: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    evidence = [{"title": "Operator manual evidence", "snippet": evidence_text, "source_type": "manual"}] if evidence_text.strip() else []
+    packet = v4_ai_news_providers.run_manual_evidence_news_analysis(evidence)
+    return _v3_action_redirect(
+        f"/v3/markets/{market_id_or_slug}/news-odds",
+        action_status="manual_evidence_previewed",
+        action_detail=f"{packet.get('source_count', len(evidence))}_sources",
+    )
+
+
+@app.post("/api/v3/ai/news-odds/market/{market_id_or_slug}/adjust")
+async def api_v3_ai_news_odds_market_adjust(market_id_or_slug: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    evidence = payload.get("evidence") or payload.get("sources") or payload.get("items") or []
+    base = build_market_recommendation_row(market)
+    packet = v4_ai_news_odds.build_news_odds_adjustment_packet(market, evidence, base)
+    packet["explanation"] = v4_ai_news_odds.explain_news_odds_adjustment(packet)
+    packet["safety_validation"] = v4_ai_news_odds.validate_news_adjustment_safety(packet)
+    persisted = v4_ai_news_odds.persist_adjustment(packet) if bool(payload.get("write", True)) else {"ok": True, "adjustment": packet, "write": False}
+    ai_edge_payload = {
+        "title": f"AI News Odds Adjustment: {packet.get('market_title')}",
+        "market_id": packet.get("market_id"),
+        "market_title": packet.get("market_title"),
+        "research_question": f"Review draft news-adjusted fair odds for {packet.get('market_title')}",
+        "news_odds_adjustment_snapshot": packet,
+        "evidence_sources": packet.get("source_records", []),
+        "recommended_side": base.get("recommended_side"),
+        "model_fair_yes": packet.get("adjusted_fair_yes"),
+        "model_fair_source": "AI News Odds draft fair probability adjustment",
+        "write": bool(payload.get("write_ai_edge_packet", False)),
+    }
+    ai_edge_packet = v4_ai_edge.generate_edge_packet(ai_edge_payload, write=bool(payload.get("write_ai_edge_packet", False)), mode="news_odds_adjustment")
+    return {
+        "version": APP_VERSION,
+        "ok": True,
+        "adjustment": persisted.get("adjustment", packet),
+        "ai_edge_packet": ai_edge_packet.get("packet"),
+        "review_only": True,
+        "not_financial_advice": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+        "live_trading_armed": False,
+        "no_live_mutation": True,
+    }
+
+
+@app.post("/v3/ai/news-odds/market/{market_id_or_slug}/adjust")
+async def v3_ai_news_odds_market_adjust_page(
+    market_id_or_slug: str,
+    evidence_text: str = Form(default=""),
+    write: bool = Form(default=False),
+    user: dict = Depends(require_admin),
+):
+    evidence = [{"title": "Operator manual evidence", "snippet": evidence_text, "source_type": "manual"}] if evidence_text.strip() else []
+    result = await api_v3_ai_news_odds_market_adjust(market_id_or_slug, {"evidence": evidence, "write": write, "write_ai_edge_packet": False})
+    adjustment = result.get("adjustment", {}) if isinstance(result, dict) else {}
+    adjustment_id = str(adjustment.get("adjustment_id") or "")
+    if write and adjustment_id:
+        return _v3_action_redirect(
+            f"/v3/ai/news-odds/adjustment/{adjustment_id}",
+            action_status="news_odds_adjustment_saved",
+            action_detail=adjustment_id,
+        )
+    return _v3_action_redirect(
+        f"/v3/markets/{market_id_or_slug}/news-odds",
+        action_status="news_odds_adjustment_previewed",
+        action_detail="preview_not_saved",
+    )
+
+
+@app.get("/api/v3/ai/news-odds/adjustments")
+async def api_v3_ai_news_odds_adjustments(limit: int = Query(default=250, ge=1, le=5000), include_archived: bool = Query(default=False)):
+    return v4_ai_news_odds.list_adjustments(limit=limit, include_archived=include_archived)
+
+
+@app.get("/api/v3/ai/news-odds/adjustment/{adjustment_id}")
+async def api_v3_ai_news_odds_adjustment(adjustment_id: str):
+    return v4_ai_news_odds.get_adjustment(adjustment_id)
+
+
+@app.post("/api/v3/ai/news-odds/adjustment/{adjustment_id}/accept-to-review-context")
+async def api_v3_ai_news_odds_accept(adjustment_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    return v4_ai_news_odds.accept_adjustment_to_review_context(adjustment_id, payload)
+
+
+@app.post("/api/v3/ai/news-odds/adjustment/{adjustment_id}/reject")
+async def api_v3_ai_news_odds_reject(adjustment_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    return v4_ai_news_odds.reject_adjustment(adjustment_id, payload)
+
+
+@app.post("/api/v3/ai/news-odds/adjustment/{adjustment_id}/archive")
+async def api_v3_ai_news_odds_archive(adjustment_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    return v4_ai_news_odds.archive_adjustment(adjustment_id, payload)
+
+
+@app.post("/v3/ai/news-odds/adjustment/{adjustment_id}/accept-to-review-context")
+async def v3_ai_news_odds_accept_page(
+    adjustment_id: str,
+    operator_note: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    result = v4_ai_news_odds.accept_adjustment_to_review_context(adjustment_id, {"operator_note": operator_note, "operator": user.get("username", "admin")})
+    return _v3_action_redirect(
+        f"/v3/ai/news-odds/adjustment/{adjustment_id}",
+        action_status="news_odds_review_action_recorded" if result.get("ok") else "news_odds_review_action_blocked",
+        action_detail="accepted_to_review_context",
+    )
+
+
+@app.post("/v3/ai/news-odds/adjustment/{adjustment_id}/reject")
+async def v3_ai_news_odds_reject_page(
+    adjustment_id: str,
+    operator_note: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    result = v4_ai_news_odds.reject_adjustment(adjustment_id, {"operator_note": operator_note, "operator": user.get("username", "admin")})
+    return _v3_action_redirect(
+        f"/v3/ai/news-odds/adjustment/{adjustment_id}",
+        action_status="news_odds_review_action_recorded" if result.get("ok") else "news_odds_review_action_blocked",
+        action_detail="rejected",
+    )
+
+
+@app.post("/v3/ai/news-odds/adjustment/{adjustment_id}/archive")
+async def v3_ai_news_odds_archive_page(
+    adjustment_id: str,
+    operator_note: str = Form(default=""),
+    user: dict = Depends(require_admin),
+):
+    result = v4_ai_news_odds.archive_adjustment(adjustment_id, {"operator_note": operator_note, "operator": user.get("username", "admin")})
+    return _v3_action_redirect(
+        f"/v3/ai/news-odds/adjustment/{adjustment_id}",
+        action_status="news_odds_review_action_recorded" if result.get("ok") else "news_odds_review_action_blocked",
+        action_detail="archived",
+    )
+
+
+@app.get("/api/v3/ai/news-odds/source/{source_id}")
+async def api_v3_ai_news_odds_source(source_id: str):
+    safe_id = str(source_id or "")
+    matches = []
+    for adjustment in v4_ai_news_odds.list_adjustments(limit=5000, include_archived=True).get("items", []):
+        for source in adjustment.get("source_records", []) or []:
+            if str(source.get("source_id") or source.get("canonical_domain") or source.get("url") or "") == safe_id:
+                matches.append(source)
+    return {"version": APP_VERSION, "source_id": safe_id, "count": len(matches), "items": matches, "review_only": True, "order_submitted": False, "order_cancelled": False, "live_trading_armed": False}
+
+
+@app.get("/v3/markets/{market_id_or_slug}/news-odds", response_class=HTMLResponse)
+async def v3_market_news_odds_page(request: Request, market_id_or_slug: str):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    base = build_market_recommendation_row(market)
+    preview = v4_ai_news_odds.build_news_odds_adjustment_packet(market, [], base)
+    preview["explanation"] = v4_ai_news_odds.explain_news_odds_adjustment(preview)
+    return templates.TemplateResponse(
+        "market_news_odds.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "market": market,
+            "edge": base,
+            "preview": preview,
+            "settings": v4_ai_news_odds.news_odds_settings_summary(),
+        },
+    )
+
+
+@app.get("/v3/markets/family/{family_id}/news-odds", response_class=HTMLResponse)
+async def v3_market_family_news_odds_page(request: Request, family_id: str, demo: bool = Query(default=True)):
+    markets = await _review_market_rows(limit=200, demo=demo)
+    comparison = build_family_comparison(markets, family_id)
+    return templates.TemplateResponse(
+        "family_news_odds.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "family": comparison,
+            "settings": v4_ai_news_odds.news_odds_settings_summary(),
+        },
+    )
+
+
+@app.post("/api/v3/ai/news-odds/family/{family_id}/plan")
+async def api_v3_ai_news_odds_family_plan(family_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    markets = await _review_market_rows(limit=200, demo=bool(payload.get("demo", True)))
+    family = build_family_comparison(markets, family_id)
+    title = family.get("family_title") or family_id
+    return v4_ai_news_odds.build_market_search_plan({"id": family_id, "question": title, "family_title": title}, operator_notes=payload.get("operator_notes"))
+
+
+@app.post("/api/v3/ai/news-odds/family/{family_id}/search")
+async def api_v3_ai_news_odds_family_search(family_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    plan = await api_v3_ai_news_odds_family_plan(family_id, payload)
+    return v4_ai_news_providers.run_openai_web_news_search({"requests": plan.get("queries", [])}, payload)
+
+
+@app.post("/api/v3/ai/news-odds/family/{family_id}/adjust")
+async def api_v3_ai_news_odds_family_adjust(family_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    markets = await _review_market_rows(limit=200, demo=bool(payload.get("demo", True)))
+    family = build_family_comparison(markets, family_id)
+    items = []
+    for row in family.get("items", [])[:25]:
+        market = await _review_market_by_id(str(row.get("market_id")))
+        if market:
+            packet = v4_ai_news_odds.build_news_odds_adjustment_packet(market, payload.get("evidence") or payload.get("sources") or [], build_market_recommendation_row(market))
+            packet["family_normalization_applied"] = False
+            packet["family_normalization_note"] = "Family normalization not applied unless the family is clearly complete and mutually exhaustive."
+            items.append(packet)
+    return {"version": APP_VERSION, "family_id": family_id, "count": len(items), "items": items, "family_normalization_applied": False, "review_only": True, "order_submitted": False, "order_cancelled": False, "trade_approved": False, "live_trading_armed": False, "no_live_mutation": True}
+
+
+@app.get("/v3/markets/family/{family_id}", response_class=HTMLResponse)
+@app.get("/v3/ai/edge/family/{family_id}", response_class=HTMLResponse)
+async def v3_market_family_page(request: Request, family_id: str, limit: int = Query(default=200, ge=20, le=500), demo: bool = Query(default=False)):
+    markets = await _review_market_rows(limit=limit, demo=demo)
+    comparison = build_family_comparison(markets, family_id)
+    return templates.TemplateResponse(
+        "market_family_comparison.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "family": comparison,
+            "limit": limit,
+            "demo_mode": demo or any(row.get("demo_fixture") for row in markets),
+        },
+    )
+
+
+@app.get("/api/v3/markets/family/{family_id}/summary")
+async def api_v3_market_family_summary(family_id: str, limit: int = Query(default=200, ge=20, le=500), demo: bool = Query(default=False)):
+    markets = await _review_market_rows(limit=limit, demo=demo)
+    return build_family_comparison(markets, family_id)
+
+
+@app.get("/v3/markets/{market_id_or_slug}", response_class=HTMLResponse)
+@app.get("/market/{market_id_or_slug}", response_class=HTMLResponse)
+async def v3_market_detail_page(request: Request, market_id_or_slug: str):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    detail = build_market_detail_context(market, v4_ai_edge.list_packets(limit=500).get("items", []))
+    return templates.TemplateResponse(
+        "market_detail_v46.html",
+        {
+            "request": request,
+            "user": current_user(request),
+            "detail": detail,
+            "market": detail["market"],
+            "edge": detail["edge"],
+            "review_record": detail["review_record"],
+            "operator_notes": detail["operator_notes"],
+            "ai_edge_packet_lifecycle": detail["ai_edge_packet_lifecycle"],
+        },
+    )
+
+
+@app.get("/api/v3/markets/{market_id_or_slug}/summary")
+async def api_v3_market_summary(market_id_or_slug: str):
+    market = await _review_market_by_id(market_id_or_slug)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    return build_market_detail_context(market, v4_ai_edge.list_packets(limit=500).get("items", []))
 
 
 @app.get("/markets/{market_id}", response_class=HTMLResponse)
@@ -5569,7 +6728,7 @@ async def market_detail(request: Request, market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     books = []
     if scored.get("clob_token_ids"):
         books = await clob.get_books_for_tokens(scored["clob_token_ids"])
@@ -5625,13 +6784,13 @@ async def market_evidence_probability_api(market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     return {"source": "local", "mode": "evidence_adjusted_probability", "item": evidence_adjusted_probability(scored)}
 
 
 @app.get("/api/evidence-probabilities")
 async def evidence_probabilities_api(limit: int = Query(default=settings.default_limit, ge=1, le=100)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     return {"source": "gamma+local_evidence", "mode": "evidence_adjusted_probability", "items": attach_evidence_probability(markets)}
 
 @app.get("/api/evidence/{packet_id}/score")
@@ -5661,7 +6820,7 @@ async def create_market_evidence_packet_api(market_id: str, include_weak_sources
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     return {"source": "local", "item": create_manual_evidence_packet(scored, created_by=user.get("username", "admin"), note=note, include_weak_sources=include_weak_sources)}
 
 
@@ -5670,7 +6829,7 @@ async def create_market_evidence_packet_page(market_id: str, include_weak_source
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     create_manual_evidence_packet(scored, created_by=user.get("username", "admin"), note=note, include_weak_sources=include_weak_sources)
     return RedirectResponse(url=f"/markets/{market_id}", status_code=303)
 
@@ -5696,7 +6855,7 @@ async def market_source_pack_api(market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     return {"source": "local", "item": build_market_source_pack(scored)}
 
 
@@ -5710,7 +6869,7 @@ async def market_collection_targets_api(market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     return {"source": "local", "mode": "research_collection_targets", "item": build_market_collection_targets(scored)}
 
 
@@ -5785,14 +6944,34 @@ async def top_events(limit: int = Query(default=settings.default_limit, ge=1, le
 
 @app.get("/api/markets/top")
 async def top_markets(limit: int = Query(default=settings.default_limit, ge=1, le=100)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit)))
+    markets = _score_market_rows(await client.list_markets(limit=limit))
     return {"source": "gamma", "summary": summarize_snapshot(markets), "items": markets}
 
 
 @app.get("/api/markets/opportunities")
 async def opportunities(limit: int = Query(default=settings.default_limit, ge=1, le=100)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit)))
+    markets = _score_market_rows(await client.list_markets(limit=limit))
     return {"source": "gamma", "note": "Probability model v1 is for paper trading only, not financial advice.", "items": markets}
+
+
+@app.get("/api/markets/edge-legend")
+async def market_edge_legend_api():
+    return {"source": "local", "item": edge_recommendation_legend(), "order_submitted": False, "order_cancelled": False, "trade_approved": False, "live_trading_armed": False}
+
+
+@app.get("/api/markets/family-rankings")
+async def market_family_rankings_api(limit: int = Query(default=settings.default_limit, ge=2, le=200)):
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
+    return {"source": "gamma+local", "items": rank_market_family(markets), "note": "Favorite ranking is separate from edge and is research-only.", "order_submitted": False, "order_cancelled": False, "trade_approved": False}
+
+
+@app.get("/api/markets/{market_id}/edge-recommendation")
+async def market_edge_recommendation_api(market_id: str):
+    market = await client.get_market(market_id)
+    if not market:
+        raise HTTPException(status_code=404, detail="Market not found")
+    scored = _score_market_rows([market])[0]
+    return {"source": "gamma+local", "item": scored.get("market_edge_recommendation"), "legend": edge_recommendation_legend(), "order_submitted": False, "order_cancelled": False, "trade_approved": False, "live_trading_armed": False}
 
 
 @app.get("/api/markets/{market_id}")
@@ -5800,12 +6979,12 @@ async def market_api(market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    return {"source": "gamma", "item": attach_probability(attach_scores([market]))[0]}
+    return {"source": "gamma", "item": _score_market_rows([market])[0]}
 
 
 @app.post("/api/snapshots")
 async def create_snapshot(limit: int = Query(default=100, ge=1, le=500), user: dict = Depends(require_admin)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit)))
+    markets = _score_market_rows(await client.list_markets(limit=limit))
     return save_snapshot(markets)
 
 
@@ -5825,7 +7004,7 @@ async def snapshots(limit: int = Query(default=25, ge=1, le=100)):
 @app.get("/api/movers")
 async def movers(limit: int = Query(default=100, ge=1, le=500)):
     previous = load_latest()
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit)))
+    markets = _score_market_rows(await client.list_markets(limit=limit))
     return {
         "source": "gamma",
         "previous_snapshot_found": previous is not None,
@@ -5860,7 +7039,7 @@ async def market_research(market_id: str):
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     return {"source": "local", "note": "Research packet only; not a trading signal.", "item": make_research_packet(scored)}
 
 
@@ -5900,7 +7079,7 @@ async def remove_watchlist_api(market_id: str, user: dict = Depends(require_admi
 
 @app.get("/api/probabilities")
 async def probabilities(limit: int = Query(default=settings.default_limit, ge=1, le=100)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     return {"source": "local", "note": "Deterministic probability model v1 for paper trading only.", "items": markets}
 
 
@@ -5909,7 +7088,7 @@ async def probabilities(limit: int = Query(default=settings.default_limit, ge=1,
 @app.get("/api/alerts")
 async def alerts_api(limit: int = Query(default=100, ge=1, le=500)):
     previous = load_latest()
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     movers = calculate_movers(markets, previous)[:50]
     portfolio = summarize_portfolio(markets)
     risk = risk_status(load_portfolio())
@@ -5924,7 +7103,7 @@ async def alerts_api(limit: int = Query(default=100, ge=1, le=500)):
 
 @app.get("/api/paper/analytics")
 async def paper_analytics():
-    markets = attach_probability(attach_scores(await client.list_markets(limit=100, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=100, order="volume24hr"))
     portfolio = summarize_portfolio(markets)
     trades = load_trades()
     return {"source": "local", "mode": "paper_only", "analytics": trade_analytics(trades, portfolio), "portfolio": portfolio}
@@ -5936,7 +7115,7 @@ async def paper_trades_csv():
 
 @app.get("/api/portfolio")
 async def portfolio_api(limit: int = Query(default=100, ge=1, le=500)):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     return summarize_portfolio(markets)
 
 
@@ -6049,7 +7228,7 @@ async def paper_review_report_page(
 @app.get("/api/paper/positions")
 async def paper_positions_api(limit: int = Query(default=100, ge=1, le=500)):
     try:
-        markets = attach_probability(attach_scores(await client.list_markets(limit=min(limit, 200), order="volume24hr")))
+        markets = _score_market_rows(await client.list_markets(limit=min(limit, 200), order="volume24hr"))
     except Exception:
         markets = []
     portfolio = summarize_portfolio(markets)
@@ -6066,7 +7245,7 @@ async def paper_positions_api(limit: int = Query(default=100, ge=1, le=500)):
 @app.get("/api/paper/position-alerts")
 async def paper_position_alerts_api(limit: int = Query(default=100, ge=1, le=500)):
     try:
-        markets = attach_probability(attach_scores(await client.list_markets(limit=min(limit, 200), order="volume24hr")))
+        markets = _score_market_rows(await client.list_markets(limit=min(limit, 200), order="volume24hr"))
     except Exception:
         markets = []
     portfolio = summarize_portfolio(markets)
@@ -6103,7 +7282,7 @@ async def paper_position_plan_api(
 @app.get("/positions", response_class=HTMLResponse)
 async def positions_page(request: Request, limit: int = Query(default=100, ge=1, le=500)):
     try:
-        markets = attach_probability(attach_scores(await client.list_markets(limit=min(limit, 200), order="volume24hr")))
+        markets = _score_market_rows(await client.list_markets(limit=min(limit, 200), order="volume24hr"))
     except Exception:
         markets = []
     portfolio = summarize_portfolio(markets)
@@ -6158,7 +7337,7 @@ async def paper_buy_api(market_id: str, stake: float = Query(default=100.0, gt=0
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     try:
         return paper_buy(scored, outcome=outcome, stake=stake, reason=reason)
     except ValueError as exc:
@@ -6170,7 +7349,7 @@ async def paper_sell_api(market_id: str, outcome: str = Query(default="YES"), sh
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     try:
         return paper_sell(scored, outcome=outcome, shares=shares, reason=reason)
     except ValueError as exc:
@@ -6210,7 +7389,7 @@ async def paper_settle_api(
 @app.get("/settlements", response_class=HTMLResponse)
 async def settlements_page(request: Request, limit: int = Query(default=100, ge=1, le=500)):
     try:
-        markets = attach_probability(attach_scores(await client.list_markets(limit=min(limit, 100), order="volume24hr")))
+        markets = _score_market_rows(await client.list_markets(limit=min(limit, 100), order="volume24hr"))
     except Exception:
         markets = []
     portfolio_summary = summarize_portfolio(markets)
@@ -6248,7 +7427,7 @@ async def paper_buy_page(market_id: str, stake: float = Query(default=100.0, gt=
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     try:
         paper_buy(scored, outcome=outcome, stake=stake, reason="dashboard paper buy")
     except ValueError:
@@ -6261,7 +7440,7 @@ async def paper_sell_page(market_id: str, outcome: str = Query(default="YES"), u
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     try:
         paper_sell(scored, outcome=outcome, reason="dashboard paper sell all")
     except ValueError:
@@ -6278,7 +7457,7 @@ async def risk_status_api():
 
 async def _risk_budget_markets(limit: int = 200) -> list[dict[str, Any]]:
     try:
-        return attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+        return _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     except Exception:
         return []
 
@@ -7472,7 +8651,7 @@ async def risk_check_api(
     market = await client.get_market(market_id)
     if not market:
         raise HTTPException(status_code=404, detail="Market not found")
-    scored = attach_probability(attach_scores([market]))[0]
+    scored = _score_market_rows([market])[0]
     price = float((scored.get("probability_model") or {}).get("market_probability") or 0.5)
     return check_paper_buy(scored, load_portfolio(), stake=stake, price=price, outcome=outcome)
 
@@ -7490,7 +8669,7 @@ async def strategy_recommendations_api(
     max_recommendations: int = Query(default=20, ge=1, le=100),
     stake: float = Query(default=100.0, gt=0),
 ):
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     return {
         "source": "local",
         "note": "Simulation-only recommendations. No orders are placed.",
@@ -7525,7 +8704,7 @@ async def run_backtest_api(user: dict = Depends(require_admin),
     )
 
 from .thesis_scoring import score_market_theses, score_all_market_theses
-from .review_queue import build_review_queue
+from .review_queue import build_review_queue, build_review_queue_payload, list_review_queue_actions, list_review_queue_audit, record_review_queue_action
 
 
 async def _ranked_opportunities(limit: int = 50) -> list[dict]:
@@ -7534,7 +8713,7 @@ async def _ranked_opportunities(limit: int = 50) -> list[dict]:
     This keeps review/readiness/ticket workflows on the same data path as the
     visible opportunity engine instead of relying on older placeholder helpers.
     """
-    markets = attach_probability(attach_scores(await client.list_markets(limit=limit, order="volume24hr")))
+    markets = _score_market_rows(await client.list_markets(limit=limit, order="volume24hr"))
     markets = attach_evidence_probability(markets)
     return rank_opportunities(markets, watchlist=load_watchlist(), max_items=limit)
 
@@ -7568,21 +8747,126 @@ async def api_market_thesis_score(market_id: str):
     return score_market_theses(market_id, theses).to_dict()
 
 @app.get("/api/review-queue")
-async def api_review_queue(limit: int = 25):
+async def api_review_queue(limit: int = 25, demo: bool = Query(default=False)):
     theses = _load_json_file_safe(_data_path("theses.json"), [])
     thesis_ids = sorted({str(t.get("market_id", "")) for t in theses if t.get("market_id")})
     thesis_score_items = score_all_market_theses(thesis_ids, theses)
     thesis_score_map = {str(item["market_id"]): item for item in thesis_score_items}
-    try:
-        opportunities = await _ranked_opportunities(limit=limit)
-    except Exception:
-        opportunities = []
-    return {"items": build_review_queue(opportunities, thesis_score_map, limit=limit)}
+    if demo:
+        opportunities = opportunity_demo_markets()
+        source_state = "demo_fixture"
+    else:
+        try:
+            opportunities = await _ranked_opportunities(limit=limit)
+            source_state = "configured_local_or_network_source" if opportunities else "no_source_rows"
+        except Exception:
+            opportunities = []
+            source_state = "source_unavailable"
+    return build_review_queue_payload(
+        opportunities,
+        thesis_score_map,
+        limit=limit,
+        requested_demo=demo,
+        source_state=source_state,
+        source_route=f"/api/review-queue?demo={'true' if demo else 'false'}",
+    )
+
+
+@app.get("/api/review-queue/actions")
+async def api_review_queue_actions(limit: int = Query(default=100, ge=1, le=500), market_id: str = Query(default="")):
+    items = list_review_queue_actions(market_id=market_id or None, limit=limit)
+    return {
+        "version": APP_VERSION,
+        "items": items,
+        "count": len(items),
+        "market_id": market_id or "",
+        "review_only": True,
+        "safe_review_only": True,
+        "live_disabled": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+        "live_trading_armed": False,
+        "secret_values_returned": False,
+    }
+
+
+@app.get("/api/review-queue/audit")
+async def api_review_queue_audit():
+    return {"items": list_review_queue_audit(), "review_only": True, "live_disabled": True, "order_submitted": False, "order_cancelled": False}
+
+
+@app.post("/api/review-queue/{market_id}/action")
+async def api_review_queue_action(market_id: str, payload: dict[str, Any] = Body(default_factory=dict)):
+    action = str(payload.get("action") or "mark_reviewed")
+    return record_review_queue_action(market_id, action, payload)
+
 
 @app.get("/review-queue")
-async def review_queue_page(request: Request, limit: int = 25):
-    data = await api_review_queue(limit=limit)
-    return templates.TemplateResponse("review_queue_v031.html", {"request": request, "items": data["items"], "limit": limit})
+async def review_queue_page(
+    request: Request,
+    limit: int = 25,
+    demo: bool = Query(default=False),
+    rq_action: str = Query(default=""),
+    action: str = Query(default=""),
+    status: str = Query(default=""),
+    market_id: str = Query(default=""),
+):
+    data = await api_review_queue(limit=limit, demo=demo)
+    return templates.TemplateResponse(
+        "review_queue_v031.html",
+        {
+            "request": request,
+            "queue": data,
+            "payload": data,
+            "items": data["items"],
+            "limit": limit,
+            "demo_mode": demo,
+            "feedback": {"rq_action": rq_action, "action": action, "status": status, "market_id": market_id},
+        },
+    )
+
+
+@app.post("/review-queue/{market_id}/action")
+async def review_queue_action_page(
+    market_id: str,
+    action: str = Form(default="mark_reviewed"),
+    market_title: str = Form(default=""),
+    previous_state: str = Form(default="UNREVIEWED"),
+    reason: str = Form(default=""),
+    operator_note: str = Form(default=""),
+    queue_stage: str = Form(default=""),
+    queue_action: str = Form(default=""),
+    data_state: str = Form(default="cached"),
+    data_freshness: str = Form(default="cached_runtime"),
+    source_state: str = Form(default="configured_or_cached_source"),
+    source_route: str = Form(default="/review-queue"),
+    source_component: str = Form(default="review_queue.action_form"),
+    return_to: str = Form(default="/review-queue"),
+    user: dict = Depends(require_admin),
+):
+    result = record_review_queue_action(
+        market_id,
+        action,
+        {
+            "market_title": market_title,
+            "previous_state": previous_state,
+            "reason": reason,
+            "operator_note": operator_note,
+            "queue_stage": queue_stage,
+            "queue_action": queue_action,
+            "data_state": data_state,
+            "data_freshness": data_freshness,
+            "source_state": source_state,
+            "source_route": source_route,
+            "source_component": source_component,
+            "requested_by": user.get("username", "local"),
+        },
+    )
+    redirect_base = _safe_return_path(return_to, "/review-queue")
+    separator = "&" if "?" in redirect_base else "?"
+    suffix = urlencode({"rq_action": "recorded" if result.get("ok") else "error", "action": action, "status": result.get("item", {}).get("new_state", result.get("status", "error")), "market_id": market_id})
+    return RedirectResponse(url=f"{redirect_base}{separator}{suffix}", status_code=303)
 
 from .evidence_automation import create_evidence_packet as create_automated_evidence_packet, build_evidence_workbench, build_evidence_tasks_for_market
 
@@ -7673,7 +8957,7 @@ async def _get_opportunity_for_playbook(market_id: str) -> dict:
     except Exception:
         market = None
     if market:
-        scored = attach_evidence_probability(attach_probability(attach_scores([market])))
+        scored = attach_evidence_probability(_score_market_rows([market]))
         rows = rank_opportunities(scored, watchlist=load_watchlist(), max_items=1)
         return rows[0] if rows else scored[0]
     return {"id": market_id, "market_id": market_id, "title": market_id, "question": market_id}
@@ -7935,7 +9219,7 @@ async def _get_opportunity_for_ticket(market_id: str) -> dict:
         return opportunity
     market = await client.get_market(market_id)
     if market:
-        scored = attach_evidence_probability(attach_probability(attach_scores([market])))
+        scored = attach_evidence_probability(_score_market_rows([market]))
         rows = rank_opportunities(scored, watchlist=load_watchlist(), max_items=1)
         return rows[0] if rows else scored[0]
     return {"id": market_id, "market_id": market_id, "title": market_id, "question": market_id}

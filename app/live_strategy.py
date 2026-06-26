@@ -471,7 +471,13 @@ def strategy_export_markdown() -> str:
         ))
     lines.extend(["", "## Scorecards", "", "| ID | Thesis | Total | Weighted | Next Action |", "|---|---|---:|---:|---|"])
     for item in workspace.get("scorecards", []):
-        lines.append(f"| {_text(item.get('id'))} | {_text(item.get('thesis_id'))} | {item.get('total_score', 0)} | {item.get('weighted_score', 0)} | {_text(item.get('recommended_next_action')).replace('|', '\\|')} |")
+        lines.append("| {id} | {thesis} | {total} | {weighted} | {next_action} |".format(
+            id=_text(item.get("id")),
+            thesis=_text(item.get("thesis_id")),
+            total=item.get("total_score", 0),
+            weighted=item.get("weighted_score", 0),
+            next_action=_text(item.get("recommended_next_action")).replace("|", "\\|"),
+        ))
     lines.extend(["", "Secret values are redacted. This export is a research/playbook report only and does not approve, place, or cancel orders.", ""])
     return "\n".join(lines)
 

@@ -84,10 +84,13 @@ button, input, select, textarea { font: inherit; }
 .v3-badge.blocked { color: var(--blocked); border-color: rgba(255, 107, 107, .38); background: rgba(255, 107, 107, .08); }
 .v3-badge.unknown { color: var(--unknown); border-color: rgba(199, 210, 254, .34); background: rgba(199, 210, 254, .08); }
 .v3-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.v3-actions form { display: inline-flex; margin: 0; }
 .v3-button, .v3-actions a, button { border: 1px solid var(--border); background: rgba(10, 22, 39, .92); color: var(--text); border-radius: 13px; padding: 9px 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
 .v3-button:hover, .v3-actions a:hover, button:hover { text-decoration: none; background: rgba(139, 211, 255, .12); border-color: var(--border-strong); }
 .v3-button.primary { background: linear-gradient(135deg, rgba(139,211,255,.26), rgba(167,139,250,.18)); border-color: var(--border-strong); }
 .v3-button.danger { border-color: rgba(255,139,139,.42); color: var(--danger); background: rgba(255,139,139,.08); }
+.v3-action-feedback { border:1px solid rgba(123, 220, 181, .35); background:rgba(123, 220, 181, .09); color:var(--text); border-radius:14px; padding:10px 12px; margin:10px 0; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.v3-action-feedback span { color:var(--muted); font-size:13px; }
 .v3-filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px; background: rgba(5, 11, 22, .55); border: 1px solid var(--border); border-radius: var(--radius-md); margin: 10px 0 14px; }
 .v3-filterbar input, .v3-filterbar select, .v3-field { border: 1px solid var(--border); background: rgba(5, 11, 22, .88); color: var(--text); border-radius: 12px; padding: 10px 11px; min-width: 150px; }
 .v3-fieldset { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: rgba(5, 11, 22, .34); margin: 10px 0; }
@@ -117,3 +120,19 @@ pre { white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow
 .v3-dependency-tree { display: grid; gap: 10px; }
 .v3-dependency-node { display: grid; grid-template-columns: minmax(120px,1fr) auto minmax(120px,1fr) auto; gap: 8px; align-items: center; border: 1px solid var(--border); border-radius: 14px; padding: 10px; background: rgba(5, 11, 22, .42); }
 @media (max-width: 1080px) { .v3-cockpit-grid { grid-template-columns: 1fr; } .v3-dependency-node { grid-template-columns: 1fr; } }
+
+/* v4.3 unified operator surface bridge */
+.v3-global-bridge { display:flex; flex-wrap:wrap; gap:8px; align-items:center; border:1px solid var(--border); border-radius:16px; padding:10px; margin:-4px 0 16px; background:rgba(5,11,22,.55); }
+.v3-global-bridge a { color:var(--text); border:1px solid var(--border); border-radius:999px; padding:7px 10px; font-weight:800; font-size:12px; background:rgba(10,22,39,.76); }
+.v3-global-bridge a:hover { text-decoration:none; border-color:var(--border-strong); background:rgba(139,211,255,.12); }
+
+/* v4.15 functional completion: cards that look clickable are real form controls. */
+.v3-inline-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:10px 0 12px; }
+.v3-select-card { padding:0; overflow:hidden; }
+.v3-select-card.selected { border-color: var(--border-strong); background: linear-gradient(135deg, rgba(139, 211, 255, .10), rgba(142, 247, 181, .08)); }
+.v3-card-button { width:100%; border:0; border-radius:14px; background:transparent; color:var(--text); text-align:left; padding:12px; cursor:pointer; display:block; }
+.v3-card-button:hover { background:rgba(139,211,255,.08); text-decoration:none; }
+.v3-card-button p { margin:6px 0; color:var(--muted); }
+.v3-card-button:focus-visible { outline:3px solid rgba(139,211,255,.75); outline-offset:-3px; }
+.v3-select-card[data-v3-busy="true"] { opacity:.72; }
+.v3-select-card[data-v3-busy="true"] .v3-card-button::after { content:"Saving…"; float:right; color:var(--warn); font-weight:900; }

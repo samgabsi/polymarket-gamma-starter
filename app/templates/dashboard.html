@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Operator Overview - Polymarket OP Console {{ app_version_short }}{% endblock %}
+{% block title %}Unified Operator Dashboard - Polymarket OP Console {{ app_version_short }}{% endblock %}
 
 {% block breadcrumbs %}
   <a href="/">Overview</a>
@@ -11,17 +11,18 @@
   <div>
     <p class="page-kicker">Operator console · {{ app_version_short }} · local-first</p>
     <div class="page-title-row">
-      <h1>Operator Overview</h1>
+      <h1>Unified Operator Dashboard</h1>
       <span class="status-badge tone-local">LOCAL</span>
       <span class="status-badge tone-paper">PAPER ONLY</span>
       <span class="status-badge tone-neutral">LIVE DISABLED</span>
     </div>
-    <p class="page-subtitle">Research, paper workflow, risk review, ops closeout, audit, and staged live-readiness in one console. No wallet actions, live orders, or autonomous execution.</p>
+    <p class="page-subtitle">One product surface for Operator OS, AI Copilot, AI Edge Research, Live Controls, Platform Health, Cockpit, Workspace, Tasks, Data/Freshness, Simulation, Analytics, and Settings. Navigation never bypasses backend gates.</p>
     <div class="action-bar" aria-label="Primary actions">
-      <a class="button-link" href="/workflow">Open workflow map</a>
-      <a class="button-link quiet" href="/operator">Operator brief</a>
-      <a class="button-link quiet" href="/audit">Audit ledger</a>
-      <a class="button-link quiet" href="/live-manual-execution">Manual execution control</a>
+      <a class="button-link" href="/v3">Open Operator OS</a>
+      <a class="button-link quiet" href="/v3/ai">AI Copilot</a>
+      <a class="button-link quiet" href="/v3/ai/edge">AI Edge Research</a>
+      <a class="button-link quiet" href="/v2-live">Live Controls</a>
+      <a class="button-link quiet" href="/system-map">System Map</a>
     </div>
   </div>
   <form method="get" class="stacked-form" aria-label="Refresh market scan">
@@ -29,6 +30,32 @@
     <label><input type="checkbox" name="save" value="true"> Save snapshot on refresh</label>
     <button type="submit">Refresh overview</button>
   </form>
+</section>
+
+
+<section class="callout info">
+  <h3>Recommended starting point: Operator Intelligence OS (/v3)</h3>
+  <p>Polymarket OP Console is organized into safety-preserved sections. v2 live controls remain separate for compatibility and safety, while v3, AI, AI Edge Research, platform, cockpit, workspace, tasks, data, and analytics are linked into this unified operator surface.</p>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div>
+      <h2>Unified Operator Surface</h2>
+      <p class="muted">Start from any card. These links navigate only; they do not place orders, cancel orders, approve trades, arm live trading, or disable safety gates.</p>
+    </div>
+    <a class="button-link quiet" href="/system-map">Open route map</a>
+  </div>
+  <div class="unified-surface-grid">
+    {% for item in primary_entry_points %}
+      <article class="unified-entry-card">
+        <div class="meta">{{ item.section }} · {{ item.safety_class }} · {{ item.mutation_risk }}</div>
+        <h3>{{ item.title }}</h3>
+        <p class="muted">{{ item.description }}</p>
+        <p><a class="button-link" href="{{ item.canonical_path }}">Open {{ item.title.split('/')[0].strip() }}</a>{% if item.alias_path %} <a class="button-link quiet" href="{{ item.alias_path }}">Alias {{ item.alias_path }}</a>{% endif %}</p>
+      </article>
+    {% endfor %}
+  </div>
 </section>
 
 {% if snapshot %}
@@ -42,6 +69,8 @@
   <h3>Safety Posture</h3>
   <p>Live submit/cancel are implemented only through the manual CLOB adapter boundary; fake adapter receipts are local simulations only, and execution controls remain gated by kill switch, manual confirmation, authorization, dry-run, risk, and audit boundaries.</p>
 </section>
+
+
 
 <section class="content-card">
   <div class="section-header">
@@ -268,17 +297,22 @@
   {% if markets %}
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Score</th><th>Question</th><th class="numeric">24h Volume</th><th class="numeric">Liquidity</th><th>Outcome Prices</th><th>Why Analyze</th><th>Status</th></tr></thead>
+      <thead><tr><th>Score</th><th>Question</th><th>Market Family / Rank</th><th class="numeric">24h Volume</th><th class="numeric">Liquidity</th><th>Prices</th><th>Model Fair / Edge</th><th>Recommended Side</th><th>Why</th><th>AI Edge</th><th>Status</th></tr></thead>
       <tbody>
         {% for market in markets %}
+        {% set edge = market.market_edge_recommendation or {} %}
         <tr>
           <td class="numeric"><strong>{{ market.opportunity_score }}</strong></td>
           <td><a href="/markets/{{ market.id }}">{{ market.question }}</a><br><a class="small" href="{{ market.url }}" target="_blank" rel="noreferrer">{{ market.polymarket_url_label }}</a></td>
+          <td><strong>{{ edge.family_title or 'No family detected' }}</strong><br><span class="muted">{{ edge.group_rank_label or 'Favorite rank unavailable' }}</span></td>
           <td class="numeric">${{ '{:,.0f}'.format(market.volume_24hr) }}</td>
           <td class="numeric">${{ '{:,.0f}'.format(market.liquidity) }}</td>
-          <td>{% for outcome in market.outcomes %}<span class="pill">{{ outcome.name }} {{ '%.2f'|format(outcome.price) }}</span>{% endfor %}</td>
-          <td>{{ '; '.join(market.why_analyze) }}</td>
-          <td><span class="status-badge tone-{{ market.mispricing_status|status_tone }}">{{ market.mispricing_status }}</span></td>
+          <td><span class="pill">YES {{ '%.1f%%'|format(edge.market_yes_price * 100) if edge.market_yes_price is not none else 'unavailable' }}</span><span class="pill">NO {{ '%.1f%%'|format(edge.market_no_price * 100) if edge.market_no_price is not none else 'unavailable' }}</span><br><span class="muted">{{ edge.market_implied_source or 'market source unavailable' }}</span></td>
+          <td><strong>Fair YES {{ '%.1f%%'|format(edge.model_fair_yes * 100) if edge.model_fair_yes is not none else 'unavailable' }}</strong><br><span class="muted">Fair NO {{ '%.1f%%'|format(edge.model_fair_no * 100) if edge.model_fair_no is not none else 'unavailable' }} · source: {{ edge.model_fair_source or 'unavailable' }}</span><br><span class="pill">YES {{ '%+.1f pp'|format(edge.yes_edge_pp) if edge.yes_edge_pp is not none else 'unavailable' }}</span><span class="pill">NO {{ '%+.1f pp'|format(edge.no_edge_pp) if edge.no_edge_pp is not none else 'unavailable' }}</span></td>
+          <td><span class="status-badge tone-{{ edge.recommendation_status|status_tone }}">{{ edge.recommended_side or 'INSUFFICIENT DATA' }}</span><br><strong>{{ edge.side_badge or 'INSUFFICIENT DATA' }}</strong><br><span class="muted">Confidence: {{ edge.confidence_label or 'low' }}</span></td>
+          <td>{{ edge.explanation or 'Model fair probability or market-implied price is unavailable.' }}<br><span class="muted">{{ edge.favorite_vs_edge_note }}</span></td>
+          <td><a class="button-link quiet" href="{{ edge.ai_edge_market_href or '/v3/ai/edge' }}">Analyze with AI Edge</a><br><a class="small" href="{{ edge.ai_edge_packet_href or '/api/v3/ai/edge/packets' }}">Open Packet</a> · <a class="small" href="{{ edge.calibration_href or '/v3/ai/edge/calibration' }}">Calibration</a></td>
+          <td><span class="status-badge tone-{{ market.mispricing_status|status_tone }}">{{ market.mispricing_status }}</span><br><span class="muted">{{ edge.safety_note }}</span></td>
         </tr>
         {% endfor %}
       </tbody>

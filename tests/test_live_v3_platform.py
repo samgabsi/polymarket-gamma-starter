@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from app.config import APP_VERSION
 from app.main import app
 from app import auth, live_v2
-from app import platform_diagnostics, platform_plugins, platform_routes, platform_safety, platform_storage, platform_exports
+from app import platform_api, platform_diagnostics, platform_migrations, platform_plugins, platform_routes, platform_safety, platform_storage, platform_exports
 from app import live_v3, live_v3_cockpit
 
 
@@ -26,8 +26,8 @@ def authed_client(monkeypatch, tmp_path):
         yield client
 
 
-def test_v40_version_and_safety_helpers():
-    assert APP_VERSION == "4.0.1-real"
+def test_v42_version_and_safety_helpers():
+    assert APP_VERSION == "4.17.0-real"
     statements = platform_safety.safety_statements()
     assert statements["platform_diagnostics_do_not_mutate_live_trading_state"] is True
     assert platform_safety.action_is_forbidden("place_order") is True
@@ -35,6 +35,49 @@ def test_v40_version_and_safety_helpers():
     assert platform_safety.action_is_forbidden("arm_live_trading") is True
     assert "supersecret" not in platform_safety.redact_text("api_key=supersecret").lower()
     assert platform_safety.validate_safety_class("bad") == "informational"
+
+
+def test_api_schema_inventory_and_response_envelope_are_safe():
+    envelope = platform_api.api_response_envelope(
+        "tests",
+        "schema_probe",
+        data={"ok": True},
+        unknown_unavailable_data=["test unknown"],
+    )
+    validation = platform_api.validate_envelope_shape(envelope)
+    schema = platform_api.summarize_api_schema_consistency(app)
+    export_json = platform_api.export_schema_inventory_json(app)
+    export_md = platform_api.export_schema_inventory_markdown(app)
+    assert validation["ok"] is True
+    assert envelope["success"] is True
+    assert envelope["app_version"] == "4.17.0-real"
+    assert envelope["package_name"] == "Polymarket OP Console"
+    assert envelope["package_slug"] == "polymarket-op-console"
+    assert envelope["unknown_unavailable_data"]
+    assert "do not place" in envelope["safety_statement"].lower()
+    assert schema["summary"]["api_family_count"] >= 8
+    assert schema["summary"]["schema_object_count"] >= 5
+    assert export_json["secret_values_returned"] is False
+    assert "API Schema Inventory" in export_md
+
+
+def test_runtime_migration_planner_is_non_destructive(monkeypatch, tmp_path):
+    monkeypatch.setattr(platform_migrations, "DATA_DIR", tmp_path / "data")
+    before = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*"))
+    summary = platform_migrations.migration_summary()
+    plan = platform_migrations.migration_plan()
+    storage_map = platform_migrations.storage_map()
+    export_json = platform_migrations.export_migration_plan_json()
+    export_md = platform_migrations.export_migration_plan_markdown()
+    after = sorted(str(path.relative_to(tmp_path)) for path in tmp_path.rglob("*"))
+    assert before == after
+    assert summary["migration_planner_does_not_mutate_runtime_data"] is True
+    assert plan["automatic_runtime_migration"] is False
+    assert plan["migration_planner_does_not_delete_move_rewrite_or_migrate_data"] is True
+    assert any(step["classification"] == "destructive action prohibited" for step in plan["steps"])
+    assert storage_map["package_excluded_runtime_data"] is True
+    assert export_json["secret_values_returned"] is False
+    assert "Runtime Migration Plan" in export_md
 
 
 def test_plugin_manifests_are_metadata_only_and_reject_forbidden_capabilities():
@@ -64,7 +107,9 @@ def test_route_storage_diagnostics_and_exports_are_safe():
     assert routes["count"] > 0
     assert routes["route_inventory_does_not_mutate_live_trading_state"] is True
     assert storage["count"] >= 5
-    assert storage["migration_policy"].startswith("documentation-only")
+    assert storage["migration_policy"].startswith("non-destructive")
+    assert diag["api_schema"]["summary"]["api_family_count"] >= 8
+    assert diag["migrations"]["destructive_actions_prohibited"] is True
     assert diag["diagnostics_do_not_mutate_live_trading_state"] is True
     assert export["secret_values_returned"] is False
     assert platform_exports.validate_export_secret_safe(export)["ok"] is True
@@ -81,21 +126,25 @@ def test_platform_integrates_with_search_graph_workflows_demo_and_command_center
     assert "platform" in center["groups"]
     templates = live_v3.workflow_templates()
     assert any(t["workflow_id"] == "platform_health_review" for t in templates["templates"])
-    run = live_v3.run_workflow({"workflow_id": "plugin_boundary_review"})
+    assert any(t["workflow_id"] == "api_schema_consistency_review" for t in templates["templates"])
+    assert any(t["workflow_id"] == "runtime_migration_planning_review" for t in templates["templates"])
+    run = live_v3.run_workflow({"workflow_id": "runtime_migration_planning_review"})
     assert run["status"] == "completed"
     assert run["order_submitted"] is False
     fixture = live_v3.build_demo_fixture()
     assert fixture["v4_platform"]["safe_demo_data"] is True
+    assert fixture["v4_platform"]["fake_api_schema_inventory"]["success"] is True
+    assert fixture["v4_platform"]["fake_runtime_migration_plan"]["automatic_runtime_migration"] is False
 
 
 def test_platform_routes_and_apis_render(authed_client):
-    for route in ["/v3/platform", "/v3/platform/health", "/v3/platform/routes", "/v3/platform/plugins", "/v3/platform/storage", "/v3/platform/diagnostics", "/v3/platform/exports", "/v3/platform/settings"]:
+    for route in ["/v3/platform", "/v3/platform/health", "/v3/platform/routes", "/v3/platform/schema", "/v3/platform/plugins", "/v3/platform/storage", "/v3/platform/migrations", "/v3/platform/migrations/plan", "/v3/platform/migrations/storage-map", "/v3/platform/diagnostics", "/v3/platform/exports", "/v3/platform/settings"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Platform" in response.text or "platform" in response.text
         assert "do not place" in response.text or "do not execute" in response.text
-    for route in ["/api/v3/platform/summary", "/api/v3/platform/health", "/api/v3/platform/routes", "/api/v3/platform/plugins", "/api/v3/platform/storage", "/api/v3/platform/diagnostics", "/api/v3/platform/export.json", "/api/v3/platform/export.md", "/api/v3/platform/settings"]:
+    for route in ["/api/v3/platform/summary", "/api/v3/platform/health", "/api/v3/platform/routes", "/api/v3/platform/route-registry", "/api/v3/platform/routes/export.json", "/api/v3/platform/routes/export.md", "/api/v3/platform/schema", "/api/v3/platform/schema/families", "/api/v3/platform/schema/envelopes", "/api/v3/platform/schema/objects", "/api/v3/platform/schema/export.json", "/api/v3/platform/schema/export.md", "/api/v3/platform/plugins", "/api/v3/platform/storage", "/api/v3/platform/storage/export.json", "/api/v3/platform/storage/export.md", "/api/v3/platform/migrations/summary", "/api/v3/platform/migrations/plan", "/api/v3/platform/migrations/storage-map", "/api/v3/platform/migrations/export.json", "/api/v3/platform/migrations/export.md", "/api/v3/platform/diagnostics", "/api/v3/platform/export.json", "/api/v3/platform/export.md", "/api/v3/platform/settings"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
         assert "private_key" not in response.text.lower()

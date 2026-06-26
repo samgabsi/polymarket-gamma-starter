@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 from typing import Any
 
 from .config import APP_VERSION
-from .live_v2 import redact_data as _live_redact_data, redact_text as _live_redact_text
 
 STANDARD_SAFETY_STATEMENT = (
-    "Platform diagnostics, plugin manifests, route inventories, storage summaries, exports, tasks, guided reviews, "
-    "cockpit views, command-palette actions, keyboard shortcuts, and workflow packets are local-first operator aids. "
+    "Platform diagnostics, AI drafts, AI suggestions, ChatGPT connector blueprints, plugin manifests, route inventories, "
+    "storage summaries, exports, tasks, guided reviews, cockpit views, command-palette actions, keyboard shortcuts, and workflow packets are local-first operator aids. "
     "They do not place orders, cancel orders, approve trades, sign transactions, arm live trading, bypass backend gates, "
     "or provide financial advice."
 )
 NO_FINANCIAL_ADVICE_STATEMENT = "Workflow priority, diagnostics, reports, tasks, plugins, and cockpit panels are not financial advice."
-NO_LIVE_MUTATION_STATEMENT = "No platform, plugin, diagnostic, export, route-inventory, task, guided, cockpit, shortcut, or command-palette action mutates live trading state."
+NO_LIVE_MUTATION_STATEMENT = "No AI draft, platform, plugin, diagnostic, export, route-inventory, task, guided, cockpit, shortcut, or command-palette action mutates live trading state."
 TASK_NOT_APPROVAL_STATEMENT = "Task completion is an operator workflow status only and is not trade approval."
 GUIDED_NOT_APPROVAL_STATEMENT = "Guided review completion is not trade approval."
 COCKPIT_NOT_TRADING_STATEMENT = "Cockpit layouts, focus modes, panels, shortcuts, and command-palette actions do not place or cancel orders."
@@ -36,15 +36,66 @@ SECRET_PATTERNS = [
     "wallet_secret", "clob_secret", "poly_secret", "token=", "password=",
 ]
 _SECRET_VALUE_RE = re.compile(r"(?i)(private[_-]?key|api[_-]?key|api[_-]?secret|secret|passphrase|authorization|bearer|token|password)\s*[:=]\s*[^\s,;}]+")
+_SECRET_ENV_KEYS = {
+    "POLYMARKET_CLOB_API_KEY",
+    "POLYMARKET_CLOB_SECRET",
+    "POLYMARKET_CLOB_PASSPHRASE",
+    "CLOB_API_KEY",
+    "CLOB_SECRET",
+    "CLOB_PASSPHRASE",
+    "OPENAI_API_KEY",
+    "KALSHI_API_KEY_ID",
+    "KALSHI_PRIVATE_KEY_PATH",
+}
+
+
+def _secret_values() -> list[str]:
+    return [str(os.getenv(key, "")).strip() for key in _SECRET_ENV_KEYS if str(os.getenv(key, "")).strip()]
+
+
+def _present(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    return True
 
 
 def redact_text(value: Any) -> str:
-    text = _live_redact_text(str(value or ""))
+    text = str(value or "").strip()
+    for secret in _secret_values():
+        text = text.replace(secret, "[redacted]")
     return _SECRET_VALUE_RE.sub(lambda m: m.group(1) + "=[REDACTED]", text)
 
 
 def redact_data(value: Any) -> Any:
-    return _live_redact_data(value)
+    if isinstance(value, dict):
+        redacted: dict[Any, Any] = {}
+        for key, item in value.items():
+            key_text = str(key)
+            safe_secret_status_keys = {
+                "secret_values_returned",
+                "secret_values_allowed",
+                "secrets_masked",
+                "secrets_redacted",
+                "secret_scan_ok",
+            }
+            if key_text in safe_secret_status_keys:
+                redacted[key] = bool(item)
+            elif any(token in key_text.upper() for token in ["PRIVATE", "SECRET", "PASSPHRASE", "API_KEY", "SIGNATURE", "AUTHORIZATION"]):
+                redacted[key] = "[redacted]" if _present(item) else ""
+            else:
+                redacted[key] = redact_data(item)
+        return redacted
+    if isinstance(value, list):
+        return [redact_data(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(redact_data(item) for item in value)
+    if isinstance(value, str):
+        return redact_text(value)
+    return value
 
 
 def contains_secret_keyword(value: Any) -> bool:

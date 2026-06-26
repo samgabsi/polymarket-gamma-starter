@@ -599,7 +599,7 @@ def export_csv(kind: str) -> str:
     _event("export_generated", "ok", {"format": "csv", "kind": kind})
     return _csv_from_rows(mapping.get(kind, []), fields)
 
-# v4.0.1-real simulation context integration for analytics summaries.
+# v4.4.0-real simulation context integration for analytics summaries.
 _analytics_context_v33 = analytics_context
 
 
@@ -631,7 +631,7 @@ def build_analytics_summary(data: dict[str, Any] | None = None) -> dict[str, Any
     summary["secret_values_returned"] = False
     return redact_data(summary)
 
-# v4.0.1-real dataset context integration for analytics summaries.
+# v4.4.0-real dataset context integration for analytics summaries.
 _analytics_context_v34 = analytics_context
 
 def analytics_context(limit: int = 5) -> dict[str, Any]:  # type: ignore[override]
@@ -662,7 +662,7 @@ def build_analytics_summary(data: dict[str, Any] | None = None) -> dict[str, Any
     return redact_data(summary)
 
 
-# v4.0.1-real freshness context integration for analytics summaries.
+# v4.4.0-real freshness context integration for analytics summaries.
 _build_analytics_summary_v35 = build_analytics_summary
 
 def build_analytics_summary(data: dict[str, Any] | None = None) -> dict[str, Any]:  # type: ignore[override]

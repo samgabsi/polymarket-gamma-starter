@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}Feature Readiness{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3">Operator OS</a> / <span>Feature Readiness</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">{{ context.app_version }} · Feature readiness review workflow</p>
+    <h1>Feature Readiness</h1>
+    <p class="page-subtitle">A truthful, local-first view of what is working, partial, config-required, scaffolded, disabled, unavailable, or erroring. This page performs no live probes and cannot enable trading.</p>
+  </div>
+  <div class="settings-health tone-ok">
+    <span>Safety posture</span>
+    <strong>review-only</strong>
+    <small>live disabled · secrets masked · no orders</small>
+  </div>
+</section>
+
+<div class="callout ok"><strong>Operator implication:</strong> {{ context.operator_implication }}</div>
+<div class="callout warning"><strong>Data state:</strong> {{ context.data_state }} — {{ context.data_state_reason }}</div>
+
+{% if action_status %}
+<section class="content-card">
+  <h2>Action feedback</h2>
+  <div class="callout ok"><strong>Recorded.</strong> {{ action_status|replace('_',' ')|title }}{% if action_detail %} · <code>{{ action_detail }}</code>{% endif %}. This acknowledgement is local audit evidence only and does not enable disabled features.</div>
+</section>
+{% endif %}
+
+<section class="metric-grid" aria-label="Feature readiness summary">
+  <article class="metric-card"><strong>{{ context.status_map["count"] }}</strong><span>Feature status rows</span></article>
+  <article class="metric-card"><strong>{{ context.stub_burndown["count"] }}</strong><span>Stub burn-down rows</span></article>
+  <article class="metric-card"><strong>{{ context.status_map["counts"].working or 0 }}</strong><span>Working features</span></article>
+  <article class="metric-card"><strong>{{ context.status_map["counts"].partial or 0 }}</strong><span>Partial features</span></article>
+  <article class="metric-card"><strong>{{ context.status_map["counts"].config_required or 0 }}</strong><span>Config required</span></article>
+  <article class="metric-card"><strong>{{ context.status_map["counts"].disabled or 0 }}</strong><span>Disabled</span></article>
+  <article class="metric-card"><strong>{{ context.acknowledgements["count"] }}</strong><span>Recent acknowledgements</span></article>
+  <article class="metric-card"><strong>{{ 'false' if not context.secret_values_returned else 'true' }}</strong><span>Secrets returned</span></article>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div>
+      <h2>Filter readiness rows</h2>
+      <p class="help-text">Filtering changes only what is displayed and recorded in the acknowledgement metadata. It does not probe networks or mutate configuration.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/api/v3/features/status">Feature status JSON</a>
+      <a class="button-link quiet" href="/api/v3/features/stub-burndown">Stub burn-down JSON</a>
+      <a class="button-link quiet" href="/api/v3/features/readiness/acknowledgements">Acknowledgements JSON</a>
+    </div>
+  </div>
+  <form method="get" action="/v3/feature-readiness" class="filter-grid">
+    <label>Status
+      <select name="status">
+        <option value="">All statuses</option>
+        {% for item in context.status_values %}<option value="{{ item }}" {% if context.status_filter == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Area
+      <select name="area">
+        <option value="">All areas</option>
+        {% for item in context.area_values %}<option value="{{ item }}" {% if context.area_filter == item %}selected{% endif %}>{{ item }}</option>{% endfor %}
+      </select>
+    </label>
+    <div class="action-bar"><button class="button-link" type="submit">Apply filter</button><a class="button-link quiet" href="/v3/feature-readiness">Clear</a></div>
+  </form>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div>
+      <h2>Record readiness review</h2>
+      <p class="help-text">Creates a local JSONL audit row that records which filters/counts were reviewed. It does not approve trades, submit orders, turn on live mode, or change feature status.</p>
+    </div>
+  </div>
+  <form method="post" action="/v3/feature-readiness/acknowledge" class="review-form">
+    <input type="hidden" name="status_filter" value="{{ context.status_filter }}">
+    <input type="hidden" name="area_filter" value="{{ context.area_filter }}">
+    <input type="hidden" name="return_to" value="/v3/feature-readiness{% if context.status_filter or context.area_filter %}?status={{ context.status_filter }}&area={{ context.area_filter }}{% endif %}">
+    <label>Operator note
+      <textarea name="operator_note" rows="3" placeholder="Example: Reviewed config_required and disabled feature statuses before operating."></textarea>
+    </label>
+    <div class="action-bar"><button class="button-link" type="submit">Record readiness review</button></div>
+  </form>
+</section>
+
+<section class="content-card">
+  <h2>Feature status registry</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Feature</th><th>Status</th><th>Data state</th><th>Area</th><th>Operator implication</th><th>Next action</th><th>Route/API</th></tr></thead>
+    <tbody>
+      {% for item in context.feature_rows %}
+      <tr>
+        <td><strong>{{ item.title }}</strong><br><code>{{ item.feature_id }}</code></td>
+        <td><span class="status-badge tone-{{ 'ok' if item.status == 'working' else 'warning' if item.status in ['partial','config_required','scaffolded'] else 'neutral' }}">{{ item.status }}</span>{% if item.safe_review_only %}<br><span class="status-badge tone-neutral">review-only</span>{% endif %}{% if item.live_disabled %}<br><span class="status-badge tone-danger">live disabled</span>{% endif %}</td>
+        <td>{{ item.data_state }}</td>
+        <td>{{ item.area }}</td>
+        <td>{{ item.operator_implication or item.reason }}</td>
+        <td>{{ item.next_action or item.operator_action }}</td>
+        <td>{% if item.route %}<a href="{{ item.route }}">UI</a>{% endif %}{% if item.api_route %}<br><code>{{ item.api_route }}</code>{% endif %}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7"><div class="empty-state"><h3>No feature rows match</h3><p>Clear the status or area filter.</p></div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="content-card">
+  <h2>Stub burn-down map</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Surface</th><th>Status</th><th>Data state</th><th>UI wiring</th><th>Backend wiring</th><th>Tests/docs</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for item in context.stub_rows %}
+      <tr>
+        <td><strong>{{ item.title }}</strong><br><code>{{ item.feature_id }}</code><br><span class="muted small">{{ item.visible_surface }}</span></td>
+        <td><span class="status-badge tone-{{ 'ok' if item.status == 'working' else 'warning' if item.status in ['partial','config_required','scaffolded','needs_tests','needs_ui_wiring','needs_backend_wiring','needs_docs'] else 'neutral' }}">{{ item.status }}</span>{% if item.safe_review_only %}<br><span class="status-badge tone-neutral">review-only</span>{% endif %}{% if item.live_disabled %}<br><span class="status-badge tone-danger">live disabled</span>{% endif %}</td>
+        <td>{{ item.data_state }}</td>
+        <td>{{ item.ui_wiring }}</td>
+        <td>{{ item.backend_wiring }}</td>
+        <td>{{ item.test_status }} / {{ item.docs_status }}</td>
+        <td>{{ item.reason }}<br><span class="muted small">Next: {{ item.next_action }}</span></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7"><div class="empty-state"><h3>No stub rows match</h3><p>Clear the status or area filter.</p></div></td></tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="content-card">
+  <h2>Recent readiness acknowledgements</h2>
+  {% if context.acknowledgements["items"] %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Timestamp</th><th>Operator</th><th>Filters</th><th>Rows considered</th><th>Safety</th><th>Reason</th></tr></thead>
+    <tbody>
+      {% for item in context.acknowledgements["items"] %}
+      <tr>
+        <td>{{ item.timestamp }}<br><code>{{ item.acknowledgement_id }}</code></td>
+        <td>{{ item.operator }}</td>
+        <td>Status: {{ item.status_filter or 'all' }}<br>Area: {{ item.area_filter or 'all' }}</td>
+        <td>{{ item.matching_rows_considered }} matching<br>{{ item.feature_rows_considered }} feature · {{ item.stub_rows_considered }} stub</td>
+        <td>{% if item.review_only %}<span class="status-badge tone-neutral">review-only</span>{% endif %}{% if item.live_disabled %}<span class="status-badge tone-danger">live disabled</span>{% endif %}{% if not item.order_submitted %}<span class="status-badge tone-ok">no orders</span>{% endif %}</td>
+        <td>{{ item.reason }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <div class="empty-state"><h3>No readiness acknowledgements yet</h3><p>Use the form above after reviewing the current feature and stub rows. Records are stored locally and remain outside release ZIPs.</p></div>
+  {% endif %}
+</section>
+{% endblock %}

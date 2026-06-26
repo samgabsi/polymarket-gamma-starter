@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Market Family Comparison · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/opportunities">Opportunity Review Workbench</a> / <span>Market Family Comparison</span>{% endblock %}
+{% block content %}
+<section class="page-hero v46-hero">
+  <p class="eyebrow">v4.7.0-real · Market Family Comparison</p>
+  <h1>{{ family.family_title }}</h1>
+  <p class="muted">Family ID: {{ family.family_id }} · detection confidence: {{ family.detection_confidence }}</p>
+  <p class="notice">Favorite does not equal best wager. All output is review-only and does not approve trades, place orders, cancel orders, or arm live trading.</p>
+  <div class="link-row">
+    <a class="button-link" href="/v3/opportunities">Back to Workbench</a>
+    <a class="button-link quiet" href="/api/v3/markets/family/{{ family.family_id }}/summary?demo={{ 'true' if demo_mode else 'false' }}" target="_blank" rel="noreferrer">Open family JSON</a>
+    <a class="button-link quiet" href="/v3/markets/family/{{ family.family_id }}/news-odds">Family News Odds</a>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Favorite vs edge explanation</h2>
+  <p>{{ family.favorite_vs_edge }}</p>
+  <p class="muted">France can be the market favorite while still having only a small YES edge. Another team can be less likely to win but still have a larger draft edge if its price is lower than model fair probability.</p>
+</section>
+
+{% if family["items"] %}
+<section class="stats v46-stats">
+  <div><strong>{{ family.family_size }}</strong><span>Family markets</span></div>
+  <div><strong>{{ family.favorite_by_market_price.market_title }}</strong><span>Favorite by market price</span></div>
+  <div><strong>{{ family.favorite_by_model_fair.market_title }}</strong><span>Favorite by model fair</span></div>
+  <div><strong>{{ family.best_draft_yes_edge.yes_edge_pp }}</strong><span>Best draft YES edge pp</span></div>
+  <div><strong>{{ family.best_draft_no_edge.no_edge_pp }}</strong><span>Best draft NO edge pp</span></div>
+</section>
+
+<section class="panel">
+  <h2>Family comparison table</h2>
+  <div class="responsive-table family-comparison-table">
+    <table>
+      <thead>
+        <tr><th>Market</th><th>Market price rank</th><th>Model fair rank</th><th>YES Price</th><th>Model Fair</th><th>YES Edge</th><th>NO Edge</th><th>Recommended Side</th><th>News Odds</th><th>Why</th></tr>
+      </thead>
+      <tbody>
+        {% for row in family["items"] %}
+        <tr>
+          <td><a href="{{ row.detail_href }}"><strong>{{ row.market_title }}</strong></a></td>
+          <td>#{{ row.rank_by_market_yes_price }}{% if row.is_market_favorite %} · Group favorite{% endif %}</td>
+          <td>#{{ row.rank_by_model_fair_yes }}{% if row.is_model_favorite %} · Model favorite{% endif %}</td>
+          <td>{% if row.market_yes_price is not none %}{{ '%.1f%%'|format(row.market_yes_price * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.model_fair_yes is not none %}{{ '%.1f%%'|format(row.model_fair_yes * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.yes_edge_pp is not none %}{{ '%+.1f pp'|format(row.yes_edge_pp) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.no_edge_pp is not none %}{{ '%+.1f pp'|format(row.no_edge_pp) }}{% else %}unavailable{% endif %}</td>
+          <td><span class="status-badge tone-{{ row.recommended_side|status_tone }}">{{ row.recommended_side }}</span><br>{{ row.side_badge }}</td>
+          <td><a href="{{ row.news_odds_href }}">Open News Odds</a><br><span class="muted">{{ row.news_confidence }}</span></td>
+          <td>{{ row.why }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% else %}
+<section class="panel">
+  <h2>No family detected</h2>
+  <p>{{ family.warning }}</p>
+  {% if family.known_family_ids %}<p class="muted">Known family IDs: {{ ', '.join(family.known_family_ids) }}</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Warnings</h2>
+  <ul class="compact">{% for warning in family.warnings or [] %}<li>{{ warning }}</li>{% endfor %}</ul>
+  <p class="muted">{{ family.review_only_note }}</p>
+</section>
+{% endblock %}

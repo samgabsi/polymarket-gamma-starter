@@ -1,0 +1,65 @@
+# V4 Market Family Ranking Guide - v4.6.0-real
+
+Market Family Comparison pages compare mutually exclusive markets by market price rank, model fair rank, edge rank, and recommendation state while explaining that favorite is not edge.
+
+
+## v4.6 Scope
+
+v4.6.0-real adds the Opportunity Review Workbench, Market Detail / Opportunity Review pages, Market Family Comparison pages, AI Edge Packet Lifecycle summaries, operator notes/review records, safe watchlist and paper-review queue states, visual QA hardening, route smoke hardening, and no-live-mutation validation.
+
+## Review-Only Boundary
+
+All opportunity review records, operator notes, watchlist states, paper-review queue states, market-edge recommendations, AI Edge packets, calibration summaries, and evidence reviews are research/review-only. They do not approve trades, place orders, cancel orders, arm live trading, disable read-only mode, disable the kill switch, or bypass backend gates.
+
+## Key Routes
+
+- `/v3/opportunities` and `/opportunities` — Opportunity Review Workbench.
+- `/v3/markets/{market_id_or_slug}` and `/market/{market_id_or_slug}` — Market Detail / Opportunity Review.
+- `/v3/markets/family/{family_id}` — Market Family Comparison.
+- `/v3/ai/edge/packets` — AI Edge packet list and lifecycle context.
+- `/api/v3/opportunities/reviews` — review record list.
+- `/api/v3/opportunities/review/{market_id_or_slug}/notes` — operator notes update API.
+- `/api/v3/opportunities/review/{market_id_or_slug}/status` — review status update API.
+
+## Favorite vs Edge
+
+Favorite means most likely outcome in a detected market family. Edge means possible model-fair versus market-implied price mismatch. A favorite can have no edge, and an underdog can have draft edge. This distinction is displayed in the workbench, detail pages, and family comparison pages.
+
+## Safety Confirmations
+
+- No real order placement.
+- No real order cancellation.
+- No AI trade approval.
+- No automatic live trading arming.
+- No hidden autonomous trading.
+- No release ZIP runtime ledgers, credentials, AI responses, operator notes, review records, watchlists, paper-review queues, screenshots with secrets, local logs, `.env`, venvs, or node modules.
+
+## Preserved Prior Guidance
+
+# Market Family Ranking Guide - v4.6.0-real
+
+Market-family ranking is a conservative UI/research aid for mutually exclusive market groups.
+
+## Detection Rules
+
+The detector in `app/market_edge.py` uses title and slug patterns only when confidence is high enough. Examples include:
+
+- `Will France win the 2026 FIFA World Cup?`
+- `Will Brazil win the 2026 FIFA World Cup?`
+- `Will Germany win the 2026 FIFA World Cup?`
+
+These rows can be grouped as `2026 FIFA World Cup winner`. Similar conservative patterns are available for tournament winners, election winners, award winners, and championship winners. Unrelated markets are not forced into a family and the UI shows `No family detected` when grouping is unavailable.
+
+## Ranking
+
+Family rows can be ranked by market YES price and, when model fair probability is available, by model fair YES probability. The UI can show Group favorite, Rank #1 by market YES price, Rank #2 by model fair probability, or Not favorite but possible edge.
+
+
+## Favorite vs Edge
+
+Favorite means the highest-probability outcome in a detected group, such as a World Cup winner family. Edge means a possible model/price mismatch versus the current market YES or NO price. A favorite can have no edge if the price is already too high. A long shot can have edge if the price is too low. Group rank never means a trade is approved.
+
+
+## Safety and Scope
+
+All edge, AI Edge, evidence, calibration, family-ranking, and recommendation output is draft research only. It is not financial advice, not a trade approval, and not an executable order. The release does not place orders, cancel orders, arm live trading, disable read-only mode, disable the kill switch, or let AI bypass backend gates. Live controls, paper controls, approval checkboxes, typed confirmation phrases, warning acknowledgements, audit logging, emergency controls, and kill-switch controls remain authoritative.

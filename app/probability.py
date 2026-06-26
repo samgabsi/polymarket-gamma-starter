@@ -135,9 +135,9 @@ def attach_probability(markets: list[dict[str, Any]]) -> list[dict[str, Any]]:
 def _label(estimate: dict[str, Any]) -> str:
     edge = estimate.get("edge")
     if edge is None:
-        return "No usable price"
+        return "INSUFFICIENT DATA · model fair probability or market YES price unavailable"
     if edge >= 0.025:
-        return f"Possible YES edge: +{edge * 100:.1f}%"
+        return f"DRAFT YES EDGE · model fair YES exceeds market YES by {edge * 100:+.1f} pp"
     if edge <= -0.025:
-        return f"Possible NO/avoid signal: {edge * 100:.1f}%"
-    return "No clear model edge"
+        return f"DRAFT NO EDGE · model fair YES is below market YES by {abs(edge) * 100:.1f} pp"
+    return "HOLD · no clear YES/NO edge above threshold"

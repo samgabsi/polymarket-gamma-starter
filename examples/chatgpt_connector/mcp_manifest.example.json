@@ -1,0 +1,23 @@
+{
+  "name": "polymarket-op-console-readonly-blueprint",
+  "version": "4.2.0-real",
+  "description": "Blueprint-only ChatGPT/MCP connector manifest for read-only Polymarket OP Console review tools.",
+  "enabled_by_default": false,
+  "auth_required": true,
+  "read_only": true,
+  "no_live_mutation": true,
+  "no_secret_access": true,
+  "allowed_tools_file": "tools.example.json",
+  "forbidden_capabilities": [
+    "place_order",
+    "cancel_order",
+    "approve_trade",
+    "sign_transaction",
+    "arm_live_trading",
+    "disable_kill_switch",
+    "disable_read_only",
+    "mutate_live_config",
+    "export_secrets"
+  ]
+}
+

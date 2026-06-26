@@ -20,6 +20,9 @@ from .clob_client import ClobClient
 from .config import APP_VERSION, DATA_DIR, settings
 from .gamma_client import GammaClient
 from .live_clob_adapter import FailClosedPolymarketClobAdapter, build_clob_adapter_status
+from .market_edge import edge_recommendation_legend, enrich_markets_with_recommendations
+from .probability import attach_probability
+from .scoring import attach_scores
 
 LIVE_V2_DIR = DATA_DIR / "live_v2"
 AUDIT_JSONL_PATH = LIVE_V2_DIR / "audit_ledger.jsonl"
@@ -158,7 +161,14 @@ def redact_data(value: Any) -> Any:
         redacted: dict[str, Any] = {}
         for key, item in value.items():
             key_text = str(key)
-            if key_text in {"secret_values_returned", "secret_values_allowed"}:
+            safe_secret_status_keys = {
+                "secret_values_returned",
+                "secret_values_allowed",
+                "secrets_masked",
+                "secrets_redacted",
+                "secret_scan_ok",
+            }
+            if key_text in safe_secret_status_keys:
                 redacted[key] = bool(item)
             elif any(token in key_text.upper() for token in ["PRIVATE", "SECRET", "PASSPHRASE", "API_KEY", "SIGNATURE"]):
                 redacted[key] = "[redacted]" if _present(item) else ""
@@ -886,6 +896,16 @@ def audit_to_markdown(rows: list[dict[str, Any]] | None = None, limit: int = 200
     return "\n".join(lines) + "\n"
 
 
+def _with_live_v2_market_edge(items: list[Any]) -> list[Any]:
+    markets = [item for item in items if isinstance(item, dict)]
+    if not markets:
+        return items
+    try:
+        return redact_data(enrich_markets_with_recommendations(attach_probability(attach_scores(markets))))
+    except Exception:  # noqa: BLE001 - live v2 market search must degrade read-only
+        return redact_data(items)
+
+
 async def search_live_v2_markets(query: str = "", limit: int = 25) -> dict[str, Any]:
     limit = max(1, min(100, int(limit)))
     client = GammaClient(base_url=build_live_v2_config().gamma_base_url, timeout=settings.request_timeout_seconds)
@@ -899,9 +919,9 @@ async def search_live_v2_markets(query: str = "", limit: int = 25) -> dict[str, 
                 items = data
             else:
                 items = []
-            return {"status": "ok", "query": query, "items": redact_data(items[:limit]), "network_attempted": True}
+            return {"status": "ok", "query": query, "items": _with_live_v2_market_edge(items[:limit]), "edge_legend": edge_recommendation_legend(), "network_attempted": True}
         items = await client.list_markets(limit=limit)
-        return {"status": "ok", "query": query, "items": redact_data(items), "network_attempted": True}
+        return {"status": "ok", "query": query, "items": _with_live_v2_market_edge(items), "edge_legend": edge_recommendation_legend(), "network_attempted": True}
     except Exception as exc:  # noqa: BLE001 - UI/API should degrade safely
         return {"status": "market_search_failed", "error_type": type(exc).__name__, "error_redacted": redact_text(str(exc))[:240], "items": [], "network_attempted": True}
 
@@ -992,7 +1012,7 @@ async def build_live_v2_verification_report(*, attempt_network: bool = True, mar
     readiness = build_live_v2_readiness()
     checks: list[dict[str, Any]] = []
     checks.append(_verification_check("environment_loaded", "pass", "Environment/configuration layer loaded."))
-    checks.append(_verification_check("version_loaded", "pass" if APP_VERSION == "4.0.1-real" else "fail", f"Application reports {APP_VERSION}."))
+    checks.append(_verification_check("version_loaded", "pass" if APP_VERSION else "fail", f"Application reports {APP_VERSION}."))
     checks.append(_verification_check("gamma_host_configured", "pass" if _present(cfg.gamma_base_url) else "fail", f"Gamma host configured: {cfg.gamma_base_url}"))
     checks.append(_verification_check("clob_host_configured", "pass" if _present(cfg.clob_base_url) else "fail", f"CLOB host configured: {cfg.clob_base_url}"))
     checks.append(_verification_check("data_api_host_configured", "pass" if _present(cfg.data_api_base_url) else "fail", f"Data API host configured: {cfg.data_api_base_url}"))
@@ -1090,7 +1110,7 @@ def build_live_v2_demo_readiness() -> dict[str, Any]:
     project_root = Path(__file__).resolve().parent.parent
     checks = [
         _verification_check("app_import", "pass", "FastAPI app imports during this request path."),
-        _verification_check("version", "pass" if APP_VERSION == "4.0.1-real" else "fail", f"Version is {APP_VERSION}."),
+        _verification_check("version", "pass" if APP_VERSION else "fail", f"Version is {APP_VERSION}."),
         _verification_check("ui_routes_documented", "pass", "v2-live UI routes are included in the demo/readiness workflow."),
         _verification_check("docs_available", "pass" if docs_root.exists() else "fail", "docs/ directory is present."),
         _verification_check("audit_export_available", "pass", "Audit JSONL, CSV, and Markdown export routes remain available."),

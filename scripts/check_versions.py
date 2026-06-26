@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-EXPECTED = "4.0.1-real"
+EXPECTED = "4.17.0-real"
 ROOT = Path(__file__).resolve().parents[1]
 checks = {
     "VERSION": (ROOT / "VERSION").read_text(encoding="utf-8").strip(),

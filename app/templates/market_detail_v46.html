@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}Market Detail / Opportunity Review · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/opportunities">Opportunity Review Workbench</a> / <span>Market Detail</span>{% endblock %}
+{% block content %}
+<section class="page-hero v46-hero">
+  <p class="eyebrow">v4.7.0-real · Market Detail / Opportunity Review</p>
+  <h1>{{ detail.market_title }}</h1>
+  <p class="muted">Market ID / slug: {{ detail.market_id }}</p>
+  <p class="notice">This page is review-only, not financial advice, not trade approval. It does not place orders, cancel orders, approve trades, or arm live trading.</p>
+  <div class="link-row">
+    <a class="button-link" href="/v3/opportunities">Back to Workbench</a>
+    <a class="button-link quiet" href="/api/v3/markets/{{ detail.market_id }}/summary" target="_blank" rel="noreferrer">Open summary JSON</a>
+    {% if edge.family_id %}<a class="button-link quiet" href="/v3/markets/family/{{ edge.family_id }}">Compare Family</a>{% endif %}
+    <a class="button-link quiet" href="{{ detail.news_odds_summary_href }}">News Odds Panel</a>
+  </div>
+</section>
+
+<section class="stats v46-stats">
+  <div><strong>{% if edge.market_yes_price is not none %}{{ '%.1f%%'|format(edge.market_yes_price * 100) }}{% else %}unavailable{% endif %}</strong><span>YES Price</span></div>
+  <div><strong>{% if edge.market_no_price is not none %}{{ '%.1f%%'|format(edge.market_no_price * 100) }}{% else %}unavailable{% endif %}</strong><span>NO Price</span></div>
+  <div><strong>{% if edge.model_fair_yes is not none %}{{ '%.1f%%'|format(edge.model_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>Model Fair YES</span></div>
+  <div><strong>{% if edge.model_fair_no is not none %}{{ '%.1f%%'|format(edge.model_fair_no * 100) }}{% else %}unavailable{% endif %}</strong><span>Model Fair NO</span></div>
+  <div><strong>{{ edge.recommended_side or 'INSUFFICIENT DATA' }}</strong><span>Recommended Side</span></div>
+  <div><strong>{{ review_record.review_status }}</strong><span>Review Status</span></div>
+  <div><strong>{{ detail.data_state }}</strong><span>Data state</span></div>
+</section>
+
+<section class="panel v47-panel">
+  <h2>AI News Odds Adjustment</h2>
+  <p>Draft fair odds adjustment only. News evidence can update the app's internal fair probability for review, but it does not change market prices, approve trades, place orders, cancel orders, or arm live trading.</p>
+  <div class="stats v47-stats">
+    <div><strong>{% if detail.news_odds_adjustment.base_fair_yes is not none %}{{ '%.1f%%'|format(detail.news_odds_adjustment.base_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>Base Fair YES</span></div>
+    <div><strong>{% if detail.news_odds_adjustment.adjusted_fair_yes is not none %}{{ '%.1f%%'|format(detail.news_odds_adjustment.adjusted_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>News-adjusted Fair YES</span></div>
+    <div><strong>{{ detail.news_odds_adjustment.confidence }}</strong><span>News confidence</span></div>
+    <div><strong>{{ detail.news_odds_adjustment.independent_source_count }}</strong><span>Independent sources</span></div>
+  </div>
+  <p>{{ detail.news_odds_adjustment.explanation }}</p>
+  <div class="link-row">
+    <a class="button-link" href="{{ detail.news_odds_summary_href }}">Open News Odds panel</a>
+    <form method="post" action="/v3/ai/news-odds/market/{{ detail.market_id }}/plan" class="inline-form compact-form">
+      <button type="submit" class="button-link quiet">Plan search</button>
+    </form>
+    <form method="post" action="/v3/ai/news-odds/market/{{ detail.market_id }}/adjust" class="inline-form compact-form">
+      <input type="hidden" name="write" value="true">
+      <button type="submit" class="button-link quiet">Save draft adjustment</button>
+    </form>
+  </div>
+</section>
+
+<section class="two-col">
+  <div class="panel detail">
+    <h2>Edge Explanation</h2>
+    <p><span class="status-badge tone-{{ (edge.recommended_side or 'INSUFFICIENT DATA')|status_tone }}">{{ edge.side_badge or 'INSUFFICIENT DATA' }}</span></p>
+    <p>{{ edge.explanation or 'Model fair probability or market-implied price is unavailable.' }}</p>
+    <ul class="clean-list compact">
+      <li><strong>YES Edge:</strong> {% if edge.yes_edge_pp is not none %}{{ '%+.1f pp'|format(edge.yes_edge_pp) }}{% else %}unavailable{% endif %}</li>
+      <li><strong>NO Edge:</strong> {% if edge.no_edge_pp is not none %}{{ '%+.1f pp'|format(edge.no_edge_pp) }}{% else %}unavailable{% endif %}</li>
+      <li><strong>Model Fair Source:</strong> {{ edge.model_fair_source or 'unavailable' }}</li>
+      <li><strong>Confidence:</strong> {{ edge.confidence_label or 'low' }}</li>
+      <li><strong>Thresholds:</strong> YES {{ edge.minimum_yes_edge_pp or 2.0 }} pp · NO {{ edge.minimum_no_edge_pp or 2.0 }} pp</li>
+    </ul>
+    <p class="muted">{{ edge.edge_calculation_note }}</p>
+    {% if edge.data_quality_warnings %}
+    <h3>Data quality warnings</h3>
+    <ul class="compact">{% for warning in edge.data_quality_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>
+    {% endif %}
+  </div>
+
+  <div class="panel detail">
+    <h2>Favorite vs edge</h2>
+    <p>{{ detail.favorite_vs_edge }}</p>
+    <p><strong>Family / Rank:</strong> {{ edge.group_rank_label or 'No family detected' }}</p>
+    <p class="muted">Favorite ranking and wager edge are separate. Favorite means most likely outcome in the detected family; edge means possible price/model mismatch versus current YES/NO prices.</p>
+    <p><strong>Volume:</strong> {{ market.volume_24hr or market.volume or 'unavailable' }} · <strong>Liquidity:</strong> {{ market.liquidity or 'unavailable' }} · <strong>Freshness:</strong> {{ market.data_age_minutes or 'unavailable' }} minutes</p>
+    {% if edge.family_id %}<p><a class="button-link" href="/v3/markets/family/{{ edge.family_id }}">Open Market Family Comparison</a></p>{% endif %}
+  </div>
+</section>
+
+<section class="two-col">
+  <div class="panel">
+    <h2>AI Edge Packet Lifecycle</h2>
+    <ul class="clean-list compact">
+      <li><strong>Packet:</strong> {{ ai_edge_packet_lifecycle.packet_id or 'no packet linked yet' }}</li>
+      <li><strong>Lifecycle state:</strong> {{ ai_edge_packet_lifecycle.lifecycle_state }}</li>
+      <li><strong>Evidence count:</strong> {{ ai_edge_packet_lifecycle.evidence_count }}</li>
+      <li><strong>Operator notes count:</strong> {{ ai_edge_packet_lifecycle.operator_notes_count }}</li>
+      <li><strong>No live mutation:</strong> {{ ai_edge_packet_lifecycle.no_live_mutation_confirmation }}</li>
+    </ul>
+    <div class="link-row"><a class="button-link" href="/v3/ai/edge/market/{{ detail.market_id }}">Analyze with AI Edge</a><a class="button-link quiet" href="/api/v3/ai/edge/market/{{ detail.market_id }}/packet">Open AI Edge Packet</a></div>
+  </div>
+  <div class="panel">
+    <h2>Operator Notes and Review Record</h2>
+    <p><strong>Status:</strong> {{ review_record.review_status }}</p>
+    <p class="notice"><strong>Data state:</strong> {{ detail.data_state }}. {{ detail.data_state_reason }} {{ detail.operator_implication }}</p>
+    <p>{% if review_record.operator_notes %}{{ review_record.operator_notes }}{% else %}<span class="muted">No operator notes have been recorded.</span>{% endif %}</p>
+    <form method="post" action="/v3/opportunities/review/{{ detail.market_id }}/notes" class="inline-form compact-form">
+      <input type="hidden" name="market_title" value="{{ detail.market_title }}">
+      <input type="hidden" name="review_status" value="{{ review_record.review_status }}">
+      <input type="hidden" name="data_state" value="{{ detail.data_state }}">
+      <input type="hidden" name="data_freshness" value="{{ detail.data_freshness }}">
+      <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+      <input type="hidden" name="source_component" value="market_detail.notes_form">
+      <input type="hidden" name="reason" value="Operator saved notes from Market Detail / Opportunity Review.">
+      <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+      <input name="operator_notes" value="{{ review_record.operator_notes }}" placeholder="operator notes">
+      <button type="submit">Save notes</button>
+    </form>
+    <div class="workbench-actions">
+      {% for action in detail.detail_actions %}
+        {% if action.method == 'GET' and action.href %}
+          <a class="button-link quiet" href="{{ action.href }}">{{ action.label }}</a>
+        {% elif action.status %}
+          <form method="post" action="/v3/opportunities/review/{{ detail.market_id }}/status">
+            <input type="hidden" name="review_status" value="{{ action.status }}">
+            <input type="hidden" name="market_title" value="{{ detail.market_title }}">
+            <input type="hidden" name="data_state" value="{{ detail.data_state }}">
+            <input type="hidden" name="data_freshness" value="{{ detail.data_freshness }}">
+            <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+            <input type="hidden" name="source_component" value="market_detail.status_form">
+            <input type="hidden" name="previous_state" value="{{ review_record.review_status }}">
+            <input type="hidden" name="reason" value="Operator set {{ action.status }} from Market Detail / Opportunity Review.">
+            <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+            <button type="submit" class="button-link quiet">{{ action.label }}</button>
+          </form>
+        {% elif action.label == 'Plan News Odds Search' %}
+          <form method="post" action="/v3/ai/news-odds/market/{{ detail.market_id }}/plan">
+            <button type="submit" class="button-link quiet">{{ action.label }}</button>
+          </form>
+        {% elif action.label != 'Add/Edit Operator Notes' %}
+          <span class="pill">{{ action.label }} requires POST API</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Audit / review history</h2>
+  {% if review_record.audit_history %}
+  <ul class="clean-list compact">{% for item in review_record.audit_history %}<li>{{ item.at }} · {{ item.action }} · {{ item.previous_state or 'UNREVIEWED' }} -> {{ item.new_state or item.review_status }} · {{ item.data_state or detail.data_state }} · {{ item.source_component or 'opportunity_review' }}</li>{% endfor %}</ul>
+  {% else %}
+  <p class="muted">No audit history yet. Review actions write local runtime records that are excluded from release ZIPs.</p>
+  {% endif %}
+  <p class="muted">{{ detail.review_only_note }}</p>
+</section>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}AI News Odds Adjustment Engine · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/ai">AI & Research</a> / <span>AI News Odds</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.17.0-real · AI News Odds Adjustment Engine</p>
+  <h1>AI News Odds Adjustment Engine</h1>
+  <p class="muted">Market → search plan → source weighting → corroboration → bounded fair-probability adjustment → AI Edge packet → operator review.</p>
+  <p class="notice">Draft fair odds adjustment only; review-only. This does not change Polymarket prices, place orders, cancel orders, approve trades, arm live trading, or bypass safety gates.</p>
+  <div class="link-row">
+    <a class="button-link" href="/v3/ai/news-odds/run">Run / plan research</a>
+    <a class="button-link quiet" href="/v3/ai/news-odds/adjustments">Adjustments</a>
+    <a class="button-link quiet" href="/v3/ai/news-odds/source-weights">Source weights</a>
+    <a class="button-link quiet" href="/api/v3/ai/news-odds/config" target="_blank" rel="noreferrer">Config JSON</a>
+  </div>
+</section>
+
+<section class="stats v47-stats">
+  <div><strong>{{ summary.adjustment_count }}</strong><span>Draft adjustments</span></div>
+  <div><strong>{{ 'enabled' if settings.ai_news_odds_enabled else 'disabled' }}</strong><span>Engine</span></div>
+  <div><strong>{{ 'enabled' if settings.ai_news_odds_web_search_enabled else 'disabled' }}</strong><span>Web search</span></div>
+  <div><strong>{{ 'available' if settings.ai_news_odds_manual_evidence_enabled else 'disabled' }}</strong><span>Manual evidence</span></div>
+  <div><strong>{{ settings.ai_odds_adjustment_mode }}</strong><span>Adjustment mode</span></div>
+  <div><strong>{{ settings.max_adjustment_pp }} pp</strong><span>Active final cap</span></div>
+</section>
+
+<section class="two-col">
+  <div class="panel v47-panel">
+    <h2>What “adjust odds” means here</h2>
+    <p>The app adjusts its internal draft model fair probability and fair odds for research/review. It does not alter external market odds or submit any order.</p>
+    <ul class="compact">
+      <li>Source weighting does not prove truth.</li>
+      <li>Corroboration does not prove certainty.</li>
+      <li>AI summaries can be wrong and must be reviewed.</li>
+      <li>Accepted adjustments update review context only, not live trading state.</li>
+      <li>Raw AI movement, evidence-weighted movement, and final risk-controlled movement are tracked separately.</li>
+    </ul>
+  </div>
+  <div class="panel v47-panel">
+    <h2>Cap posture</h2>
+    <ul class="clean-list compact">
+      <li><strong>Default cap:</strong> {{ settings.ai_default_max_adjustment_pct }} pp</li>
+      <li><strong>Balanced cap:</strong> {{ settings.ai_balanced_max_adjustment_pct }} pp</li>
+      <li><strong>Aggressive cap:</strong> {{ settings.ai_aggressive_max_adjustment_pct }} pp</li>
+      <li><strong>Hard cap:</strong> {{ settings.ai_absolute_hard_cap_pct }} pp</li>
+      <li><strong>Confirm above:</strong> {{ settings.ai_require_operator_confirm_above_pct }} pp</li>
+    </ul>
+  </div>
+</section>
+
+<section class="two-col">
+  <div class="panel v47-panel">
+    <h2>Provider posture</h2>
+    <ul class="clean-list compact">
+      <li><strong>OpenAI web search:</strong> {{ 'enabled' if settings.openai_web_search_enabled else 'disabled by default' }}</li>
+      <li><strong>OpenAI API key included:</strong> no; value returned: {{ settings.openai_api_key_value_returned }}</li>
+      <li><strong>Local LLM browsing:</strong> false; local LLM only reviews app-provided evidence.</li>
+      <li><strong>Manual evidence:</strong> {{ 'available' if settings.ai_news_odds_manual_evidence_enabled else 'disabled' }}</li>
+    </ul>
+    <p class="muted">{{ summary.web_search_unavailable_message }}</p>
+  </div>
+  <div class="panel v47-panel">
+    <h2>Review thresholds</h2>
+    <ul class="compact">
+      <li>Above {{ settings.ai_require_extra_evidence_above_pct }} pp, the app requires stronger independent evidence.</li>
+      <li>Above {{ settings.ai_require_operator_confirm_above_pct }} pp, packets require operator confirmation.</li>
+      <li>The legacy 2.5 pp guard is no longer an absolute ceiling, but it is still shown as a warning threshold.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Recent adjustments</h2>
+  {% if adjustments["items"] %}
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Market</th><th>Base fair</th><th>Adjusted fair</th><th>Raw / weighted / final</th><th>Direction</th><th>Confidence</th><th>Sources</th><th>Actions</th></tr></thead>
+      <tbody>
+      {% for row in adjustments["items"] %}
+        <tr>
+          <td>{{ row.market_title }}<br><span class="muted">{{ row.adjustment_id }}</span></td>
+          <td>{% if row.base_fair_yes is not none %}{{ '%.1f%%'|format(row.base_fair_yes * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.adjusted_fair_yes is not none %}{{ '%.1f%%'|format(row.adjusted_fair_yes * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{{ '%+.1f pp'|format(row.raw_ai_adjustment_pct or 0) }} / {{ '%+.1f pp'|format(row.evidence_weighted_adjustment_pct or 0) }} / {{ '%+.1f pp'|format(row.final_adjustment_pct or row.adjustment_pp or 0) }}{% if row.old_2_5_cap_exceeded %}<br><span class="status-badge tone-warning">exceeds old 2.5 pp</span>{% endif %}</td>
+          <td>{{ row.direction }}</td>
+          <td>{{ row.confidence }} / {{ row.uncertainty }}</td>
+          <td>{{ row.independent_source_count }} independent · {{ row.duplicate_source_count }} duplicate</td>
+          <td><a href="/v3/ai/news-odds/adjustment/{{ row.adjustment_id }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No runtime adjustment records yet. Start from a market detail page or add manual evidence.</p>
+  {% endif %}
+</section>
+{% endblock %}

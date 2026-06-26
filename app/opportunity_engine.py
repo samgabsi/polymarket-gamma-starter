@@ -71,6 +71,7 @@ def rank_opportunities(
         market_id = _market_id(market)
         pm = market.get("probability_model") or {}
         ep = market.get("evidence_probability") or {}
+        edge_recommendation = market.get("market_edge_recommendation") or {}
         evidence = score_market_evidence(market_id)
         evidence_score = _num(evidence.get("score"))
 
@@ -160,6 +161,13 @@ def rank_opportunities(
                 "rank_score": round(composite, 1),
                 "workflow_stage": _workflow_stage(evidence_score, edge_percent, risk_ok, watched),
                 "recommended_action": action,
+                "recommended_side": edge_recommendation.get("recommended_side", "INSUFFICIENT DATA"),
+                "side_badge": edge_recommendation.get("side_badge", "INSUFFICIENT DATA"),
+                "market_edge_recommendation": edge_recommendation,
+                "family_rank_label": edge_recommendation.get("group_rank_label", "No family detected"),
+                "model_fair_source": edge_recommendation.get("model_fair_source", "unavailable"),
+                "yes_edge_pp": edge_recommendation.get("yes_edge_pp"),
+                "no_edge_pp": edge_recommendation.get("no_edge_pp"),
                 "watched": watched,
                 "reason_codes": reasons,
                 "url": market.get("polymarket_url") or market.get("polymarket_search_url") or market.get("url"),

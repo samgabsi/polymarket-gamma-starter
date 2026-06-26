@@ -45,7 +45,7 @@ def test_live_v2_ui_routes_render_without_network(monkeypatch, tmp_path, authed_
         response = authed_client.get(route)
         assert response.status_code == 200, route
         assert "Live v2 Console" in response.text
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
 
 
 def test_live_v2_settings_schema_and_validation_do_not_return_secrets(authed_client):

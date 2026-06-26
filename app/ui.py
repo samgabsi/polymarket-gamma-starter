@@ -4,156 +4,48 @@ from datetime import datetime, timezone
 from typing import Any
 
 from .config import APP_VERSION, APP_VERSION_SHORT, settings
+from .navigation_registry import get_global_nav_items, get_navigation_sections, get_primary_entry_points, get_safety_explainer, get_system_map
 
 
 NAV_SECTIONS: list[dict[str, Any]] = [
     {
-        "label": "Overview",
+        "label": "Unified Surface",
         "items": [
-            {"label": "Dashboard", "href": "/", "match": ["/"]},
-            {"label": "Workflow map", "href": "/workflow", "match": ["/workflow"]},
-            {"label": "Operator brief", "href": "/operator", "match": ["/operator"]},
+            {"label": "Command Center", "href": "/v3", "match": ["/v3", "/v3/command-center", "/operator-os", "/command-center"]},
+            {"label": "Opportunities", "href": "/v3/opportunities", "match": ["/v3/opportunities", "/opportunities", "/v3/markets", "/v3/ai/news-odds", "/v3/arbitrage"]},
+            {"label": "Automation / Paper", "href": "/v3/automation", "match": ["/v3/automation", "/automation", "/v3/paper-trading"]},
+            {"label": "Review & Audit", "href": "/v3/review-audit", "match": ["/v3/review-audit", "/review-audit", "/review-queue", "/audit", "/v2-live/audit"]},
+            {"label": "Settings & System", "href": "/v3/settings-system", "match": ["/v3/settings-system", "/settings-system", "/v3/settings", "/v3/feature-readiness", "/settings", "/settings/configuration", "/v3/platform"]},
         ],
     },
     {
-        "label": "Research",
+        "label": "Source Details",
         "items": [
-            {"label": "Opportunities", "href": "/opportunities", "match": ["/opportunities"]},
-            {"label": "Readiness", "href": "/readiness", "match": ["/readiness"]},
-            {"label": "Playbooks", "href": "/playbooks", "match": ["/playbooks"]},
-            {"label": "Sources", "href": "/research/sources", "match": ["/research/sources"]},
-            {"label": "Evidence", "href": "/research/evidence", "match": ["/research/evidence", "/evidence-workbench"]},
+            {"label": "AI News Odds", "href": "/v3/ai/news-odds", "match": ["/v3/ai/news-odds", "/news-odds"]},
+            {"label": "Cross-Market Arbitrage", "href": "/v3/arbitrage", "match": ["/v3/arbitrage", "/arbitrage"]},
+            {"label": "Paper Trading Detail", "href": "/v3/paper-trading", "match": ["/v3/paper-trading"]},
+            {"label": "Review Queue Detail", "href": "/review-queue", "match": ["/review-queue"]},
+            {"label": "Feature Readiness Detail", "href": "/v3/feature-readiness", "match": ["/v3/feature-readiness"]},
         ],
     },
     {
-        "label": "Market Data",
+        "label": "Advanced / Legacy",
         "items": [
-            {"label": "Snapshots", "href": "/market-data", "match": ["/market-data", "/market-data/snapshots"]},
-            {"label": "Execution quality", "href": "/execution-quality", "match": ["/execution-quality"]},
-        ],
-    },
-    {
-        "label": "Paper Workflow",
-        "items": [
-            {"label": "Tickets", "href": "/trade-tickets", "match": ["/trade-tickets"]},
-            {"label": "Approvals", "href": "/approvals", "match": ["/approvals"]},
-            {"label": "Preflight", "href": "/preflight", "match": ["/preflight"]},
-            {"label": "Execution queue", "href": "/execution-queue", "match": ["/execution-queue"]},
-            {"label": "Positions", "href": "/positions", "match": ["/positions"]},
-            {"label": "Exit tickets", "href": "/exit-tickets", "match": ["/exit-tickets"]},
-            {"label": "Settlements", "href": "/settlements", "match": ["/settlements"]},
-        ],
-    },
-    {
-        "label": "Risk / Ops",
-        "items": [
-            {"label": "Risk budget", "href": "/risk-budget", "match": ["/risk-budget"]},
-            {"label": "Runbook", "href": "/runbook", "match": ["/runbook"]},
-            {"label": "Briefing", "href": "/paper-ops-briefing", "match": ["/paper-ops-briefing"]},
-            {"label": "Aging", "href": "/paper-ops-aging", "match": ["/paper-ops-aging"]},
-            {"label": "Handoffs", "href": "/paper-handoffs", "match": ["/paper-handoffs", "/paper-handoff-reconciliation"]},
-            {"label": "Escalations", "href": "/paper-ops-escalations", "match": ["/paper-ops-escalations", "/paper-ops-escalation-review"]},
-            {"label": "Closeout", "href": "/paper-ops-closeout", "match": ["/paper-ops-closeout"]},
-        ],
-    },
-    {
-        "label": "Live Ops",
-        "items": [
-            {"label": "Live config", "href": "/live-config", "match": ["/live-config"]},
-            {"label": "Intents", "href": "/live-order-intents", "match": ["/live-order-intents"]},
-            {"label": "Live preflight", "href": "/live-order-intent-preflight", "match": ["/live-order-intent-preflight"]},
-            {"label": "Authorizations", "href": "/live-order-authorizations", "match": ["/live-order-authorizations"]},
-            {"label": "Packets", "href": "/live-execution-packets", "match": ["/live-execution-packets"]},
-            {"label": "Dry-run", "href": "/live-dry-run-adapter", "match": ["/live-dry-run-adapter", "/live-dry-run-review"]},
-            {"label": "Adapter", "href": "/live-adapter", "match": ["/live-adapter", "/live-adapter-requests"]},
-            {"label": "CLOB boundary", "href": "/live-clob-adapter", "match": ["/live-clob-adapter"]},
-        ],
-    },
-    {
-        "label": "Live v2 Console",
-        "items": [
-            {"label": "Dashboard", "href": "/v2-live", "match": ["/v2-live"]},
-            {"label": "Markets", "href": "/v2-live/markets", "match": ["/v2-live/markets", "/v2-live/market-data"]},
-            {"label": "Trade Ticket", "href": "/v2-live/trade-ticket", "match": ["/v2-live/trade-ticket"]},
-            {"label": "Orders", "href": "/v2-live/orders", "match": ["/v2-live/orders"]},
-            {"label": "Positions", "href": "/v2-live/positions", "match": ["/v2-live/positions"]},
-            {"label": "Risk", "href": "/v2-live/risk", "match": ["/v2-live/risk", "/v2-live/readiness"]},
-            {"label": "Audit", "href": "/v2-live/audit", "match": ["/v2-live/audit"]},
-            {"label": "Settings", "href": "/v2-live/settings", "match": ["/v2-live/settings"]},
-            {"label": "Emergency", "href": "/v2-live/emergency", "match": ["/v2-live/emergency"]},
-            {"label": "Docs", "href": "/v2-live/docs", "match": ["/v2-live/docs"]},
-        ],
-    },
-    {
-        "label": "Manual Control",
-        "items": [
-            {"label": "Manual review", "href": "/manual-execution-boundary", "match": ["/manual-execution-boundary"]},
-            {"label": "Manual submit", "href": "/live-manual-execution", "match": ["/live-manual-execution"]},
-            {"label": "Attempts", "href": "/live-execution-attempts", "match": ["/live-execution-attempts"]},
-            {"label": "Manual cancel", "href": "/live-manual-cancel", "match": ["/live-manual-cancel"]},
-            {"label": "Live trading", "href": "/live-trading", "match": ["/live-trading"]},
-            {"label": "Live orders", "href": "/live-orders", "match": ["/live-orders"]},
-            {"label": "Reconciliation", "href": "/live-reconciliation", "match": ["/live-reconciliation"]},
-            {"label": "Operator runbook", "href": "/operator-runbook", "match": ["/operator-runbook"]},
-        ],
-    },
-    {
-        "label": "Data System",
-        "items": [
-            {"label": "Data overview", "href": "/data", "match": ["/data"]},
-            {"label": "Sources", "href": "/data/sources", "match": ["/data/sources"]},
-            {"label": "Ingestion", "href": "/data/ingestion", "match": ["/data/ingestion"]},
-            {"label": "Internet sources", "href": "/data/internet-sources", "match": ["/data/internet-sources"]},
-            {"label": "Internet workflow", "href": "/data/internet-workflow", "match": ["/data/internet-workflow"]},
-            {"label": "Raw snapshots", "href": "/data/snapshots", "match": ["/data/snapshots"]},
-            {"label": "Normalized", "href": "/data/normalized", "match": ["/data/normalized"]},
-            {"label": "Labels", "href": "/data/labels", "match": ["/data/labels"]},
-        ],
-    },
-    {
-        "label": "Training Lab",
-        "items": [
-            {"label": "Training overview", "href": "/training", "match": ["/training"]},
-            {"label": "Datasets", "href": "/training/datasets", "match": ["/training/datasets"]},
-            {"label": "Dataset builder", "href": "/training/dataset-builder", "match": ["/training/dataset-builder"]},
-            {"label": "Features", "href": "/training/features", "match": ["/training/features"]},
-            {"label": "Training runs", "href": "/training/runs", "match": ["/training/runs"]},
-            {"label": "Host jobs", "href": "/training/host-jobs", "match": ["/training/host-jobs"]},
-            {"label": "Models", "href": "/training/models", "match": ["/training/models"]},
-            {"label": "Backtests", "href": "/training/backtests", "match": ["/training/backtests"]},
-            {"label": "Generated signals", "href": "/training/signals", "match": ["/training/signals"]},
-        ],
-    },
-    {
-        "label": "Research & Strategy",
-        "items": [
-            {"label": "Strategy signals", "href": "/strategy-signals", "match": ["/strategy-signals"]},
-            {"label": "Autonomous status", "href": "/autonomous-trading", "match": ["/autonomous-trading"]},
-            {"label": "Autonomous runs", "href": "/autonomous-runs", "match": ["/autonomous-runs"]},
-        ],
-    },
-    {
-        "label": "Audit / Reports",
-        "items": [
-            {"label": "Audit ledger", "href": "/audit", "match": ["/audit"]},
-            {"label": "Review report", "href": "/review-report", "match": ["/review-report"]},
-            {"label": "Playbook performance", "href": "/playbook-performance", "match": ["/playbook-performance"]},
-            {"label": "UI system", "href": "/ui-system", "match": ["/ui-system"]},
-        ],
-    },
-    {
-        "label": "Settings",
-        "items": [
-            {"label": "Settings hub", "href": "/settings", "match": ["/settings"]},
-            {"label": "Configuration console", "href": "/settings/configuration", "match": ["/settings/configuration", "/setup/environment"]},
-            {"label": "Setup wizard", "href": "/setup/wizard", "match": ["/setup/wizard"]},
-            {"label": "Runtime status", "href": "/setup/status", "match": ["/setup/status"]},
-            {"label": "Deployment", "href": "/administration/config", "match": ["/administration/config"]},
-            {"label": "Maintenance", "href": "/administration/maintenance", "match": ["/administration/maintenance"]},
-            {"label": "Users", "href": "/users", "match": ["/users"]},
+            {"label": "Cockpit", "href": "/v3/cockpit", "match": ["/v3/cockpit", "/cockpit"]},
+            {"label": "Guided Workspace", "href": "/v3/workspace", "match": ["/v3/workspace", "/workspace"]},
+            {"label": "Tasks & Daily Ops", "href": "/v3/tasks", "match": ["/v3/tasks", "/tasks"]},
+            {"label": "Datasets", "href": "/v3/datasets", "match": ["/v3/datasets"]},
+            {"label": "Freshness", "href": "/v3/freshness", "match": ["/v3/freshness"]},
+            {"label": "Simulation Lab", "href": "/v3/simulation", "match": ["/v3/simulation"]},
+            {"label": "Analytics", "href": "/v3/analytics", "match": ["/v3/analytics"]},
+            {"label": "Live v2 Gated Controls", "href": "/v2-live", "match": ["/v2-live", "/live", "/live-controls"]},
+            {"label": "System Map", "href": "/system-map", "match": ["/system-map", "/routes"]},
         ],
     },
 ]
+
+# v4.17 consolidates the main navigation around five Operator OS workspaces while preserving direct compatibility routes.
+# Keep the Unified Surface heading unique; tests assert the sidebar heading is not duplicated.
 
 
 STATUS_TONES = {
@@ -162,6 +54,19 @@ STATUS_TONES = {
     "ready": "ok",
     "ready_for_review": "info",
     "review": "info",
+    "unreviewed": "neutral",
+    "watching": "info",
+    "ai_review_requested": "info",
+    "ai_reviewed": "ok",
+    "needs_more_evidence": "warning",
+    "paper_review": "info",
+    "rejected": "danger",
+    "archived": "neutral",
+    "draft_yes_edge": "ok",
+    "draft_no_edge": "ok",
+    "hold": "neutral",
+    "no_clear_edge": "neutral",
+    "insufficient_data": "warning",
     "needs_review": "warning",
     "warning": "warning",
     "blocked": "danger",
@@ -220,12 +125,12 @@ def build_global_safety_badges() -> list[dict[str, str]]:
 
 def build_quick_actions() -> list[dict[str, str]]:
     return [
-        {"label": "Dashboard", "href": "/", "tone": "neutral"},
-        {"label": "Live v2 Console", "href": "/v2-live", "tone": "danger"},
-        {"label": "Kill Switch", "href": "/v2-live/emergency", "tone": "warning"},
-        {"label": "Training Lab", "href": "/training", "tone": "info"},
-        {"label": "Data Lab", "href": "/data", "tone": "local"},
-        {"label": "Runbook", "href": "/operator-runbook", "tone": "ok"},
+        {"label": "Command Center", "href": "/v3", "tone": "ok"},
+        {"label": "Opportunities", "href": "/v3/opportunities", "tone": "info"},
+        {"label": "Automation", "href": "/v3/automation", "tone": "info"},
+        {"label": "Review & Audit", "href": "/v3/review-audit", "tone": "neutral"},
+        {"label": "Settings & System", "href": "/v3/settings-system", "tone": "local"},
+        {"label": "System Map", "href": "/system-map", "tone": "neutral"},
     ]
 
 
@@ -234,9 +139,16 @@ def console_globals() -> dict[str, Any]:
         "app_version": APP_VERSION,
         "app_version_short": APP_VERSION_SHORT,
         "nav_sections": NAV_SECTIONS,
-        "app_safety_posture": "Mobile-friendly local-first operator console. v2.3.0 adds browser-polished live-trading UI preferences, interactive tables, manual QA, and smooth operator workflows with live data reads, trade-ticket preview, approval gates, risk checks, CLOB submit/cancel boundaries, positions, reconciliation, emergency controls, and audit exports while preserving fail-closed defaults and operator-only execution gates.",
+        "app_safety_posture": "Operator OS consolidation: five primary workspaces guide the workflow while compatibility routes remain safe entry points that never bypass backend gates.",
         "global_safety_badges": build_global_safety_badges(),
         "quick_actions": build_quick_actions(),
+        "global_nav_items": get_global_nav_items(),
+        "primary_entry_points": get_primary_entry_points(),
+        "system_map": get_system_map(),
+        "navigation_safety_explainer": get_safety_explainer(),
+        "unified_navigation": get_navigation_sections(),
+        "unified_system_map": get_system_map(),
+        "navigation_safety": get_safety_explainer(),
     }
 
 
@@ -255,7 +167,7 @@ def safe_int(value: Any, default: int = 0) -> int:
 
 def status_tone(status: Any) -> str:
     text = str(status or "").lower().replace(" ", "_").replace("-", "_")
-    if "kill" in text or "block" in text or "critical" in text or "reject" in text:
+    if "kill" in text or "block" in text or "critical" in text or "reject" in text or "error" in text:
         return "danger"
     if "warn" in text or "stale" in text or "needs" in text or "action" in text:
         return "warning"

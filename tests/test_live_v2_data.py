@@ -62,7 +62,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_9():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_inventory_health_invalid_json_secret_scan_and_audit(monkeypatch):
@@ -75,12 +75,13 @@ def test_inventory_health_invalid_json_secret_scan_and_audit(monkeypatch):
     health = live_data.run_health_check(deep=True)
     assert health["summary"]["fail"] >= 1
     assert any(check["check_name"] == "json_valid" and check["status"] == "fail" for check in health["checks"])
-    monkeypatch.setenv("POLYMARKET_PRIVATE_KEY", "0x" + "a" * 64)
-    (bad_dir / "secret.txt").write_text("POLYMARKET_PRIVATE_KEY=0x" + "a" * 64, encoding="utf-8")
+    fake_secret = "FAKE_TEST_SECRET_DO_NOT_USE"
+    monkeypatch.setenv("POLYMARKET_FAKE_API_KEY", fake_secret)
+    (bad_dir / "secret.txt").write_text("api_key=" + fake_secret, encoding="utf-8")
     scan = live_data.scan_secrets(paths=[str(bad_dir)])
     dumped = json.dumps(scan)
     assert scan["finding_count"] >= 1
-    assert "0x" + "a" * 64 not in dumped
+    assert fake_secret not in dumped
     rows = live_v2.list_audit_records()
     assert any(row["action"].startswith("data_data_health_check_run") for row in rows)
     assert any(row["action"].startswith("data_secret_scan_run") for row in rows)
@@ -94,7 +95,7 @@ def test_backup_restore_import_export_migration_reports_and_safety():
     path = backup["bundle_path"]
     with zipfile.ZipFile(path) as archive:
         manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
-    assert manifest["app_version"] == "4.0.1-real"
+    assert manifest["app_version"] == "4.17.0-real"
     assert manifest["redaction_policy"] == "default_redacted_excludes_secrets"
     validation = live_data.validate_backup_bundle({"bundle_path": path})
     assert validation["ok"] is True
@@ -125,7 +126,7 @@ def test_data_routes_and_api_endpoints(authed_client):
     page = authed_client.get("/v2-live/data")
     assert page.status_code == 200
     assert "Data Integrity / Backup / Recovery" in page.text
-    assert "v4.0.1-real" in page.text
+    assert "v4.7.0-real" in page.text
     for endpoint in [
         "/api/v2/live/data",
         "/api/v2/live/data/health",

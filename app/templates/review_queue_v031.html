@@ -1,52 +1,156 @@
-
 <!doctype html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Review Queue - Polymarket Intelligence</title>
+  <title>Review Queue - Polymarket OP Console</title>
   <link rel="stylesheet" href="/static/style.css">
   <style>
-    body { max-width: 1200px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
+    body { max-width: 1280px; margin: 24px auto; padding: 0 16px; font-family: system-ui, -apple-system, sans-serif; }
     .muted { color: #666; }
-    .pill { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin-right: 6px; font-size: 12px; }
+    .notice { border: 1px solid #d9e2ec; background: #f8fafc; border-radius: 12px; padding: 12px 14px; margin: 12px 0; }
+    .success { border-color: #b7ebc6; background: #f0fff4; }
+    .warning { border-color: #ffe8a3; background: #fffdf0; }
+    .pill, .status-badge { display: inline-block; border: 1px solid #ccc; border-radius: 999px; padding: 3px 8px; margin: 2px 4px 2px 0; font-size: 12px; }
+    .tone-ok { background: #ecfdf5; border-color: #bbf7d0; }
+    .tone-warning { background: #fffbeb; border-color: #fde68a; }
+    .tone-neutral { background: #f8fafc; border-color: #cbd5e1; }
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0; }
+    .stats div { border: 1px solid #e5e7eb; border-radius: 12px; padding: 10px; background: white; }
+    .stats strong { display: block; font-size: 20px; }
+    .panel { border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; margin: 16px 0; background: white; }
+    .panel-heading-row { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; flex-wrap: wrap; }
+    .inline-form { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+    .inline-form label { display: grid; gap: 4px; font-size: 13px; }
+    .button-link, button { display: inline-block; border: 1px solid #cbd5e1; border-radius: 10px; padding: 7px 10px; background: #fff; color: #0f172a; text-decoration: none; cursor: pointer; font: inherit; }
+    .button-link:hover, button:hover { background: #f8fafc; }
+    .button-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .action-form { display: inline; }
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    th, td { padding: 9px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    .empty-state { border: 1px dashed #cbd5e1; padding: 18px; border-radius: 14px; background: #f8fafc; }
+    textarea { width: 100%; min-width: 240px; min-height: 42px; }
   </style>
 </head>
 <body>
   <section class="standalone-safety-banner" aria-label="Global safety status">
-    <div><strong>Mobile safety posture</strong><span> · UI-only · backend gates still apply</span></div>
+    <div><strong>Review queue safety posture</strong><span> · local decisions only · backend gates still apply</span></div>
     <nav class="standalone-mobile-links" aria-label="Quick navigation">
-      <a href="/">Dashboard</a><a href="/live-trading">Live</a><a href="/data">Data</a><a href="/training">Training</a><a href="/operator-runbook">Runbook</a>
+      <a href="/">Dashboard</a><a href="/v3/opportunities">Opportunity Review</a><a href="/v3/arbitrage">Arbitrage</a><a href="/v3/ai/news-odds">AI Odds</a><a href="/settings/configuration">Settings</a>
     </nav>
-    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REAL NETWORK DISABLED</span><span class="status-badge tone-ok">KILL SWITCH ACTIVE</span><span class="status-badge tone-neutral">SUBMIT DISABLED</span><span class="status-badge tone-neutral">CANCEL DISABLED</span><span class="status-badge tone-local">DATA INGESTION LOCAL ONLY</span></div>
+    <div class="safety-badges"><span class="status-badge tone-neutral">LIVE DISABLED</span><span class="status-badge tone-neutral">REVIEW ONLY</span><span class="status-badge tone-ok">NO ORDER PLACEMENT</span><span class="status-badge tone-neutral">NO CANCELS</span></div>
   </section>
 
+  <section class="notice"><strong>Review & Audit Workspace:</strong> This detailed queue is part of the consolidated Operator OS. <a href="/v3/review-audit">Open Review & Audit</a> · <a href="/v3">Command Center</a> · <a href="/v3/opportunities">Opportunities</a> · <a href="/v3/automation">Automation</a> · <a href="/v3/settings-system">Settings & System</a></section>
+
   <h1>Review Queue</h1>
-  <p class="muted">Actionable workflow: evidence → thesis → risk review → paper candidate.</p>
-  <p><a href="/">Dashboard</a> · <a href="/opportunities">Opportunities</a> · <a href="/api/review-queue">JSON</a></p>
-  <table>
-    <thead>
-      <tr><th>Priority</th><th>Market</th><th>Stage</th><th>Action</th><th>Signals</th><th>Reason</th></tr>
-    </thead>
-    <tbody>
-      {% for item in items %}
-      <tr>
-        <td>{{ "%.2f"|format(item.priority * 100) }}</td>
-        <td><a href="/markets/{{ item.market_id }}">{{ item.title }}</a><br><span class="muted">{{ item.market_id }}</span></td>
-        <td><span class="pill">{{ item.stage }}</span></td>
-        <td>{{ item.action }}</td>
-        <td>
-          Edge: {{ "%.1f"|format(item.edge * 100) }}%<br>
-          Confidence: {{ "%.1f"|format(item.confidence * 100) }}%<br>
-          Evidence: {{ "%.1f"|format(item.evidence_score * 100) }}%<br>
-          Thesis: {{ "%.1f"|format(item.thesis_score * 100) }}%<br>
-          Risk: {{ "%.1f"|format(item.risk_score * 100) }}%
-        </td>
-        <td>{{ item.reason }}</td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <p class="muted">Actionable workflow: evidence → thesis → risk review → paper candidate. Review queue actions persist local audit rows only. Actions here persist local operator decisions only.</p>
+  <p><a href="/">Dashboard</a> · <a href="/v3/opportunities">Opportunity Review</a> · <a href="/api/review-queue?demo={{ 'true' if demo_mode else 'false' }}">JSON</a> · <a href="/api/review-queue/actions">Action audit JSON</a></p>
+
+  {% if feedback.rq_action %}
+    <div class="notice success"><strong>Recorded:</strong> {{ feedback.action }} for {{ feedback.market_id or 'review queue item' }}. New state: {{ feedback.status }}. This is review-only and did not place, cancel, approve, or arm any live order.</div>
+  {% endif %}
+
+  <section class="stats" aria-label="Review queue status">
+    <div><strong>{{ queue.count }}</strong><span>Displayed items</span></div>
+    <div><strong>{{ queue.data_state }}</strong><span>Data state</span></div>
+    <div><strong>{{ queue.resolved_data_mode }}</strong><span>Resolved mode</span></div>
+    <div><strong>{{ queue.source_state }}</strong><span>Source state</span></div>
+    <div><strong>{{ 'yes' if queue.review_only else 'no' }}</strong><span>Review only</span></div>
+    <div><strong>{{ 'disabled' if queue.live_disabled else 'enabled' }}</strong><span>Live execution</span></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading-row">
+      <div>
+        <h2>Queue controls</h2>
+        <p class="muted">Choose explicit demo fixtures for workflow acceptance testing, or configured source mode for local/network-backed rows.</p>
+      </div>
+      <form method="get" class="inline-form">
+        <label>Limit <input type="number" name="limit" min="1" max="100" value="{{ limit }}"></label>
+        <label>Data mode
+          <select name="demo">
+            <option value="false" {% if not demo_mode %}selected{% endif %}>Configured source</option>
+            <option value="true" {% if demo_mode %}selected{% endif %}>Demo fixtures</option>
+          </select>
+        </label>
+        <button type="submit">Refresh queue</button>
+      </form>
+    </div>
+    <p class="notice"><strong>Operator implication:</strong> {{ queue.operator_implication }}</p>
+    <p class="notice"><strong>Data state:</strong> {{ queue.data_state }} — {{ queue.data_state_reason }}</p>
+    {% if queue.empty_state_reason %}<p class="empty-state"><strong>Empty state:</strong> {{ queue.empty_state_reason }}</p>{% endif %}
+  </section>
+
+  <section class="panel">
+    <h2>Queue items</h2>
+    {% if items %}
+    <table>
+      <thead>
+        <tr><th>Priority</th><th>Market</th><th>Stage</th><th>Recommended next step</th><th>Signals</th><th>Reason / state</th><th>Review action</th></tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ "%.2f"|format(item.priority * 100) }}</td>
+          <td><a href="/v3/markets/{{ item.market_id }}">{{ item.title }}</a><br><span class="muted">{{ item.market_id }}</span><br><span class="pill">{{ item.data_state }}</span><span class="pill">{{ item.data_freshness }}</span></td>
+          <td><span class="pill">{{ item.stage }}</span></td>
+          <td>{{ item.action }}</td>
+          <td>
+            Edge: {{ "%.1f"|format(item.edge * 100) }}%<br>
+            Confidence: {{ "%.1f"|format(item.confidence * 100) }}%<br>
+            Evidence: {{ "%.1f"|format(item.evidence_score * 100) }}%<br>
+            Thesis: {{ "%.1f"|format(item.thesis_score * 100) }}%<br>
+            Risk: {{ "%.1f"|format(item.risk_score * 100) }}%
+          </td>
+          <td>
+            {{ item.reason }}<br>
+            <strong>Status:</strong> <span class="status-badge tone-neutral">{{ item.review_status }}</span><br>
+            {% if item.last_action %}<span class="muted">Last action {{ item.last_action }}{% if item.last_audit_event.at %} at {{ item.last_audit_event.at }}{% endif %}</span><br>{% endif %}
+            {% if item.last_action_reason %}<span class="muted">Last reason: {{ item.last_action_reason }}</span>{% endif %}
+          </td>
+          <td>
+            <div class="button-row" aria-label="Review actions for {{ item.title }}">
+              {% for action_def in queue.available_actions %}
+              <form class="action-form" method="post" action="/review-queue/{{ item.market_id }}/action">
+                <input type="hidden" name="action" value="{{ action_def.action }}">
+                <input type="hidden" name="market_title" value="{{ item.title }}">
+                <input type="hidden" name="previous_state" value="{{ item.review_status }}">
+                <input type="hidden" name="queue_stage" value="{{ item.stage }}">
+                <input type="hidden" name="queue_action" value="{{ item.action }}">
+                <input type="hidden" name="source_state" value="{{ item.source_state }}">
+                <input type="hidden" name="reason" value="{{ action_def.reason }}">
+                <input type="hidden" name="data_state" value="{{ item.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ item.data_freshness }}">
+                <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <input type="hidden" name="source_component" value="review_queue.table_action">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit">{{ action_def.label }}</button>
+              </form>
+              {% endfor %}
+            </div>
+            <p class="muted">All actions are local/audit-only. No order is submitted or cancelled.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <div class="empty-state">
+        <strong>No review queue items.</strong>
+        <p>{{ queue.empty_state_reason }}</p>
+        <p><a class="button-link" href="/review-queue?demo=true&limit={{ limit }}">Open demo fixtures to verify the workflow</a> <a class="button-link" href="/v3/opportunities">Review opportunity workbench</a></p>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="panel warning">
+    <h2>Safety boundary</h2>
+    <p><code>order_submitted=false</code> · <code>trade_approved=false</code> · <code>live_trading_armed=false</code></p>
+    <ul>
+      <li>Review Queue decisions are local operator metadata only.</li>
+      <li>They do not approve trades, create live order tickets, submit orders, cancel orders, disable read-only mode, or arm live trading.</li>
+      <li>Demo fixtures are explicitly labeled sample data. Configured-source rows may still be cached or unavailable depending on market data access.</li>
+    </ul>
+  </section>
 </body>
 </html>

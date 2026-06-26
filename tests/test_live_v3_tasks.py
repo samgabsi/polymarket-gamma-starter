@@ -51,7 +51,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_v37_version():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_task_lifecycle_packets_cadence_exports_are_safe():
@@ -127,7 +127,7 @@ def test_task_routes_and_apis_render(authed_client):
     for route in ["/v3/tasks", "/v3/tasks/board", "/v3/tasks/inbox"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Task" in response.text or "task" in response.text
         assert "not trade approval" in response.text or "not orders" in response.text
 

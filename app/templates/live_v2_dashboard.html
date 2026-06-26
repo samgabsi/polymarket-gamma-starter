@@ -27,15 +27,30 @@
 
 <section class="page-header live-v2-hero" data-live-v2-section="{{ section }}">
   <div>
-    <p class="eyebrow">v4.0.1-real · data integrity / backup / recovery layer</p>
+    <p class="eyebrow">v4.7.0-real · AI edge research / data integrity / backup / recovery layer</p>
     <div class="page-title-row"><h1>Live v2 Console</h1><span class="status-badge tone-{{ ui.mode_tone|default('neutral') }}">{{ ui.mode_label|default(cfg.trading_mode) }}</span></div>
-    <p class="page-subtitle">A durable local-first research-to-thesis-to-ticket workstation for data health, backups, restore previews, migrations, governance, portfolio exposure, monitoring alerts, source freshness, ticket rehearsal, audit exports, verification, and emergency controls. Backend gates remain the source of truth for every live action.</p>
+    <p class="page-subtitle">The safety-critical live-control plane remains fail-closed and compatibility-preserved, while Operator OS, AI Copilot, AI Edge Research, Platform Diagnostics, Cockpit, Workspace, and Task Planner are now linked through the unified operator surface. Backend gates remain the source of truth for every live action.</p>
   </div>
   <div class="live-v2-hero-actions">
     <button class="button-link quiet js-status-refresh" type="button">Refresh status</button>
     <a class="button-link quiet" href="/api/v2/live/status">Status JSON</a>
     <a class="button-link quiet" href="/api/v2/live/audit.csv">Export CSV</a>
     <a class="button-link danger" href="/v2-live/emergency">Kill Switch</a>
+  </div>
+</section>
+
+<section class="content-card">
+  <div class="section-header"><div><h2>Unified Surface Bridge</h2><p class="help-text">This v2 live console remains the safety-critical live-control plane. Operator intelligence, AI drafting/review, AI edge research, platform diagnostics, task planning, and cockpit workflows are available in the unified v3 surface. Navigation links do not bypass live trading safety gates.</p></div><span class="status-badge tone-warning">gated live-control plane</span></div>
+  <div class="bridge-strip">
+    <a href="/">Home</a>
+    <a href="/v3">Operator Intelligence OS</a>
+    <a href="/v3/ai">AI Copilot</a>
+    <a href="/v3/ai/edge">AI Edge Research</a>
+    <a href="/v3/platform">Platform Diagnostics</a>
+    <a href="/v3/cockpit">Cockpit</a>
+    <a href="/v3/tasks">Task Planner</a>
+    <a href="/settings">Settings</a>
+    <a href="/system-map">Route Map</a>
   </div>
 </section>
 
@@ -50,6 +65,27 @@
   <span class="status-badge tone-info">{{ ui.clob_label|default('CLOB Unknown') }}</span>
   <span class="status-badge tone-neutral" id="status-last-refresh">Refresh {{ ui.last_refresh|default(status.generated_at) }}</span>
   <span class="status-badge tone-warning" id="status-critical-error">Critical: {{ ui.last_critical_error|default('None') }}</span>
+</section>
+
+<section class="content-card unified-bridge-panel" aria-label="Unified v2 to v3 bridge">
+  <div class="section-header">
+    <div>
+      <h2>Unified Operator Surface Bridge</h2>
+      <p class="help-text">This v2 live console remains the safety-critical live-control plane. Operator intelligence, AI drafting/review, AI edge research, platform diagnostics, task planning, and cockpit workflows are available in the unified v3 surface. Navigation links do not bypass live trading safety gates.</p>
+    </div>
+    <span class="status-badge tone-neutral">NAVIGATION ONLY</span>
+  </div>
+  <div class="operator-next-steps unified-entry-grid">
+    <a href="/"><strong>Home</strong><span>Unified dashboard.</span></a>
+    <a href="/v3"><strong>Operator Intelligence OS</strong><span>Command center, workflows, search, graph, and analytics.</span></a>
+    <a href="/v3/ai"><strong>AI Copilot</strong><span>Draft summaries, model/provider settings, and human-accepted suggestions.</span></a>
+    <a href="/v3/ai/edge"><strong>AI Edge Research</strong><span>Evidence-backed research packets, source citations, probability drafts, and calibration.</span></a>
+    <a href="/v3/platform"><strong>Platform Diagnostics</strong><span>Routes, schemas, migrations, plugins, and storage health.</span></a>
+    <a href="/v3/cockpit"><strong>Operator Cockpit</strong><span>Multi-panel task/source/review context.</span></a>
+    <a href="/v3/tasks"><strong>Task Planner</strong><span>Daily ops, board, cadence, templates, and exports.</span></a>
+    <a href="/settings"><strong>Settings</strong><span>Configuration health and safe setup.</span></a>
+    <a href="/system-map"><strong>Route Map</strong><span>All sections, aliases, and safety classes.</span></a>
+  </div>
 </section>
 
 <section class="content-card live-v2-preferences-panel" aria-label="Saved UI preferences">
@@ -457,9 +493,9 @@
   <h2>Release exports</h2>
   <div class="settings-link-grid docs-grid">
     <a class="settings-link-card" href="/docs/LIVE_READ_ONLY_VERIFICATION_v2.3.0-real.md"><strong>Verification guide</strong><span>How to run safe live/read-only checks and exports.</span></a>
-    <a class="settings-link-card" href="/docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md"><strong>Manual QA checklist</strong><span>Browser and screenshot acceptance checks.</span></a>
-    <a class="settings-link-card" href="/docs/RELEASE_CHECKLIST_v4.0.1-real.md"><strong>Release checklist</strong><span>GitHub release, tag, asset, and rollback workflow.</span></a>
-    <a class="settings-link-card" href="/docs/VALIDATION_v4.0.1-real.md"><strong>Validation report</strong><span>Commands, safety checks, and known limitations.</span></a>
+    <a class="settings-link-card" href="/docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md"><strong>Manual QA checklist</strong><span>Browser and screenshot acceptance checks.</span></a>
+    <a class="settings-link-card" href="/docs/RELEASE_CHECKLIST_v4.7.0-real.md"><strong>Release checklist</strong><span>GitHub release, tag, asset, and rollback workflow.</span></a>
+    <a class="settings-link-card" href="/docs/VALIDATION_v4.7.0-real.md"><strong>Validation report</strong><span>Commands, safety checks, and known limitations.</span></a>
   </div>
 </section>
 {% endif %}
@@ -472,19 +508,19 @@
     <a class="settings-link-card" href="/docs/STRATEGY_PLAYBOOK_GUIDE_v2.4.0-real.md"><strong>Strategy / Playbook</strong><span>Theses, evidence, watchlists, scorecards, ticket linkage, and reviews.</span></a>
     <a class="settings-link-card" href="/docs/MONITORING_ALERTS_GUIDE_v2.6.0-real.md"><strong>Monitoring / Alerts</strong><span>Alert rules, reminders, notification center, and exports.</span></a>
     <a class="settings-link-card" href="/docs/PORTFOLIO_EXPOSURE_GUIDE_v2.7.0-real.md"><strong>Portfolio / Exposure</strong><span>Exposure intelligence, scenario planning, and planned impact previews.</span></a>
-    <a class="settings-link-card" href="/docs/DATA_INTEGRITY_BACKUP_RECOVERY_GUIDE_v4.0.1-real.md"><strong>Data Integrity / Backup / Recovery</strong><span>Health checks, backups, restore previews, import/export, migrations, and recovery reports.</span></a>
+    <a class="settings-link-card" href="/docs/V4_STORAGE_COMPATIBILITY_GUIDE_v4.7.0-real.md"><strong>Data Integrity / Backup / Recovery</strong><span>Health checks, backups, restore previews, import/export, migrations, and recovery reports.</span></a>
     <a class="settings-link-card" href="/docs/GOVERNANCE_DECISION_JOURNAL_GUIDE_v2.8.0-real.md"><strong>Governance / Decision Journal</strong><span>Decision journal, checklists, reviews, near-misses, and mistake patterns.</span></a>
     <a class="settings-link-card" href="/docs/RESEARCH_INTAKE_GUIDE_v2.5.0-real.md"><strong>Research Intake</strong><span>Sources, queue, notes, evidence candidates, freshness, and thesis comparison.</span></a>
     <a class="settings-link-card" href="/docs/LIVE_TRADING_V2.md"><strong>Live Trading</strong><span>Control-plane architecture and gates.</span></a>
     <a class="settings-link-card" href="/docs/UI_UX_V2_2.md"><strong>Browser Polish</strong><span>Saved preferences, interactive filters, and refresh behavior.</span></a>
-    <a class="settings-link-card" href="/docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md"><strong>Manual QA Checklist</strong><span>Browser validation path and screenshot guidance.</span></a>
+    <a class="settings-link-card" href="/docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md"><strong>Manual QA Checklist</strong><span>Browser validation path and screenshot guidance.</span></a>
     <a class="settings-link-card" href="/docs/LIVE_READ_ONLY_VERIFICATION_v2.3.0-real.md"><strong>Live Read-Only Verification</strong><span>Safe verification harness and export reports.</span></a>
     <a class="settings-link-card" href="/docs/RISK_CONTROLS_GUIDE.md"><strong>Risk Controls</strong><span>Limit, approval, warning, and blocker behavior.</span></a>
     <a class="settings-link-card" href="/docs/ORDER_LIFECYCLE_GUIDE.md"><strong>Order Lifecycle</strong><span>Preview, approval, submit, status, cancel, reconcile.</span></a>
     <a class="settings-link-card" href="/docs/EMERGENCY_KILL_SWITCH_GUIDE.md"><strong>Emergency Controls</strong><span>Kill switch, read-only, disable-orders, cancel preview.</span></a>
     <a class="settings-link-card" href="/docs/ENVIRONMENT_VARIABLES_REFERENCE.md"><strong>Environment Variables</strong><span>Grouped settings and secret handling.</span></a>
     <a class="settings-link-card" href="/docs/TROUBLESHOOTING_GUIDE.md"><strong>Troubleshooting</strong><span>Common failures and recovery paths.</span></a>
-    <a class="settings-link-card" href="/docs/RELEASE_NOTES_v4.0.1-real.md"><strong>Release Notes</strong><span>What changed in v4.0.1-real.</span></a>
+    <a class="settings-link-card" href="/docs/RELEASE_NOTES_v4.7.0-real.md"><strong>Release Notes</strong><span>What changed in v4.7.0-real.</span></a>
   </div>
 </section>
 {% endif %}
@@ -566,6 +602,31 @@
       return '<div class="empty-state">No rows returned. Status: ' + escapeHtml(data && data.status || 'unknown') + '</div><details><summary>Raw response</summary><pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre></details>';
     }
     let keys = ['id', 'question', 'slug', 'active'];
+    if (kind === 'markets') {
+      const headers = ['question', 'prices', 'model fair / edge', 'recommended side', 'why', 'AI Edge'].map(k => '<th data-sort="text">' + escapeHtml(k) + '</th>').join('') + '<th>Details</th>';
+      const limit = Number(prefs.table_page_size || 25);
+      const rows = items.slice(0, limit).map(obj => {
+        const edge = obj.market_edge_recommendation || {};
+        const yesPrice = edge.market_yes_price !== undefined && edge.market_yes_price !== null ? (Number(edge.market_yes_price) * 100).toFixed(1) + '%' : 'unavailable';
+        const noPrice = edge.market_no_price !== undefined && edge.market_no_price !== null ? (Number(edge.market_no_price) * 100).toFixed(1) + '%' : 'unavailable';
+        const fairYes = edge.model_fair_yes !== undefined && edge.model_fair_yes !== null ? (Number(edge.model_fair_yes) * 100).toFixed(1) + '%' : 'unavailable';
+        const yesEdge = edge.yes_edge_pp !== undefined && edge.yes_edge_pp !== null ? Number(edge.yes_edge_pp).toFixed(1) + ' pp' : 'unavailable';
+        const noEdge = edge.no_edge_pp !== undefined && edge.no_edge_pp !== null ? Number(edge.no_edge_pp).toFixed(1) + ' pp' : 'unavailable';
+        const side = edge.recommended_side || 'INSUFFICIENT DATA';
+        const status = edge.recommendation_status || 'insufficient_data';
+        const marketId = obj.id || obj.market_id || obj.slug || '';
+        return '<tr>'
+          + '<td><a href="/markets/' + encodeURIComponent(marketId) + '">' + escapeHtml(obj.question || obj.title || obj.slug || 'Untitled market') + '</a><br><span class="small">' + escapeHtml(edge.group_rank_label || 'No family detected') + '</span></td>'
+          + '<td><span class="pill">YES ' + escapeHtml(yesPrice) + '</span><span class="pill">NO ' + escapeHtml(noPrice) + '</span></td>'
+          + '<td><strong>Fair YES ' + escapeHtml(fairYes) + '</strong><br><span class="pill">YES ' + escapeHtml(yesEdge) + '</span><span class="pill">NO ' + escapeHtml(noEdge) + '</span><br><span class="small">' + escapeHtml(edge.model_fair_source || 'unavailable') + '</span></td>'
+          + '<td><span class="status-badge tone-' + statusTone(status) + '">' + escapeHtml(side) + '</span><br><strong>' + escapeHtml(edge.side_badge || 'INSUFFICIENT DATA') + '</strong></td>'
+          + '<td>' + escapeHtml(edge.explanation || 'Model fair probability or market-implied price unavailable.') + '<br><span class="small">' + escapeHtml(edge.favorite_vs_edge_note || '') + '</span></td>'
+          + '<td><a class="button-link quiet" href="' + escapeHtml(edge.ai_edge_market_href || '/v3/ai/edge') + '">Analyze with AI Edge</a><br><a class="small" href="' + escapeHtml(edge.ai_edge_packet_href || '/api/v3/ai/edge/packets') + '">Open Packet</a></td>'
+          + '<td><details class="advanced-detail"><summary>Raw</summary><pre>' + escapeHtml(JSON.stringify(obj, null, 2)) + '</pre></details></td>'
+          + '</tr>';
+      }).join('');
+      return '<div class="table-controls"><input class="js-table-filter" data-table="' + resultId + '-table" type="search" placeholder="Filter these rows"><span class="result-count" data-count-for="' + resultId + '-table">Showing ' + Math.min(items.length, limit) + ' of ' + items.length + '</span></div><div class="table-wrap"><table class="interactive-table" id="' + resultId + '-table"><thead><tr>' + headers + '</tr></thead><tbody>' + rows + '</tbody></table></div><details class="advanced-detail"><summary>Favorite vs edge and raw response</summary><p>Favorite means highest price/probability in a detected group. Edge means model fair probability minus current YES/NO market-implied price. Draft research only; not financial advice or trade approval.</p><pre>' + escapeHtml(JSON.stringify(data, null, 2)) + '</pre></details>';
+    }
     if (kind === 'orders') keys = ['id', 'status', 'market', 'side', 'price', 'size'];
     if (kind === 'positions') keys = ['market', 'outcome', 'size', 'value', 'pnl'];
     if (kind === 'reconciliation') keys = ['timestamp', 'action', 'status', 'order_id', 'state'];

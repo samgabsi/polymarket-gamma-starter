@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}News Odds Adjustments · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/ai/news-odds">AI News Odds</a> / <span>Adjustments</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.17.0-real · Runtime records</p>
+  <h1>Draft News Odds Adjustments</h1>
+  <p class="notice">Runtime draft fair odds records are excluded from release ZIPs. Accepted adjustments update review context only; they do not place or cancel orders.</p>
+</section>
+<section class="panel"><div class="responsive-table"><table><thead><tr><th>Market</th><th>Fair YES</th><th>Raw / weighted / final</th><th>Cap decision</th><th>Confidence</th><th>Evidence</th><th>Status</th><th>Open</th></tr></thead><tbody>
+{% for row in adjustments["items"] %}
+<tr><td>{{ row.market_title }}<br><span class="muted">{{ row.adjustment_id }}</span></td><td>{% if row.base_fair_yes is not none %}{{ '%.1f%%'|format(row.base_fair_yes * 100) }} → {{ '%.1f%%'|format(row.adjusted_fair_yes * 100) if row.adjusted_fair_yes is not none else 'unavailable' }}{% else %}unavailable{% endif %}</td><td>{{ '%+.1f pp'|format(row.raw_ai_adjustment_pct or 0) }} / {{ '%+.1f pp'|format(row.evidence_weighted_adjustment_pct or 0) }} / {{ '%+.1f pp'|format(row.final_adjustment_pct or row.adjustment_pp or 0) }}</td><td>{{ row.cap_mode }}{% if row.old_2_5_cap_exceeded %}<br><span class="status-badge tone-warning">old 2.5 pp exceeded</span>{% endif %}<br><span class="muted">{{ row.cap_decision }}</span></td><td>{{ row.confidence }} / {{ row.uncertainty }}</td><td>{{ row.source_count }} sources · {{ row.independent_source_count }} independent · {{ row.duplicate_source_count }} duplicate</td><td>{% if row.accepted_to_review_context %}accepted to review context{% elif row.rejected %}rejected{% elif row.archived %}archived{% else %}draft{% endif %}</td><td><a href="/v3/ai/news-odds/adjustment/{{ row.adjustment_id }}">Open</a></td></tr>
+{% else %}
+<tr><td colspan="8"><span class="muted">No draft adjustment records yet.</span></td></tr>
+{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

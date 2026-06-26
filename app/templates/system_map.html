@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}System Map - Polymarket OP Console {{ app_version_short }}{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a><span>/</span><span>System Map</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="page-kicker">v4.3 unified operator surface · route discoverability</p>
+    <div class="page-title-row">
+      <h1>Unified System Map / Route Map</h1>
+      <span class="status-badge tone-local">NAVIGATION ONLY</span>
+      <span class="status-badge tone-neutral">NO LIVE MUTATION</span>
+    </div>
+    <p class="page-subtitle">One map for Home, Operator OS, AI Copilot, Live Controls, Platform, Cockpit, Workspace, Tasks, Data, Freshness, Simulation, Analytics, Settings, and diagnostics.</p>
+    <div class="action-bar">
+      <a class="button-link" href="{{ system_map.recommended_starting_point }}">Recommended: Operator OS</a>
+      <a class="button-link quiet" href="/v3/ai">AI Copilot</a>
+      <a class="button-link quiet" href="/v2-live">Live Controls</a>
+      <a class="button-link quiet" href="/v3/platform">Platform</a>
+    </div>
+  </div>
+</section>
+
+<section class="callout info">
+  <h3>Navigation safety model</h3>
+  <p><strong>Navigation links and aliases are safe entry points only.</strong> {{ navigation_safety_explainer.navigation_only }}</p>
+  <p>v2 live controls remain the safety-critical live-control plane. {{ navigation_safety_explainer.v2_live_controls }}</p>
+  <p>AI remains draft/review-only. {{ navigation_safety_explainer.ai_copilot }}</p>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div><h2>Major Product Sections</h2><p class="muted">Canonical paths remain compatible. Friendly aliases redirect to canonical pages without bypassing auth, warnings, blockers, confirmations, or backend gates.</p></div>
+    <span class="status-badge tone-info">{{ system_map.count }} sections · {{ system_map.alias_count }} aliases</span>
+  </div>
+  <div class="table-wrap">
+    <table class="data-table system-map-table">
+      <thead><tr><th>Section</th><th>Canonical / Alias</th><th>Purpose</th><th>Safety</th><th>Open</th></tr></thead>
+      <tbody>
+      {% for item in system_map["items"] %}
+        <tr>
+          <td><strong>{{ item.title }}</strong><br><span class="muted">{{ item.section }}</span>{% if item.recommended_entry %}<br><span class="status-badge tone-ok">recommended start</span>{% endif %}</td>
+          <td><code>{{ item.canonical_path }}</code>{% if item.alias_path %}<br><code>{{ item.alias_path }}</code>{% endif %}</td>
+          <td>{{ item.description }}</td>
+          <td><span class="status-badge tone-{{ 'danger' if item.mutation_risk == 'live-control gated' else 'warning' if item.mutation_risk == 'configuration' else 'info' if item.mutation_risk == 'draft/review only' else 'neutral' }}">{{ item.safety_class }}</span><br><span class="muted">{{ item.mutation_risk }}</span></td>
+          <td><a class="button-link quiet" href="{{ item.canonical_path }}">Open</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="content-card">
+  <div class="section-header"><div><h2>Friendly Aliases</h2><p class="muted">Aliases are safe redirects and do not duplicate live-control or AI logic.</p></div></div>
+  <div class="metadata-grid">
+    {% for alias, target in system_map.aliases.items() %}
+      <div><dt><code>{{ alias }}</code></dt><dd>→ <a href="{{ target }}">{{ target }}</a></dd></div>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

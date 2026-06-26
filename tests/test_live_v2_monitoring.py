@@ -39,7 +39,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_6():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_monitoring_rule_lifecycle_exports_and_safety():
@@ -90,7 +90,7 @@ def test_monitoring_routes_and_api_endpoints(authed_client):
     page = authed_client.get("/v2-live/monitoring")
     assert page.status_code == 200
     assert "Monitoring / Alert Workflow" in page.text
-    assert "v4.0.1-real" in page.text
+    assert "v4.7.0-real" in page.text
     create = authed_client.post("/api/v2/live/monitoring/rules", json={"rule_name": "Route rule", "rule_type": "price_threshold", "condition": "above", "threshold_value": 0.1, "severity": "watch"})
     assert create.status_code == 200
     rid = create.json()["item"]["id"]

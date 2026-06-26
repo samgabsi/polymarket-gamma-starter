@@ -32,7 +32,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_4():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_strategy_create_edit_archive_and_exports():

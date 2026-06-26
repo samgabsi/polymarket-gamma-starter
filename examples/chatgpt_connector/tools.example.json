@@ -1,0 +1,39 @@
+{
+  "tools": [
+    {
+      "name": "get_platform_summary",
+      "description": "Return a redacted platform diagnostics summary.",
+      "read_only": true,
+      "requires_auth": true,
+      "mutates_live_trading_state": false
+    },
+    {
+      "name": "draft_review_summary",
+      "description": "Create a structured AI draft for human review.",
+      "read_only": true,
+      "requires_auth": true,
+      "mutates_live_trading_state": false
+    },
+    {
+      "name": "draft_task_suggestions",
+      "description": "Create draft task suggestions that require explicit human acceptance before local task creation.",
+      "read_only": true,
+      "requires_auth": true,
+      "mutates_live_trading_state": false
+    }
+  ],
+  "forbidden_tools": [
+    "place_order",
+    "cancel_order",
+    "approve_trade",
+    "sign_transaction",
+    "arm_live_trading",
+    "disable_kill_switch",
+    "disable_read_only",
+    "mutate_live_config",
+    "export_secrets",
+    "fetch_private_keys",
+    "fetch_api_keys"
+  ]
+}
+

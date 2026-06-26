@@ -96,7 +96,7 @@ def _collect_sample_dataset():
 
 
 def test_v35_version():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_dataset_collection_validation_quality_exports_are_read_only():
@@ -156,7 +156,7 @@ def test_dataset_routes_and_apis_render(authed_client):
     for route in ["/v3/datasets", "/v3/datasets/snapshots", "/v3/datasets/collector", "/v3/datasets/builder", "/v3/datasets/quality", "/v3/datasets/provenance", "/v3/datasets/replay", "/v3/datasets/exports", "/v3/datasets/settings"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Dataset" in response.text
         assert "read-only" in response.text.lower()
 
@@ -182,10 +182,10 @@ def test_dataset_routes_and_apis_render(authed_client):
 def test_v35_docs_exist():
     root = Path(__file__).resolve().parents[1]
     for rel in [
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]:
         assert (root / rel).exists(), rel

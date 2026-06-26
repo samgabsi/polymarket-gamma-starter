@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}{{ workspace_title }} · Operator OS{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3">Operator OS</a> / <span>{{ workspace_title }}</span>{% endblock %}
+{% block content %}
+<section class="page-hero v417-hero">
+  <p class="eyebrow">{{ version }} · Operator OS consolidation</p>
+  <h1>{{ workspace_title }}</h1>
+  <p class="muted">Five primary workspaces replace the sprawling top-level experience. Backend routes remain available, but the operator flow is now Command Center → Opportunities → Automation → Review & Audit → Settings & System.</p>
+  <p class="notice"><strong>Safety posture:</strong> this UI consolidation does not enable live trading, submit orders, cancel orders, approve trades, bypass backend gates, or turn sample/cached/scaffolded data into live data.</p>
+  <div class="v417-workspace-nav" aria-label="Primary Operator OS workspaces">
+    {% for item in workspaces %}
+      <a class="button-link {% if active_workspace == item.id %}primary{% else %}quiet{% endif %}" href="{{ item.route }}" {% if active_workspace == item.id %}aria-current="page"{% endif %}>{{ item.label }}</a>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="metric-grid" aria-label="Operator shell status">
+  <article class="metric-card"><strong>{{ 'enabled' if shell_status.live_armed else 'disabled' }}</strong><span>Live trading</span></article>
+  <article class="metric-card"><strong>{{ 'on' if shell_status.kill_switch else 'off' }}</strong><span>Kill switch</span></article>
+  <article class="metric-card"><strong>{{ shell_status.paper_trading_status }}</strong><span>Paper trading</span></article>
+  <article class="metric-card"><strong>{{ shell_status.paper_automation_status }}</strong><span>Automation</span></article>
+  <article class="metric-card"><strong>{{ shell_status.openai_status }}</strong><span>OpenAI / AI</span></article>
+  <article class="metric-card"><strong>{{ shell_status.polymarket_status }}</strong><span>Polymarket</span></article>
+  <article class="metric-card"><strong>{{ shell_status.kalshi_status }}</strong><span>Kalshi</span></article>
+  <article class="metric-card"><strong>{{ shell_status.warnings_count }}</strong><span>Warnings</span></article>
+</section>
+
+{% if active_workspace == 'command_center' %}
+  {% set cc = command_center %}
+  <section class="content-card">
+    <div class="section-header">
+      <div><h2>What needs attention right now?</h2><p class="muted">Command Center summarizes safety, readiness, reviews, AI/opportunity activity, and paper automation without promoting advanced/debug pages.</p></div>
+      <a class="button-link" href="/v3/settings-system">Open Settings & System</a>
+    </div>
+    <div class="metric-grid">
+      {% for card in cc.cards %}
+      <article class="metric-card">
+        <strong>{{ card.value }}</strong><span>{{ card.label }}</span>
+        <p class="muted small">{{ card.detail }}</p>
+        <a class="button-link quiet" href="{{ card.route }}">Open</a>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="callout warning"><strong>Next recommended operator action:</strong> {{ cc.next_action }}</div>
+  </section>
+
+  <section class="content-card">
+    <h2>UI sprawl audit summary</h2>
+    <p class="muted">Routes were classified as primary workspaces, source-specific detail pages, compatibility routes, advanced/direct workflows, or settings/system diagnostics.</p>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Route family</th><th>Classification</th><th>Workspace</th><th>Operator note</th></tr></thead>
+      <tbody>{% for row in route_sprawl_audit %}<tr><td>{{ row.route_family }}</td><td>{{ row.classification }}</td><td>{{ row.workspace }}</td><td>{{ row.operator_note }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+
+  <section class="content-card">
+    <h2>Config-required / partial / scaffolded items</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Reason</th><th>Next action</th></tr></thead>
+      <tbody>{% for row in cc.config_required_rows %}<tr><td>{{ row.title }}<br><code>{{ row.feature_id }}</code></td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.reason }}</td><td>{{ row.next_action or row.operator_action }}</td></tr>{% else %}<tr><td colspan="4"><div class="empty-state"><h3>No prominent readiness blockers</h3><p>Open Settings & System for the full feature-readiness map.</p></div></td></tr>{% endfor %}</tbody>
+    </table></div>
+  </section>
+{% endif %}
+
+{% if active_workspace == 'opportunities' %}
+  {% set opp = opportunities_workspace %}
+  <section class="content-card">
+    <div class="section-header"><div><h2>Unified opportunity view</h2><p class="muted">Rows are normalized only when real local records exist. Source-specific sections stay honest when data is empty, sample, cached, or scaffolded.</p></div><a class="button-link" href="/api/v3/operator-os/opportunities">Workspace JSON</a></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Source</th><th>Market</th><th>Side</th><th>Price</th><th>Model fair</th><th>AI-adjusted</th><th>Edge / Margin</th><th>Confidence</th><th>Status</th><th>Posture</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for row in opp.rows %}<tr><td>{{ row.source }}</td><td><a href="{{ row.detail_route }}">{{ row.market }}</a><br><code>{{ row.id }}</code></td><td>{{ row.side }}</td><td>{{ row.price }}</td><td>{{ row.model_fair_price }}</td><td>{{ row.ai_adjusted_fair_price }}</td><td>{{ row.edge }}{% if row.net_margin != 'n/a' %}<br>{{ row.net_margin }}{% endif %}</td><td>{{ row.confidence }}</td><td>{{ row.status }}<br><span class="muted">{{ row.data_freshness }}</span></td><td>{{ row.posture }}</td><td>{{ row.recommended_action }}</td></tr>
+        {% else %}<tr><td colspan="11"><div class="empty-state"><h3>No unified opportunity rows yet</h3><p>{{ opp.empty_state }}</p></div></td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+  <section class="content-card">
+    <h2>Source-specific sections</h2>
+    <div class="card-grid">
+      {% for source in opp.source_sections %}
+      <article class="content-card compact"><h3>{{ source.source }}</h3><p><strong>{{ source.count }}</strong> local rows · <span class="status-badge tone-{{ source.state|status_tone }}">{{ source.state }}</span></p><p class="muted">{{ source.note }}</p><a class="button-link" href="{{ source.route }}">Open source page</a></article>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+{% if active_workspace == 'automation' %}
+  {% set auto = automation_workspace %}
+  {% set status = auto.status %}
+  {% set account = auto.account %}
+  {% set config = auto.config %}
+  <section class="content-card">
+    <div class="section-header"><div><h2>Automation / Paper Trading</h2><p class="muted">Paper-only automation status and controls. The detailed v4.17 paper trading page remains available for deep inspection.</p></div><a class="button-link" href="/v3/paper-trading">Open detailed paper trading page</a></div>
+    <div class="callout warning"><strong>PAPER ONLY:</strong> No real orders will be placed, cancelled, submitted, approved, or armed from this workspace. API responses continue to report paper_only=true and live_execution_used=false.</div>
+    <form method="post" action="/v3/paper-trading/run-once" class="inline-form">
+      <button type="submit">Run paper strategy once</button>
+      <a class="button-link quiet" href="/v3/automation">Refresh</a>
+      <a class="button-link quiet" href="/api/v3/paper/status">Status JSON</a>
+    </form>
+  </section>
+  <section class="metric-grid">
+    <article class="metric-card"><strong>{{ status.status }}</strong><span>Paper engine</span></article>
+    <article class="metric-card"><strong>{{ status.automation_status }}</strong><span>Automation</span></article>
+    <article class="metric-card"><strong>{{ status.scheduler_status }}</strong><span>Scheduler</span></article>
+    <article class="metric-card"><strong>{{ '${:,.2f}'.format(account.equity or 0) }}</strong><span>Paper equity</span></article>
+    <article class="metric-card"><strong>{{ status.open_position_count }}</strong><span>Open positions</span></article>
+    <article class="metric-card"><strong>{{ '${:,.2f}'.format(account.unrealized_pnl or 0) }}</strong><span>Unrealized P/L</span></article>
+  </section>
+  <section class="content-card">
+    <h2>Latest run / decision log</h2>
+    <p><strong>Last run:</strong> {{ auto.last_run.run_id or 'none' }} · {{ auto.last_run.status or 'not_run' }} · candidates={{ auto.last_run.candidates_considered or 0 }} · paper trades={{ auto.last_run.paper_trades_placed or 0 }}</p>
+    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Action</th><th>Market</th><th>Side</th><th>Edge / Confidence</th><th>Reason</th></tr></thead><tbody>{% for item in auto.recent_decisions[:20] %}<tr><td>{{ item.timestamp }}</td><td>{{ item.final_action }}</td><td>{{ item.market_title }}<br><code>{{ item.market_id }}</code></td><td>{{ item.side }}</td><td>{{ item.edge_pct }} / {{ item.confidence }}</td><td>{{ item.reason }}</td></tr>{% else %}<tr><td colspan="6"><div class="empty-state"><h3>No paper decisions yet</h3><p>Enable paper gates and run a strategy cycle to populate this table.</p></div></td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="content-card">
+    <h2>Paper orders / positions</h2>
+    <div class="table-wrap"><table><thead><tr><th>Order</th><th>Market</th><th>Side</th><th>Status</th><th>Notional</th><th>Safety</th></tr></thead><tbody>{% for item in auto.recent_orders[:20] %}<tr><td><code>{{ item.order_id }}</code></td><td>{{ item.market_title }}</td><td>{{ item.side }}</td><td>{{ item.status }}</td><td>{{ item.notional }}</td><td>paper_only={{ item.paper_only }} · live_execution_used={{ item.live_execution_used }}</td></tr>{% else %}<tr><td colspan="6"><div class="empty-state"><h3>No paper orders yet</h3><p>Orders are simulated local ledger records only.</p></div></td></tr>{% endfor %}</tbody></table></div>
+  </section>
+{% endif %}
+
+{% if active_workspace == 'review_audit' %}
+  {% set ra = review_audit_workspace %}
+  <section class="content-card">
+    <div class="section-header"><div><h2>Review & Audit</h2><p class="muted">Accountability workspace for review queue actions, opportunity decisions, paper automation decisions, and safety audit rows.</p></div><a class="button-link" href="/review-queue">Open detailed Review Queue</a></div>
+    <div class="metric-grid"><article class="metric-card"><strong>{{ ra.pending_review_count }}</strong><span>Pending reviews</span></article><article class="metric-card"><strong>{{ ra.review_action_count }}</strong><span>Review actions</span></article><article class="metric-card"><strong>{{ ra.paper_decision_count }}</strong><span>Paper decisions</span></article><article class="metric-card"><strong>{{ ra.paper_audit_count }}</strong><span>Paper audit rows</span></article></div>
+    <div class="table-wrap"><table><thead><tr><th>Time</th><th>Source</th><th>Action</th><th>Target</th><th>Status</th><th>Posture</th><th>Detail</th></tr></thead><tbody>{% for item in ra.events %}<tr><td>{{ item.timestamp }}</td><td>{{ item.source }}</td><td>{{ item.action }}</td><td>{{ item.target }}</td><td>{{ item.status }}</td><td>{{ item.posture }}</td><td>{{ item.detail }}</td></tr>{% else %}<tr><td colspan="7"><div class="empty-state"><h3>No review or audit events yet</h3><p>{{ ra.empty_state }}</p></div></td></tr>{% endfor %}</tbody></table></div>
+  </section>
+{% endif %}
+
+{% if active_workspace == 'settings_system' %}
+  {% set sys = settings_system_workspace %}
+  <section class="content-card">
+    <div class="section-header"><div><h2>Settings & System</h2><p class="muted">Readiness, configuration, venues, AI/OpenAI, paper limits, arbitrage settings, diagnostics, and advanced links now live together.</p></div><a class="button-link" href="/v3/settings">Open detailed settings workflow</a></div>
+    <div class="metric-grid"><article class="metric-card"><strong>{{ sys.ai.provider }}</strong><span>AI provider</span></article><article class="metric-card"><strong>{{ sys.ai.openai_api_enabled }}</strong><span>OpenAI API enabled</span></article><article class="metric-card"><strong>{{ sys.venues.kalshi_enabled }}</strong><span>Kalshi enabled</span></article><article class="metric-card"><strong>{{ sys.arbitrage.arbitrage_scanner_enabled }}</strong><span>Arbitrage scanner</span></article><article class="metric-card"><strong>{{ sys.paper.enabled }}</strong><span>Paper trading</span></article><article class="metric-card"><strong>{{ sys.paper.automation_enabled }}</strong><span>Paper automation</span></article></div>
+  </section>
+  <section class="content-card">
+    <h2>Feature readiness highlights</h2>
+    <div class="table-wrap"><table><thead><tr><th>Feature</th><th>Status</th><th>Area</th><th>Reason</th><th>Next action</th><th>Route</th></tr></thead><tbody>{% for row in sys.important_rows %}<tr><td>{{ row.title }}<br><code>{{ row.feature_id }}</code></td><td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span></td><td>{{ row.area }}</td><td>{{ row.reason }}</td><td>{{ row.next_action or row.operator_action }}</td><td>{% if row.route %}<a href="{{ row.route }}">Open</a>{% endif %}</td></tr>{% else %}<tr><td colspan="6"><div class="empty-state"><h3>No highlighted readiness rows</h3><p>Open the detailed Feature Readiness page for the full registry.</p></div></td></tr>{% endfor %}</tbody></table></div>
+  </section>
+  <section class="content-card">
+    <h2>Advanced and compatibility links</h2>
+    <p class="muted">These routes stay available, but they are no longer promoted as primary workspaces.</p>
+    <div class="link-row">{% for link in sys.advanced_links %}<a class="button-link quiet" href="{{ link.href }}">{{ link.label }}</a>{% endfor %}</div>
+  </section>
+{% endif %}
+
+<section class="content-card">
+  <h2>Compatibility routes</h2>
+  <div class="table-wrap"><table><thead><tr><th>Old route</th><th>Workspace</th><th>Workspace route</th><th>Behavior</th></tr></thead><tbody>{% for row in compatibility_routes %}<tr><td><a href="{{ row.old_route }}">{{ row.old_route }}</a></td><td>{{ row.workspace }}</td><td><a href="{{ row.new_route }}">{{ row.new_route }}</a></td><td>{{ row.behavior }}</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

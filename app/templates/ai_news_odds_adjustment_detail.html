@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}News Odds Adjustment Detail · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/ai/news-odds">AI News Odds</a> / <a href="/v3/ai/news-odds/adjustments">Adjustments</a> / <span>Detail</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.17.0-real · Adjustment detail</p>
+  <h1>{{ adjustment.market_title or 'Adjustment not found' }}</h1>
+  <p class="muted">{{ adjustment.adjustment_id }}</p>
+  <p class="notice">Review-only. Not financial advice. Does not place orders, cancel orders, approve trades, or arm live trading.</p>
+</section>
+{% if detail.ok %}
+<section class="stats v47-stats">
+  <div><strong>{% if adjustment.base_edge and adjustment.base_edge.market_yes_price is not none %}{{ '%.1f%%'|format(adjustment.base_edge.market_yes_price * 100) }}{% else %}unavailable{% endif %}</strong><span>Market YES price</span></div>
+  <div><strong>{% if adjustment.base_fair_yes is not none %}{{ '%.1f%%'|format(adjustment.base_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>Base Fair YES</span></div>
+  <div><strong>{% if adjustment.adjusted_fair_yes is not none %}{{ '%.1f%%'|format(adjustment.adjusted_fair_yes * 100) }}{% else %}unavailable{% endif %}</strong><span>Adjusted Fair YES</span></div>
+  <div><strong>{{ '%+.1f pp'|format(adjustment.raw_ai_adjustment_pct or 0) }}</strong><span>Raw AI adjustment</span></div>
+  <div><strong>{{ '%+.1f pp'|format(adjustment.evidence_weighted_adjustment_pct or 0) }}</strong><span>Evidence-weighted</span></div>
+  <div><strong>{{ '%+.1f pp'|format(adjustment.final_adjustment_pct or adjustment.adjustment_pp or 0) }}</strong><span>Final adjustment</span></div>
+  <div><strong>{{ adjustment.base_recommendation.recommended_side if adjustment.base_recommendation else 'NEEDS REVIEW' }}</strong><span>Recommended side</span></div>
+  <div><strong>{{ adjustment.confidence }}</strong><span>Confidence</span></div>
+  <div><strong>{{ adjustment.independent_source_count }}</strong><span>Independent sources</span></div>
+</section>
+<section class="panel">
+  <h2>Review action</h2>
+  <p>These actions persist a local AI odds review decision and audit record only. They do not approve a trade, place an order, or arm live trading.</p>
+  <div class="workbench-actions">
+    <form method="post" action="/v3/ai/news-odds/adjustment/{{ adjustment.adjustment_id }}/accept-to-review-context" class="inline-form compact-form">
+      <input name="operator_note" placeholder="operator note">
+      <button type="submit" class="button-link">Accept to review context</button>
+    </form>
+    <form method="post" action="/v3/ai/news-odds/adjustment/{{ adjustment.adjustment_id }}/reject" class="inline-form compact-form">
+      <input name="operator_note" placeholder="operator note">
+      <button type="submit" class="button-link quiet">Reject draft</button>
+    </form>
+    <form method="post" action="/v3/ai/news-odds/adjustment/{{ adjustment.adjustment_id }}/archive" class="inline-form compact-form">
+      <input name="operator_note" placeholder="operator note">
+      <button type="submit" class="button-link quiet">Archive draft</button>
+    </form>
+  </div>
+  <ul class="compact">
+    <li><strong>Current action:</strong> {{ adjustment.operator_action or 'draft_generated' }}</li>
+    <li><strong>Accepted to review context:</strong> {{ adjustment.accepted_to_review_context }}</li>
+    <li><strong>Rejected:</strong> {{ adjustment.rejected }}</li>
+    <li><strong>Archived:</strong> {{ adjustment.archived }}</li>
+    <li><strong>Operator confirmation required:</strong> {{ adjustment.operator_confirmation_required }}</li>
+  </ul>
+</section>
+<section class="panel">
+  <h2>Cap decision</h2>
+  <p>{{ adjustment.cap_decision or 'No cap decision recorded.' }}</p>
+  <ul class="compact">
+    <li><strong>Mode:</strong> {{ adjustment.cap_mode }}</li>
+    <li><strong>Configured cap:</strong> {{ adjustment.configured_cap_pct }} pp</li>
+    <li><strong>Effective cap:</strong> {{ adjustment.effective_cap_pct }} pp</li>
+    <li><strong>Hard cap:</strong> {{ adjustment.absolute_hard_cap_pct }} pp</li>
+    <li><strong>Old 2.5 pp warning:</strong> {{ adjustment.old_2_5_cap_exceeded }}</li>
+    <li><strong>Operator confirmation required:</strong> {{ adjustment.operator_confirmation_required }}</li>
+  </ul>
+</section>
+<section class="two-col">
+  <div class="panel"><h2>Top evidence</h2><ul class="compact">{% for source in adjustment.top_evidence or [] %}<li><strong>{{ source.title }}</strong> · {{ source.canonical_domain }} · credibility {{ source.credibility_score }} · relevance {{ source.relevance_score }}</li>{% else %}<li>No evidence attached.</li>{% endfor %}</ul></div>
+  <div class="panel"><h2>Warnings</h2><ul class="compact">{% for warning in adjustment.warnings or [] %}<li>{{ warning }}</li>{% else %}<li>No warning recorded.</li>{% endfor %}</ul></div>
+</section>
+<section class="panel">
+  <h2>Evidence quality</h2>
+  <ul class="compact">
+    <li><strong>Trust tiers:</strong> {{ ', '.join(adjustment.evidence_quality.source_trust_tiers or []) if adjustment.evidence_quality else 'unavailable' }}</li>
+    <li><strong>Contradictory evidence:</strong> {{ adjustment.contradiction_count }} item(s)</li>
+    <li><strong>Average relevance:</strong> {{ adjustment.evidence_quality.average_relevance_score if adjustment.evidence_quality else 'unavailable' }}</li>
+    <li><strong>Average recency:</strong> {{ adjustment.evidence_quality.average_recency_score if adjustment.evidence_quality else 'unavailable' }}</li>
+  </ul>
+</section>
+<section class="panel"><h2>Safety flags</h2><p>Does not place orders: {{ adjustment.does_not_place_orders }} · does not cancel orders: {{ adjustment.does_not_cancel_orders }} · does not arm live: {{ adjustment.does_not_arm_live }} · no live mutation: {{ adjustment.no_live_mutation }}</p></section>
+{% else %}
+<section class="panel"><p>{{ detail.error }}</p></section>
+{% endif %}
+{% endblock %}

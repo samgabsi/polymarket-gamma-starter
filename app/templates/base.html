@@ -57,6 +57,12 @@
         </div>
       </header>
 
+      <nav class="unified-nav-strip" aria-label="Unified operator surface">
+        {% for item in global_nav_items[:12] %}
+          <a href="{{ item.canonical_path }}" title="{{ item.description }}">{{ item.title.split('/')[0].strip() }}</a>
+        {% endfor %}
+      </nav>
+
       <details class="mobile-nav-panel">
         <summary aria-label="Open mobile navigation">Menu · Safety · Workflows</summary>
         <div class="mobile-safety-stack" aria-label="Mobile safety status">
@@ -67,7 +73,7 @@
         <nav class="mobile-nav-groups" aria-label="Mobile navigation">
           {% for section in nav_sections %}
           <section class="nav-group">
-            <h2>{{ section.label }}</h2>
+            <h2>Mobile · {{ section.label }}</h2>
             <ul>
             {% for item in section["items"] %}
               {% set is_active = active_path == item.href or (item.match and active_path in item.match) %}
@@ -92,6 +98,17 @@
       </section>
 
       <main id="main-content" class="console-main" tabindex="-1">
+        {% if request is defined and request %}
+          {% set feedback_status = request.query_params.get('action_status') or request.query_params.get('review_status') or request.query_params.get('arbitrage_review') %}
+          {% if feedback_status %}
+            <section class="callout ok operator-feedback" aria-live="polite">
+              <strong>{{ feedback_status|replace('_', ' ')|title }}</strong>
+              {% if request.query_params.get('action') %}<span> · {{ request.query_params.get('action')|replace('_', ' ')|title }}</span>{% endif %}
+              {% if request.query_params.get('action_detail') %}<span> · {{ request.query_params.get('action_detail') }}</span>{% endif %}
+              <div class="muted small">Local operator workflow feedback only. No order was submitted, no trade was approved, and live trading was not armed.</div>
+            </section>
+          {% endif %}
+        {% endif %}
         {% block content %}{% endblock %}
       </main>
 

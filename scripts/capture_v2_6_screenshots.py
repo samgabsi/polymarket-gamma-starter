@@ -7,7 +7,7 @@ It requires Playwright if you choose to use it:
     playwright install chromium
     python scripts/capture_v2_6_screenshots.py --base-url http://127.0.0.1:8000
 
-Screenshots are saved under runtime_screenshots/v4.0.1-real/, which is not intended for release ZIP assets unless manually reviewed for secrets.
+Screenshots are saved under runtime_screenshots/v4.7.0-real/, which is not intended for release ZIP assets unless manually reviewed for secrets.
 """
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ PAGES = {
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
-    parser.add_argument("--out", default="runtime_screenshots/v4.0.1-real")
+    parser.add_argument("--out", default="runtime_screenshots/v4.7.0-real")
     args = parser.parse_args()
     try:
         from playwright.sync_api import sync_playwright

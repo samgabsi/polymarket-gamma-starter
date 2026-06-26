@@ -589,7 +589,7 @@ def simulation_analytics_context() -> dict[str, Any]:
     summary = simulation_summary()
     return {"simulation_sessions": summary.get("session_count", 0), "process_backtests_completed": summary.get("process_backtest_count", 0), "no_trade_simulations": summary.get("no_trade_simulation_count", 0), "recurring_simulated_blockers": "unknown/unavailable until simulation reports exist", "next_simulation_review_action": summary.get("next_simulation_review_action"), "secret_values_returned": False}
 
-# v4.0.1-real dataset integration for Simulation Lab inputs.
+# v4.4.0-real dataset integration for Simulation Lab inputs.
 _simulation_summary_v34 = simulation_summary
 
 def simulation_summary() -> dict[str, Any]:  # type: ignore[override]
@@ -618,7 +618,7 @@ def export_simulation_json() -> dict[str, Any]:  # type: ignore[override]
     return redact_data(data)
 
 
-# v4.0.1-real freshness context integration for simulation readiness.
+# v4.4.0-real freshness context integration for simulation readiness.
 _simulation_summary_v35 = simulation_summary
 
 def simulation_summary() -> dict[str, Any]:  # type: ignore[override]

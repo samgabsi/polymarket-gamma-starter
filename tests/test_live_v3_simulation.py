@@ -96,7 +96,7 @@ def assert_safe(result):
 
 
 def test_v34_version_and_simulation_core():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
     thesis = seed_simulation_objects()
     created = live_v3_simulation.create_session({"session_title": "Replay", "simulation_type": "pre_trade_replay", "market_id": "sim-mkt", "thesis_id": thesis["id"], "assumptions": {"hypothetical_fill_percentage": 50}})
     assert_safe(created)
@@ -155,7 +155,7 @@ def test_v34_simulation_routes_and_apis_render(authed_client):
     for route in ["/v3/simulation", "/v3/simulation/replay", "/v3/simulation/sessions", "/v3/simulation/scenarios", "/v3/simulation/pre-trade", "/v3/simulation/thesis", "/v3/simulation/alerts", "/v3/simulation/portfolio", "/v3/simulation/governance", "/v3/simulation/no-trade", "/v3/simulation/reports"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Simulation Lab" in response.text
         assert "No Live Orders" in response.text or "Simulation Only" in response.text
     summary = authed_client.get("/api/v3/simulation")
@@ -176,10 +176,10 @@ def test_v34_docs_exist():
     from pathlib import Path
     root = Path(__file__).resolve().parents[1]
     for rel in [
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]:
         assert (root / rel).exists(), rel

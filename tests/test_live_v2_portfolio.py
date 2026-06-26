@@ -42,7 +42,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_7():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_portfolio_snapshot_bankroll_warnings_exports_and_safety():
@@ -84,7 +84,7 @@ def test_portfolio_routes_and_api_endpoints(authed_client):
     page = authed_client.get("/v2-live/portfolio")
     assert page.status_code == 200
     assert "Portfolio / Exposure Intelligence" in page.text
-    assert "v4.0.1-real" in page.text
+    assert "v4.7.0-real" in page.text
     assert authed_client.get("/api/v2/live/portfolio").status_code == 200
     assert authed_client.get("/api/v2/live/portfolio/snapshot").status_code == 200
     assert authed_client.post("/api/v2/live/portfolio/snapshot").status_code == 200

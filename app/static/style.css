@@ -1045,3 +1045,97 @@ button[disabled]::after { content: ""; }
 .strategy-forms-grid { align-items: start; }
 .strategy-forms-grid .content-card { min-height: 100%; }
 .live-v2-tabs a[href="/v2-live/strategy"].active { background: rgba(143,199,255,.16); box-shadow: inset 0 0 0 1px rgba(143,199,255,.35); }
+
+/* v4.3 unified operator surface */
+.unified-nav-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  padding: 0.65rem 1rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(15, 23, 42, 0.86);
+}
+.unified-nav-strip a {
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  color: #dbeafe;
+  padding: 0.35rem 0.65rem;
+  text-decoration: none;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.unified-nav-strip a:hover { border-color: rgba(96, 165, 250, 0.8); background: rgba(59, 130, 246, 0.13); }
+.unified-surface-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.unified-entry-card { border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 18px; padding: 1rem; background: rgba(15, 23, 42, 0.78); }
+.unified-entry-card h3 { margin-top: 0; }
+.unified-entry-card .meta { color: #93c5fd; font-size: 0.82rem; }
+.system-map-table td, .system-map-table th { vertical-align: top; }
+.bridge-strip { display: flex; flex-wrap: wrap; gap: 0.55rem; margin-top: 0.8rem; }
+.bridge-strip a { border: 1px solid rgba(148, 163, 184, 0.25); border-radius: 999px; padding: 0.35rem 0.65rem; text-decoration: none; }
+
+/* v4.7.0-real opportunity review, market drilldown, and visual QA hardening */
+.v46-hero { border-color: rgba(96, 165, 250, 0.28); }
+.v46-hero .notice, .v46-panel .notice { margin-top: 0.75rem; }
+.v46-stats { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.panel-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.responsive-table {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 14px;
+}
+.responsive-table table { min-width: 980px; margin: 0; }
+.opportunity-workbench-table th,
+.opportunity-workbench-table td,
+.family-comparison-table th,
+.family-comparison-table td { vertical-align: top; }
+.workbench-actions { display: flex; flex-direction: column; gap: 0.35rem; min-width: 150px; }
+.workbench-actions form { margin: 0; }
+.workbench-actions .button-link { text-align: center; }
+.v46-panel .status-badge, .detail .status-badge { display: inline-flex; margin-bottom: 0.25rem; }
+.v46-panel td .muted, .family-comparison-table td .muted { display: block; max-width: 320px; }
+@media (max-width: 900px) {
+  .panel-heading-row { display: block; }
+  .workbench-actions { flex-direction: row; flex-wrap: wrap; }
+  .responsive-table table { min-width: 760px; }
+}
+
+/* v4.7 AI News Odds Adjustment Engine polish */
+.v47-hero {
+  border: 1px solid rgba(125, 211, 252, 0.22);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.10), rgba(168, 85, 247, 0.08));
+}
+.v47-panel {
+  border-color: rgba(125, 211, 252, 0.20);
+}
+.v47-stats div {
+  min-width: 12rem;
+}
+.news-odds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+.news-source-chip {
+  display: inline-flex;
+  gap: .35rem;
+  align-items: center;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 999px;
+  padding: .25rem .55rem;
+  font-size: .78rem;
+  color: var(--muted-text, #94a3b8);
+}
+@media (max-width: 760px) {
+  .v47-stats div { min-width: 9rem; }
+  .opportunity-workbench-table table,
+  .family-comparison-table table { min-width: 72rem; }
+}

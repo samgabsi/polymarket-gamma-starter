@@ -61,7 +61,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_v39_version():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_cockpit_layout_focus_shortcuts_commands_exports_are_safe():
@@ -126,7 +126,7 @@ def test_cockpit_routes_and_apis_render(authed_client):
     for route in ["/v3/cockpit", "/v3/cockpit/dependencies", "/v3/cockpit/command-palette"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.17.0-real" in response.text
         assert "Cockpit" in response.text or "cockpit" in response.text
         assert "do not place" in response.text or "not trade approval" in response.text
 
@@ -156,3 +156,48 @@ def test_cockpit_routes_and_apis_render(authed_client):
         response = authed_client.get(route)
         assert response.status_code == 200, route
         assert "private_key" not in response.text.lower()
+
+
+def test_v410_layout_selector_cards_select_persist_and_render(authed_client):
+    page = authed_client.get("/v3/cockpit")
+    assert page.status_code == 200
+    assert "Layout Selector" in page.text
+    assert "selectable + persistent" in page.text
+    assert "data-v3-layout-card" in page.text
+
+    response = authed_client.post("/v3/cockpit/layouts/layout_weekly_review/select", follow_redirects=False)
+    assert response.status_code in {303, 307}
+    settings = live_v3_cockpit.build_settings()
+    assert settings["selected_layout_id"] == "layout_weekly_review"
+
+    refreshed = authed_client.get("/v3/cockpit")
+    assert refreshed.status_code == 200
+    assert "Weekly Review Cockpit" in refreshed.text
+    assert "selected" in refreshed.text
+    assert "panel_review_packet" in refreshed.text
+
+
+def test_v410_focus_modes_start_navigate_and_feature_status_is_honest(authed_client):
+    focus = authed_client.post("/v3/cockpit/focus-modes/focus_task_triage/start", follow_redirects=False)
+    assert focus.status_code in {303, 307}
+    assert "/v3/cockpit/tasks" in focus.headers.get("location", "")
+    settings = live_v3_cockpit.build_settings()
+    assert settings["selected_layout_id"] == "layout_task_triage"
+    assert settings["active_focus_mode_id"] == "focus_task_triage"
+
+    saved = authed_client.post("/v3/cockpit/layouts/save-selected", data={"title": "Operator saved triage"}, follow_redirects=False)
+    assert saved.status_code in {303, 307}
+    assert live_v3_cockpit.build_settings()["selected_layout_id"].startswith("layout_") or live_v3_cockpit.build_settings()["selected_layout_id"].startswith("cockpit")
+
+    status = authed_client.get("/api/v3/features/status")
+    assert status.status_code == 200
+    body = status.json()
+    statuses = {row["feature_id"]: row["status"] for row in body["items"]}
+    assert statuses["cockpit.layout_selector"] == "working"
+    assert statuses["cockpit.focus_modes"] == "working"
+    assert statuses["opportunity.review_actions"] == "working"
+    assert statuses["ai.odds_page_actions"] == "working"
+    assert statuses["arbitrage.review_actions"] == "working"
+    assert statuses["settings.ai_arbitrage_config"] == "working"
+    assert statuses["arbitrage.kalshi_adapter"] in {"disabled", "config_required", "partial"}
+    assert body["order_submitted"] is False

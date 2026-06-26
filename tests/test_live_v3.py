@@ -95,13 +95,13 @@ def seed_objects():
 
 
 def test_version_is_v3():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_command_center_search_graph_and_missing_prereqs_are_local_and_safe():
     thesis = seed_objects()
     command = live_v3.build_command_center()
-    assert command["version"] == "4.0.1-real"
+    assert command["version"] == "4.17.0-real"
     assert command["secret_values_returned"] is False
     assert command["live_armed"] is False
 
@@ -148,7 +148,7 @@ def test_v3_workflows_packets_exports_and_ai_boundary_do_not_trade(monkeypatch):
 def test_v3_routes_and_apis_render():
     seed_objects()
     root = live_v3.build_command_center()
-    assert root["version"] == "4.0.1-real"
+    assert root["version"] == "4.17.0-real"
     assert root["secret_values_returned"] is False
     packet = live_v3.pre_trade_packet({"market_id": "m-v3"})
     assert packet["order_submitted"] is False
@@ -184,7 +184,7 @@ def test_v31_search_graph_filters_templates_demo_and_validation_are_safe():
 def test_v32_analytics_engine_snapshots_reports_and_exports_are_safe():
     seed_objects()
     summary = live_v3_analytics.build_analytics_summary()
-    assert summary["version"] == "4.0.1-real"
+    assert summary["version"] == "4.17.0-real"
     assert summary["secret_values_returned"] is False
     assert summary["analytics_are_descriptive"] is True
 

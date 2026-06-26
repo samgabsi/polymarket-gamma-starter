@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+import os
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -27,6 +28,8 @@ def ensure_data_dir() -> None:
 
 
 def get_session_secret() -> str:
+    if os.getenv("POLYMARKET_OP_CONSOLE_EPHEMERAL_SESSION_SECRET", "").lower() in {"1", "true", "yes", "on"}:
+        return "ephemeral-doc-generation-session-secret-not-for-production"
     ensure_data_dir()
     if SECRET_PATH.exists():
         value = SECRET_PATH.read_text(encoding="utf-8").strip()

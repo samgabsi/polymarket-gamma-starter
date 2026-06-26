@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Opportunity Engine · Polymarket OP Console v0.5.11</title>
+  <title>Opportunity Engine · Polymarket OP Console v4.7.0-real</title>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -18,9 +18,9 @@
   <main>
     <header>
       <div>
-        <p class="eyebrow">v0.5.11 · Opportunity Engine</p>
+        <p class="eyebrow">v4.7.0-real · Opportunity Engine</p>
         <h1>Opportunity Engine</h1>
-        <p class="muted">Real-use ranking across market odds, model odds, evidence readiness, risk checks, liquidity, volume, and watchlist state.</p>
+        <p class="muted">Real-use ranking across market odds, model fair probability, explicit YES/NO/HOLD draft edge labels, evidence readiness, risk checks, liquidity, volume, and watchlist state.</p>
         {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · <a href="/">Dashboard</a> · <a href="/operator">Operator brief</a> · <a href="/research/evidence">Evidence</a> · <a href="/logout">Logout</a></p>{% endif %}
       </div>
       <form method="get">
@@ -43,7 +43,7 @@
       <table>
         <thead>
           <tr>
-            <th>Rank</th><th>Market</th><th>Market</th><th>Model</th><th>Edge</th><th>Evidence</th><th>Risk</th><th>Stage</th><th>Action</th><th>Why</th>
+            <th>Rank</th><th>Market</th><th>Recommended Side</th><th>Market</th><th>Model Fair</th><th>YES/NO Edge</th><th>Family Rank</th><th>Evidence</th><th>Risk</th><th>Stage</th><th>Action</th><th>Why</th>
           </tr>
         </thead>
         <tbody>
@@ -51,9 +51,11 @@
           <tr>
             <td><strong>{{ '%.1f'|format(row.rank_score) }}</strong></td>
             <td><a href="/markets/{{ row.market_id }}">{{ row.question }}</a><br><span class="muted">Vol ${{ '{:,.0f}'.format(row.volume_24hr) }} · Liq ${{ '{:,.0f}'.format(row.liquidity) }}</span></td>
-            <td>{% if row.market_probability is not none %}{{ '%.1f'|format(row.market_probability * 100) }}%{% else %}n/a{% endif %}</td>
-            <td>{% if row.model_probability is not none %}{{ '%.1f'|format(row.model_probability * 100) }}%{% else %}n/a{% endif %}<br><span class="muted">{{ row.confidence }}</span></td>
-            <td>{{ '%+.2f'|format(row.edge_percent) }}%</td>
+            <td><span class="status-badge tone-{{ row.market_edge_recommendation.recommendation_status|status_tone }}">{{ row.recommended_side }}</span><br><strong>{{ row.side_badge }}</strong><br><a class="small" href="/v3/ai/edge/market/{{ row.market_id }}">Analyze with AI Edge</a></td>
+            <td>{% if row.market_probability is not none %}{{ '%.1f'|format(row.market_probability * 100) }}% YES{% else %}n/a{% endif %}</td>
+            <td>{% if row.model_probability is not none %}{{ '%.1f'|format(row.model_probability * 100) }}% YES{% else %}n/a{% endif %}<br><span class="muted">{{ row.confidence }} · {{ row.model_fair_source }}</span></td>
+            <td><span class="pill">YES {{ '%+.1f pp'|format(row.yes_edge_pp) if row.yes_edge_pp is not none else 'unavailable' }}</span><span class="pill">NO {{ '%+.1f pp'|format(row.no_edge_pp) if row.no_edge_pp is not none else 'unavailable' }}</span></td>
+            <td>{{ row.family_rank_label }}</td>
             <td>{{ '%.0f'|format(row.evidence_score) }}/100<br><span class="muted">{{ row.evidence_readiness }}</span></td>
             <td><span class="pill">{{ 'OK' if row.risk_ok else 'blocked' }}</span></td>
             <td>{{ row.workflow_stage }}</td>

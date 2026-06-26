@@ -83,7 +83,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_v33_version_and_design_system_files_exist():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
     root = Path(__file__).resolve().parents[1]
     assert (root / "app/static/v3_design.css").exists()
     assert (root / "app/static/v3_interactions.js").exists()
@@ -109,7 +109,7 @@ def test_v33_routes_render_redesigned_layout(authed_client):
     for route in ["/v3", "/v3/search", "/v3/graph"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Dataset Builder / Simulation Lab / Operator Intelligence" in response.text
         assert "v3_design.css" in response.text
         assert "Operator Intelligence OS" in response.text
@@ -145,11 +145,11 @@ def test_v33_ux_apis_and_scripts_are_safe(authed_client):
 def test_v33_docs_exist():
     root = Path(__file__).resolve().parents[1]
     for rel in [
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]:
         assert (root / rel).exists(), rel

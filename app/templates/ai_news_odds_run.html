@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Run AI News Odds Review · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/ai/news-odds">AI News Odds</a> / <span>Run</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.7.0-real · Search planner</p>
+  <h1>Run News Odds Research</h1>
+  <p class="notice">Planning and manual evidence are review-only. Web search unavailable unless every provider gate is explicitly configured. Use manual evidence by default.</p>
+</section>
+<section class="panel">
+  <h2>Safe demo markets</h2>
+  <div class="responsive-table"><table><thead><tr><th>Market</th><th>Recommended side</th><th>News Odds</th><th>APIs</th></tr></thead><tbody>
+    {% for market in markets %}
+    {% set edge = market.market_edge_recommendation %}
+    <tr>
+      <td><a href="/v3/markets/{{ market.id }}">{{ market.question }}</a></td>
+      <td>{{ edge.recommended_side }} · {{ edge.side_badge }}</td>
+      <td><a class="button-link" href="/v3/markets/{{ market.id }}/news-odds">Open News Odds panel</a></td>
+      <td><code>POST /api/v3/ai/news-odds/market/{{ market.id }}/plan</code><br><code>POST /api/v3/ai/news-odds/market/{{ market.id }}/adjust</code></td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

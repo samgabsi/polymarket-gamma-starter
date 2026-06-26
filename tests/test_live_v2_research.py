@@ -36,7 +36,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_6():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_research_source_queue_note_candidate_conversion_and_exports():
@@ -80,7 +80,7 @@ def test_research_routes_and_api_endpoints(authed_client):
     page = authed_client.get("/v2-live/research")
     assert page.status_code == 200
     assert "Research Intake Workspace" in page.text
-    assert "v4.0.1-real" in page.text
+    assert "v4.7.0-real" in page.text
     thesis = authed_client.post("/api/v2/live/strategy/theses", json={"market_title": "Route market", "market_id": "route-1", "thesis_summary": "route thesis"}).json()["item"]
     source_resp = authed_client.post("/api/v2/live/research/sources", json={"title": "Route source", "source_type": "news", "related_thesis_id": thesis["id"]})
     assert source_resp.status_code == 200

@@ -128,6 +128,8 @@ def _group_for_key(key: str) -> str:
         return "First-run setup"
     if key in {"OPENAI_API_KEY", "NEWS_API_KEY"}:
         return "Optional integrations"
+    if key.startswith("KALSHI_") or key.startswith("ARBITRAGE_") or key.startswith("AI_ODDS_ADJUSTMENT") or key.startswith("AI_DEFAULT_MAX_ADJUSTMENT") or key.startswith("AI_BALANCED_MAX_ADJUSTMENT") or key.startswith("AI_AGGRESSIVE_MAX_ADJUSTMENT") or key.startswith("AI_ABSOLUTE_HARD_CAP") or key.startswith("AI_REQUIRE_") or key.startswith("AI_ALLOW_CAP_EXCEED"):
+        return "AI & Arbitrage review"
     if key.startswith("PAPER_"):
         return "Paper trading"
     if key.startswith("TRAINING_"):
@@ -192,7 +194,7 @@ def _looks_bool(default: str, key: str) -> bool:
     if str(default).strip().lower() in TRUE_VALUES | FALSE_VALUES:
         return True
     suffixes = ("_ENABLED", "_REQUIRED", "_ONLY", "_READONLY", "_SECURE", "_MODE", "_FETCH_ENABLED", "_ALLOW_NETWORK", "_ALLOW_INTERNET")
-    if key.endswith(suffixes) and key not in {"APP_MODE", "POLYMARKET_V2_TRADING_MODE", "POLYMARKET_LIVE_SDK_SUBMIT_METHOD", "POLYMARKET_LIVE_SDK_CANCEL_METHOD"}:
+    if key.endswith(suffixes) and key not in {"APP_MODE", "AI_ODDS_ADJUSTMENT_MODE", "POLYMARKET_V2_TRADING_MODE", "POLYMARKET_LIVE_SDK_SUBMIT_METHOD", "POLYMARKET_LIVE_SDK_CANCEL_METHOD"}:
         return True
     return False
 
@@ -208,6 +210,7 @@ def _looks_float(default: str) -> bool:
 def _allowed_values_for(key: str) -> list[str]:
     mapping = {
         "APP_MODE": ["read_only", "paper", "local_research"],
+        "AI_ODDS_ADJUSTMENT_MODE": ["off", "conservative", "balanced", "aggressive", "custom"],
         "SESSION_COOKIE_SAMESITE": ["lax", "strict", "none"],
         "HOST": ["127.0.0.1", "0.0.0.0"],
         "POLYMARKET_CHAIN_ID": ["137"],
@@ -958,7 +961,7 @@ def setup_runtime_status() -> dict[str, Any]:
     }
     deps_missing = [row for row in dependency_rows if not row.get("available")]
     status["sections"] = [
-        {"name": "App", "tone": "ok", "rows": [{"label": "App version", "detected": APP_VERSION, "expected": "4.0.1-real"}, {"label": "Package mode", "detected": status["package_mode"], "expected": "source_tree"}]},
+        {"name": "App", "tone": "ok", "rows": [{"label": "App version", "detected": APP_VERSION, "expected": "4.7.0-real"}, {"label": "Package mode", "detected": status["package_mode"], "expected": "source_tree"}]},
         {"name": "Python", "tone": "ok", "rows": [{"label": "Python version", "detected": status["python_version"], "expected": "3.10+"}, {"label": "Executable", "detected": status["python_executable"], "expected": "Project venv executable recommended"}]},
         {"name": "Virtual Environment", "tone": "ok" if venv_detected else "warning", "rows": [{"label": "Venv detected", "detected": "yes" if venv_detected else "no", "expected": "yes for local operator installs"}, {"label": "sys.prefix", "detected": sys.prefix, "expected": "Inside .venv when activated"}]},
         {"name": "Launch", "tone": "info", "rows": [{"label": "Expected launch", "detected": status["expected_launch_command"], "expected": "Copy and run manually; UI does not execute commands"}]},
@@ -1137,6 +1140,7 @@ def settings_dashboard() -> dict[str, Any]:
         {"label": "Configuration Export", "href": "/api/config/export-sanitized", "description": "Download a secret-safe troubleshooting report."},
         {"label": "Environment Diff Preview", "href": "/settings/configuration#save-controls", "description": "Preview pending .env changes before writing anything."},
         {"label": "Configuration Audit History", "href": "/api/config/audit-history", "description": "See recent runtime-only save audits with secrets masked."},
+        {"label": "Feature Readiness Review", "href": "/v3/feature-readiness", "description": "Review truthful working/partial/config-required/scaffolded statuses and record a local acknowledgement."},
         {"label": "Host Training Configuration", "href": "/settings/configuration?mode=simple&filter=training", "description": "Configure host jobs, row caps, and 100K batch training safely."},
         {"label": "Data / Internet Ingestion", "href": "/settings/configuration?mode=simple&filter=data", "description": "Review data source, dataset, and internet-ingestion switches."},
         {"label": "Paper Trading", "href": "/settings/configuration?mode=simple&filter=paper", "description": "Tune local simulation and paper-workflow settings."},

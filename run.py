@@ -4,7 +4,7 @@ import socket
 
 import uvicorn
 
-from app.config import settings
+from app.config import APP_VERSION, settings
 
 
 def local_lan_ips() -> list[str]:
@@ -35,7 +35,7 @@ def local_lan_ips() -> list[str]:
 def print_startup_urls() -> None:
     host = settings.host
     port = settings.port
-    print("\nPolymarket OP Console v1.4.0-real")
+    print(f"\nPolymarket OP Console v{APP_VERSION}")
     print(f"Binding host: {host}")
     print("Security:     Auth required; security headers enabled; configurable ALLOWED_HOSTS")
     print(f"Local URL:    http://127.0.0.1:{port}")

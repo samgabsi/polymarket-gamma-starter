@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Family News Odds · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/opportunities">Opportunity Review</a> / <a href="/v3/markets/family/{{ family.family_id }}">Family</a> / <span>News Odds</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.7.0-real · Family News Odds</p>
+  <h1>{{ family.family_title }}</h1>
+  <p class="notice">Family news analysis is review-only. family normalization not applied unless the family is clearly complete and mutually exhaustive.</p>
+  <div class="link-row"><a class="button-link" href="/v3/markets/family/{{ family.family_id }}">Back to Family Comparison</a><a class="button-link quiet" href="/api/v3/ai/news-odds/family/{{ family.family_id }}/plan">Plan family search</a><a class="button-link quiet" href="/v3/ai/news-odds/source-weights">Source weights</a></div>
+</section>
+<section class="panel"><h2>Family news adjustment posture</h2><p>{{ family.news_odds_summary }}</p><p>{{ family.favorite_vs_edge }}</p><ul class="compact"><li>Outcome-specific news can affect one market without implying a full-family normalization.</li><li>Incomplete family grouping is not treated as mutually exhaustive.</li><li>Favorite does not equal edge; source weighting does not imply truth.</li></ul></section>
+<section class="panel"><h2>Markets in family</h2><div class="responsive-table"><table><thead><tr><th>Market</th><th>YES Price</th><th>Model Fair</th><th>Edge</th><th>News Odds</th></tr></thead><tbody>{% for row in family["items"] %}<tr><td>{{ row.market_title }}</td><td>{% if row.market_yes_price is not none %}{{ '%.1f%%'|format(row.market_yes_price * 100) }}{% else %}unavailable{% endif %}</td><td>{% if row.model_fair_yes is not none %}{{ '%.1f%%'|format(row.model_fair_yes * 100) }}{% else %}unavailable{% endif %}</td><td>{% if row.yes_edge_pp is not none %}{{ '%+.1f pp'|format(row.yes_edge_pp) }}{% else %}unavailable{% endif %}</td><td><a href="{{ row.news_odds_href }}">Open panel</a></td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

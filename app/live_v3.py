@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from .config import APP_VERSION, DATA_DIR
+from .config import APP_VERSION, DATA_DIR, settings as app_settings
 from .live_v2 import build_live_v2_readiness, build_live_v2_status, list_audit_records, record_audit, redact_data, redact_text
 from .live_strategy import list_theses, list_evidence, list_watchlist, list_scorecards, list_reviews
 from .live_research import list_sources, list_queue, list_notes, list_candidates, freshness_summary, build_thesis_comparison
@@ -688,21 +689,438 @@ def _extract_stale_evidence(data: dict[str, Any], thesis_id: str = "", market_id
     return stale[:50]
 
 
+
+
+V3_UI_SETTING_DEFINITIONS: list[dict[str, Any]] = [
+    {
+        "key": "ai_odds_adjustment_enabled",
+        "env_key": "AI_ODDS_ADJUSTMENT_ENABLED",
+        "label": "AI odds adjustment enabled",
+        "group": "AI odds adjustment",
+        "description": "Controls whether AI odds adjustment review surfaces are enabled. Outputs remain advisory and review-only.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": True,
+        "restart_required": True,
+    },
+    {
+        "key": "ai_odds_adjustment_mode",
+        "env_key": "AI_ODDS_ADJUSTMENT_MODE",
+        "label": "AI odds adjustment mode",
+        "group": "AI odds adjustment",
+        "description": "Operator preference for conservative, balanced, aggressive, or custom cap posture.",
+        "value_type": "select",
+        "control": "select",
+        "allowed_values": ["off", "conservative", "balanced", "aggressive", "custom"],
+        "default_value": "conservative",
+        "restart_required": True,
+    },
+    {
+        "key": "ai_default_max_adjustment_pct",
+        "env_key": "AI_DEFAULT_MAX_ADJUSTMENT_PCT",
+        "label": "Conservative/default max adjustment pct",
+        "group": "AI odds adjustment",
+        "description": "Default soft cap. Safe default preserves the old 2.5 percentage-point posture unless evidence/config permit more.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 2.5,
+        "min_value": 0.0,
+        "max_value": 25.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "ai_balanced_max_adjustment_pct",
+        "env_key": "AI_BALANCED_MAX_ADJUSTMENT_PCT",
+        "label": "Balanced max adjustment pct",
+        "group": "AI odds adjustment",
+        "description": "Soft cap used by balanced mode when evidence quality supports a larger adjustment.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 7.5,
+        "min_value": 0.0,
+        "max_value": 25.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "ai_aggressive_max_adjustment_pct",
+        "env_key": "AI_AGGRESSIVE_MAX_ADJUSTMENT_PCT",
+        "label": "Aggressive max adjustment pct",
+        "group": "AI odds adjustment",
+        "description": "Upper soft cap for aggressive mode; hard cap and operator confirmation still apply.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 15.0,
+        "min_value": 0.0,
+        "max_value": 25.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "ai_absolute_hard_cap_pct",
+        "env_key": "AI_ABSOLUTE_HARD_CAP_PCT",
+        "label": "Absolute hard cap pct",
+        "group": "AI odds adjustment",
+        "description": "Never allow final adjustment above this cap. This protects against extreme model or evidence errors.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 25.0,
+        "min_value": 0.0,
+        "max_value": 25.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "ai_require_operator_confirm_above_pct",
+        "env_key": "AI_REQUIRE_OPERATOR_CONFIRM_ABOVE_PCT",
+        "label": "Operator confirmation threshold pct",
+        "group": "AI odds adjustment",
+        "description": "Large adjustments above this threshold require explicit operator confirmation before being treated as review context.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 10.0,
+        "min_value": 0.0,
+        "max_value": 25.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "arbitrage_scanner_enabled",
+        "env_key": "ARBITRAGE_SCANNER_ENABLED",
+        "label": "Arbitrage scanner enabled",
+        "group": "Cross-market arbitrage",
+        "description": "Enables review-first scan surfaces. Disabled default keeps the page in sample/config-required mode.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": False,
+        "restart_required": True,
+    },
+    {
+        "key": "arbitrage_min_net_margin_pct",
+        "env_key": "ARBITRAGE_MIN_NET_MARGIN_PCT",
+        "label": "Minimum net arbitrage margin pct",
+        "group": "Cross-market arbitrage",
+        "description": "Minimum net margin after fees/slippage before an opportunity should be considered for review.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 1.0,
+        "min_value": 0.0,
+        "max_value": 50.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "arbitrage_min_confidence",
+        "env_key": "ARBITRAGE_MIN_CONFIDENCE",
+        "label": "Minimum arbitrage confidence",
+        "group": "Cross-market arbitrage",
+        "description": "Minimum normalized equivalence/confidence score for review-worthy candidates.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 0.72,
+        "min_value": 0.0,
+        "max_value": 1.0,
+        "step": 0.01,
+        "restart_required": True,
+    },
+    {
+        "key": "arbitrage_max_stale_seconds",
+        "env_key": "ARBITRAGE_MAX_STALE_SECONDS",
+        "label": "Maximum stale seconds",
+        "group": "Cross-market arbitrage",
+        "description": "Data older than this should be marked stale before a candidate is trusted.",
+        "value_type": "int",
+        "control": "number",
+        "default_value": 300,
+        "min_value": 10,
+        "max_value": 86400,
+        "step": 10,
+        "restart_required": True,
+    },
+    {
+        "key": "kalshi_enabled",
+        "env_key": "KALSHI_ENABLED",
+        "label": "Kalshi adapter enabled",
+        "group": "Venue configuration",
+        "description": "Disabled by default. Enable only when read-only Kalshi discovery/orderbook access should be attempted.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": False,
+        "restart_required": True,
+    },
+    {
+        "key": "kalshi_use_demo",
+        "env_key": "KALSHI_USE_DEMO",
+        "label": "Use Kalshi demo host",
+        "group": "Venue configuration",
+        "description": "Routes Kalshi read attempts toward the demo base URL when the adapter is explicitly enabled.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": False,
+        "restart_required": True,
+    },
+    {
+        "key": "kalshi_api_base_url",
+        "env_key": "KALSHI_API_BASE_URL",
+        "label": "Kalshi API base URL",
+        "group": "Venue configuration",
+        "description": "Public/private Kalshi API base URL. This is not a credential, but changes require restart.",
+        "value_type": "text",
+        "control": "text",
+        "default_value": "https://external-api.kalshi.com/trade-api/v2",
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_enabled",
+        "env_key": "PAPER_TRADING_ENABLED",
+        "label": "Paper trading enabled",
+        "group": "Automated paper trading",
+        "description": "Enables the local paper trading ledger and simulated broker. This never enables live trading.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": False,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_automation_enabled",
+        "env_key": "PAPER_TRADING_AUTOMATION_ENABLED",
+        "label": "Automated paper strategy loop enabled",
+        "group": "Automated paper trading",
+        "description": "Allows the paper strategy runner to evaluate candidates and create simulated orders when invoked.",
+        "value_type": "bool",
+        "control": "toggle",
+        "default_value": False,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_starting_balance",
+        "env_key": "PAPER_TRADING_STARTING_BALANCE",
+        "label": "Paper account starting balance",
+        "group": "Automated paper trading",
+        "description": "Starting cash for local simulated account resets.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 1000.0,
+        "min_value": 1.0,
+        "max_value": 1000000.0,
+        "step": 1.0,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_max_order_notional",
+        "env_key": "PAPER_TRADING_MAX_ORDER_NOTIONAL",
+        "label": "Max paper order notional",
+        "group": "Automated paper trading",
+        "description": "Maximum simulated notional per paper order.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 25.0,
+        "min_value": 0.0,
+        "max_value": 100000.0,
+        "step": 1.0,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_max_daily_notional",
+        "env_key": "PAPER_TRADING_MAX_DAILY_NOTIONAL",
+        "label": "Max daily paper notional",
+        "group": "Automated paper trading",
+        "description": "Maximum simulated notional per UTC day.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 250.0,
+        "min_value": 0.0,
+        "max_value": 1000000.0,
+        "step": 1.0,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_min_edge_pct",
+        "env_key": "PAPER_TRADING_MIN_EDGE_PCT",
+        "label": "Minimum paper edge pct",
+        "group": "Automated paper trading",
+        "description": "Minimum edge required before the automation can create a paper order.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 2.0,
+        "min_value": 0.0,
+        "max_value": 100.0,
+        "step": 0.1,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_min_confidence",
+        "env_key": "PAPER_TRADING_MIN_CONFIDENCE",
+        "label": "Minimum paper confidence",
+        "group": "Automated paper trading",
+        "description": "Minimum confidence required before a paper order can be simulated.",
+        "value_type": "float",
+        "control": "number",
+        "default_value": 0.70,
+        "min_value": 0.0,
+        "max_value": 1.0,
+        "step": 0.01,
+        "restart_required": True,
+    },
+    {
+        "key": "paper_trading_fill_model",
+        "env_key": "PAPER_TRADING_FILL_MODEL",
+        "label": "Paper fill model",
+        "group": "Automated paper trading",
+        "description": "Simulated fill model used by the paper broker.",
+        "value_type": "select",
+        "control": "select",
+        "allowed_values": ["top_of_book", "midpoint", "conservative", "adverse"],
+        "default_value": "conservative",
+        "restart_required": True,
+    },
+]
+
+
+def _read_saved_v3_settings() -> dict[str, Any]:
+    try:
+        if V3_SETTINGS_PATH.exists():
+            data = json.loads(V3_SETTINGS_PATH.read_text(encoding="utf-8"))
+            return data if isinstance(data, dict) else {}
+    except (OSError, json.JSONDecodeError):
+        return {"settings_warning": "Settings file was invalid JSON; runtime defaults are shown."}
+    return {}
+
+
+def _runtime_setting_value(definition: dict[str, Any]) -> Any:
+    key = str(definition["key"])
+    return getattr(app_settings, key, definition.get("default_value"))
+
+
+def _setting_source(definition: dict[str, Any]) -> str:
+    env_key = str(definition.get("env_key") or "")
+    if env_key and env_key in os.environ:
+        return "process_environment_or_dotenv"
+    return "runtime_default"
+
+
+def _mask_setting_value(value: Any, *, secret: bool = False) -> Any:
+    if not secret:
+        return value
+    return "configured_redacted" if value not in {None, "", False} else "not_configured"
+
+
+def _coerce_v3_setting_value(definition: dict[str, Any], raw_value: Any) -> tuple[Any | None, str | None]:
+    key = str(definition["key"])
+    value_type = str(definition.get("value_type") or "text")
+    if definition.get("secret"):
+        return None, f"{key} is secret-backed and cannot be saved from the v3 UI preference form."
+    try:
+        if value_type == "bool":
+            if isinstance(raw_value, bool):
+                value = raw_value
+            else:
+                value = str(raw_value or "").strip().lower() in {"1", "true", "yes", "on"}
+        elif value_type == "int":
+            value = int(float(str(raw_value).strip()))
+        elif value_type == "float":
+            value = float(str(raw_value).strip())
+        elif value_type == "select":
+            value = str(raw_value or "").strip().lower()
+            allowed = [str(v) for v in definition.get("allowed_values", [])]
+            if allowed and value not in allowed:
+                return None, f"{key} must be one of: {', '.join(allowed)}."
+        else:
+            value = str(raw_value or "").strip()
+    except (TypeError, ValueError):
+        return None, f"{key} could not be parsed as {value_type}."
+
+    if value_type in {"float", "int"}:
+        min_value = definition.get("min_value")
+        max_value = definition.get("max_value")
+        numeric = float(value)
+        if min_value is not None and numeric < float(min_value):
+            return None, f"{key} must be >= {min_value}."
+        if max_value is not None and numeric > float(max_value):
+            return None, f"{key} must be <= {max_value}."
+    if key == "ai_absolute_hard_cap_pct" and float(value) > 25.0:
+        return None, "ai_absolute_hard_cap_pct cannot exceed 25.0 in the operator preference UI."
+    if key == "kalshi_api_base_url" and value and not str(value).startswith(("https://", "http://")):
+        return None, "kalshi_api_base_url must start with http:// or https://."
+    return value, None
+
+
+def _build_v3_settings_sections(saved: dict[str, Any]) -> list[dict[str, Any]]:
+    saved_preferences = saved.get("preferences") if isinstance(saved.get("preferences"), dict) else {}
+    rows: list[dict[str, Any]] = []
+    for definition in V3_UI_SETTING_DEFINITIONS:
+        secret = bool(definition.get("secret"))
+        key = str(definition["key"])
+        runtime_value = _runtime_setting_value(definition)
+        has_saved = key in saved_preferences
+        saved_value = saved_preferences.get(key)
+        effective_operator_value = saved_value if has_saved else runtime_value
+        rows.append(redact_data({
+            **definition,
+            "runtime_value": _mask_setting_value(runtime_value, secret=secret),
+            "saved_preference": _mask_setting_value(saved_value, secret=secret) if has_saved else None,
+            "effective_operator_value": _mask_setting_value(effective_operator_value, secret=secret),
+            "source": "ui_preference" if has_saved else _setting_source(definition),
+            "runtime_source": _setting_source(definition),
+            "saved": has_saved,
+            "editable": not secret,
+            "requires_restart": bool(definition.get("restart_required", True)),
+            "secret": secret,
+            "review_only": True,
+            "live_disabled": True,
+        }))
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row.get("group") or "General"), []).append(row)
+    return [{"group": group, "items": items, "count": len(items)} for group, items in grouped.items()]
+
+
 def build_v3_settings() -> dict[str, Any]:
+    saved = _read_saved_v3_settings()
+    sections = _build_v3_settings_sections(saved)
+    flattened = [item for section in sections for item in section["items"]]
+    configured_count = sum(1 for item in flattened if item.get("saved"))
     settings = {
         "version": APP_VERSION,
+        "generated_at": _now(),
+        "workflow_status": "working",
+        "workflow_name": "v3 operator settings preferences",
+        "settings_storage_path": str(V3_SETTINGS_PATH),
+        "settings_storage_state": "saved_preferences_present" if configured_count else "runtime_defaults_only",
+        "settings_warning": saved.get("settings_warning", ""),
         "ai_assistance_enabled": False,
         "analysis_provider": {"provider": "deterministic_local", "enabled": False, "external_calls_allowed": False, "secret_values_sent": False},
+        "sections": sections,
+        "editable_keys": [str(item["key"]) for item in flattened if item.get("editable")],
+        "configured_preference_count": configured_count,
+        "operator_feedback": {
+            "save_supported": True,
+            "invalid_values_rejected": True,
+            "secrets_masked": True,
+            "restart_required_visible": True,
+            "runtime_env_not_mutated": True,
+        },
         "preferences": [
-            {"key": "default_landing_page", "value": "/v3", "secret": False},
-            {"key": "search_index_manual_rebuild", "value": True, "secret": False},
-            {"key": "graph_manual_rebuild", "value": True, "secret": False},
-            {"key": "workflow_outputs_are_drafts", "value": True, "secret": False},
-            {"key": "prompt_payload_redaction", "value": "always", "secret": False},
-            {"key": "packet_generation_default", "value": "read_only", "secret": False},
+            {"key": "default_landing_page", "value": "/v3", "secret": False, "source": "runtime_default", "saved": False},
+            {"key": "search_index_manual_rebuild", "value": True, "secret": False, "source": "runtime_default", "saved": False},
+            {"key": "graph_manual_rebuild", "value": True, "secret": False, "source": "runtime_default", "saved": False},
+            {"key": "workflow_outputs_are_drafts", "value": True, "secret": False, "source": "runtime_default", "saved": False},
+            {"key": "prompt_payload_redaction", "value": "always", "secret": False, "source": "runtime_default", "saved": False},
+            {"key": "packet_generation_default", "value": "read_only", "secret": False, "source": "runtime_default", "saved": False},
         ],
+        "last_saved_at": saved.get("saved_at"),
+        "last_operator_payload_keys": saved.get("operator_payload_keys", []),
+        "validation_errors": saved.get("last_validation_errors", []),
+        "audit_action": "settings_preferences_saved",
         "secret_values_returned": False,
         "sensitive_data_allowed": False,
+        "review_only": True,
+        "safe_review_only": True,
+        "live_disabled": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
     }
     return redact_data(settings)
 
@@ -710,13 +1128,77 @@ def build_v3_settings() -> dict[str, Any]:
 def update_v3_settings(payload: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = redact_data(payload or {})
     _ensure_dir()
-    current = build_v3_settings()
-    current["updated_at"] = _now()
-    current["operator_payload_keys"] = sorted([k for k in payload.keys() if "secret" not in k.lower() and "key" not in k.lower()])
-    V3_SETTINGS_PATH.write_text(json.dumps(current, indent=2, sort_keys=True, default=str), encoding="utf-8")
-    _event("settings_changed", "ok", {"keys": current["operator_payload_keys"]})
-    return {"ok": True, "settings": current, "secret_values_returned": False}
+    current_saved = _read_saved_v3_settings()
+    current_preferences = current_saved.get("preferences") if isinstance(current_saved.get("preferences"), dict) else {}
+    definitions = {str(item["key"]): item for item in V3_UI_SETTING_DEFINITIONS}
+    updates: dict[str, Any] = {}
+    errors: list[dict[str, str]] = []
+    ignored_keys: list[str] = []
+    for key, raw_value in payload.items():
+        if str(key).startswith("_"):
+            continue
+        if key not in definitions:
+            ignored_keys.append(str(key))
+            continue
+        value, error = _coerce_v3_setting_value(definitions[key], raw_value)
+        if error:
+            errors.append({"key": key, "error": error})
+        else:
+            updates[key] = value
+    if errors:
+        rejected = {
+            "ok": False,
+            "version": APP_VERSION,
+            "errors": errors,
+            "ignored_keys": ignored_keys,
+            "updated_keys": [],
+            "settings": build_v3_settings(),
+            "secret_values_returned": False,
+            "order_submitted": False,
+            "order_cancelled": False,
+            "trade_approved": False,
+            "review_only": True,
+            "live_disabled": True,
+        }
+        _event("settings_preferences_rejected", "blocked", {"errors": errors, "ignored_keys": ignored_keys, "source_route": payload.get("_source_route", "/api/v3/settings"), "source_component": payload.get("_source_component", "api_v3_settings_update")})
+        return redact_data(rejected)
 
+    new_preferences = {**current_preferences, **updates}
+    record = redact_data({
+        "version": APP_VERSION,
+        "saved_at": _now(),
+        "preferences": new_preferences,
+        "operator_payload_keys": sorted(updates.keys()),
+        "ignored_keys": ignored_keys,
+        "last_validation_errors": [],
+        "source_route": payload.get("_source_route", "/api/v3/settings"),
+        "source_component": payload.get("_source_component", "api_v3_settings_update"),
+        "secret_values_returned": False,
+        "review_only": True,
+        "safe_review_only": True,
+        "live_disabled": True,
+        "order_submitted": False,
+        "order_cancelled": False,
+        "trade_approved": False,
+    })
+    V3_SETTINGS_PATH.write_text(json.dumps(record, indent=2, sort_keys=True, default=str), encoding="utf-8")
+    _event(
+        "settings_preferences_saved",
+        "ok",
+        {
+            "keys": sorted(updates.keys()),
+            "ignored_keys": ignored_keys,
+            "previous_state": {key: current_preferences.get(key) for key in updates},
+            "new_state": updates,
+            "source_route": payload.get("_source_route", "/api/v3/settings"),
+            "source_component": payload.get("_source_component", "api_v3_settings_update"),
+            "restart_required": True,
+            "runtime_env_mutated": False,
+            "review_only": True,
+            "live_disabled": True,
+        },
+    )
+    return {"ok": True, "settings": build_v3_settings(), "updated_keys": sorted(updates.keys()), "ignored_keys": ignored_keys, "secret_values_returned": False, "order_submitted": False, "order_cancelled": False, "trade_approved": False, "review_only": True, "live_disabled": True}
 
 def export_report_json(kind: str = "command_center", payload: dict[str, Any] | None = None) -> dict[str, Any]:
     payload = payload or {}
@@ -763,7 +1245,7 @@ def export_report_markdown(kind: str = "command_center", payload: dict[str, Any]
         lines.append(str(body)[:2000])
     return "\n".join(lines) + "\n"
 
-# v4.0.1-real polish layer: demo fixtures, filters, release validation helpers, and safer packet templates.
+# v4.4.0-real polish layer: demo fixtures, filters, release validation helpers, and safer packet templates.
 V3_DEMO_DATA_PATH = V3_DIR / "demo_fixture.json"
 
 
@@ -1013,13 +1495,13 @@ def workflow_outputs(limit: int = 100) -> dict[str, Any]:
 
 def validation_status() -> dict[str, Any]:
     required_docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     root = Path(__file__).resolve().parents[1]
     checks = []
@@ -1062,7 +1544,7 @@ def export_pre_trade_packet_markdown(payload: dict[str, Any] | None = None) -> s
 def export_operator_review_markdown(payload: dict[str, Any] | None = None) -> str:
     return export_report_markdown("operator_review", payload or {})
 
-# v4.0.1-real analytics learning layer: local-first descriptive metrics, learning reports,
+# v4.4.0-real analytics learning layer: local-first descriptive metrics, learning reports,
 # analytics search/graph integration, and read-only workflow context.
 
 _build_search_index_v31 = build_search_index
@@ -1204,14 +1686,14 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v31()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.2 analytics documentation before release."} for rel in docs]
     try:
@@ -1223,7 +1705,7 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status.update({"checks": checks, "overall_status": "pass" if all(c.get("status") == "pass" for c in checks if "v3.2" in c.get("check", "") or c.get("check") == "v3.2 analytics") else "warning", "analytics_are_descriptive": True, "secret_values_returned": False})
     return redact_data(status)
 
-# v4.0.1-real complete UI/UX redesign layer: design-system metadata,
+# v4.4.0-real complete UI/UX redesign layer: design-system metadata,
 # navigation grouping, UX validation status, and release-candidate safety signals.
 
 def design_system_status() -> dict[str, Any]:
@@ -1264,15 +1746,15 @@ def navigation_groups() -> dict[str, Any]:
 def ux_release_status() -> dict[str, Any]:
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     script_checks = [
         "scripts/capture_v3_screenshots.py",
@@ -1316,7 +1798,7 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     })
     return redact_data(status)
 
-# v4.0.1-real simulation lab integration: local-first replay, simulation, process backtesting,
+# v4.4.0-real simulation lab integration: local-first replay, simulation, process backtesting,
 # and clear live/paper/simulation separation. All helpers are read-only/descriptive.
 
 _build_search_index_v33 = build_search_index
@@ -1419,16 +1901,16 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v33()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.5 simulation documentation before release."} for rel in docs]
     try:
@@ -1480,7 +1962,7 @@ def run_workflow(payload: dict[str, Any] | None = None) -> dict[str, Any]:  # ty
             return redact_data({"run_id": f"v3_run_{uuid4().hex[:12]}", "workflow_id": workflow_id, "status": "failed", "error_redacted": redact_text(str(exc)), "order_submitted": False, "order_cancelled": False, "live_trading_armed": False, "secret_values_returned": False})
     return _run_workflow_v33(payload)
 
-# v4.0.1-real dataset/snapshot layer: read-only snapshot collection, replay datasets,
+# v4.4.0-real dataset/snapshot layer: read-only snapshot collection, replay datasets,
 # provenance, quality scoring, and local-first dataset integration. No live/paper mutation.
 _build_search_index_v34 = build_search_index
 
@@ -1576,17 +2058,17 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v34()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.5 dataset/snapshot documentation before release."} for rel in docs]
     try:
@@ -1672,7 +2154,7 @@ def clear_demo_data() -> dict[str, Any]:  # type: ignore[override]
     return redact_data(result)
 
 
-# v4.0.1-real freshness/scheduler layer: read-only collection planning, dataset freshness,
+# v4.4.0-real freshness/scheduler layer: read-only collection planning, dataset freshness,
 # local notifications, and operator-controlled collection queues.
 _build_search_index_v35 = build_search_index
 
@@ -1748,18 +2230,18 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v35()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.0.1-real.md",
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.7.0-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.7 freshness/scheduler documentation before release."} for rel in docs]
     try:
@@ -1851,7 +2333,7 @@ def clear_demo_data() -> dict[str, Any]:  # type: ignore[override]
     result["secret_values_returned"] = False
     return redact_data(result)
 
-# v4.0.1-real operator task planner, daily ops, weekly cadence, and human-in-the-loop follow-through layer.
+# v4.4.0-real operator task planner, daily ops, weekly cadence, and human-in-the-loop follow-through layer.
 _build_search_index_v36 = build_search_index
 
 def build_search_index(limit: int = 250) -> dict[str, Any]:  # type: ignore[override]
@@ -1982,19 +2464,19 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v36()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.0.1-real.md",
-        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.0.1-real.md",
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.7.0-real.md",
+        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.7.0-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.7 task planner and daily ops documentation before release."} for rel in docs]
     try:
@@ -2008,7 +2490,7 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status.update({"checks": checks, "overall_status": "pass" if task_ok and daily_ok and weekly_ok else "warning", "task_planner_active": True, "task_planning_is_local_first": True, "task_workflows_do_not_arm_live_trading": True, "task_completion_is_not_trade_approval": True, "secret_values_returned": False})
     return redact_data(status)
 
-# v4.0.1-real guided operator workspace, interactive review flows, source previews,
+# v4.4.0-real guided operator workspace, interactive review flows, source previews,
 # saved views, task dependency intelligence, and review packet integration.
 _build_search_index_v37 = build_search_index
 
@@ -2143,20 +2625,20 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v37()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.0.1-real.md",
-        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.0.1-real.md",
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.7.0-real.md",
+        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.7.0-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v3.8 guided workspace documentation before release."} for rel in docs]
     try:
@@ -2172,7 +2654,7 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status.update({"checks": checks, "overall_status": "pass" if workspace_ok and guided_ok else "warning", "guided_workspace_active": True, "guided_reviews_are_local_first": True, "guided_workflows_do_not_arm_live_trading": True, "guided_review_completion_is_not_trade_approval": True, "secret_values_returned": False})
     return redact_data(status)
 
-# v4.0.1-real multi-panel operator cockpit, saved layouts, keyboard navigation,
+# v4.4.0-real multi-panel operator cockpit, saved layouts, keyboard navigation,
 # safe command palette, focus modes, side-by-side context, and dependency visualization.
 _build_search_index_v38 = build_search_index
 
@@ -2308,21 +2790,21 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     status = _validation_status_v38()
     root = Path(__file__).resolve().parents[1]
     docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V3_OPERATOR_COCKPIT_GUIDE_v4.0.1-real.md",
-        "docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.0.1-real.md",
-        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.0.1-real.md",
-        "docs/V3_DATASET_BUILDER_GUIDE_v4.0.1-real.md",
-        "docs/V3_SIMULATION_LAB_GUIDE_v4.0.1-real.md",
-        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md",
-        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md",
-        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V3_OPERATOR_COCKPIT_GUIDE_v4.7.0-real.md",
+        "docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_TASK_PLANNER_GUIDE_v4.7.0-real.md",
+        "docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.7.0-real.md",
+        "docs/V3_DATASET_BUILDER_GUIDE_v4.7.0-real.md",
+        "docs/V3_SIMULATION_LAB_GUIDE_v4.7.0-real.md",
+        "docs/V3_UI_UX_REDESIGN_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.7.0-real.md",
+        "docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.7.0-real.md",
+        "docs/V2_TO_V3_MIGRATION_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = status.get("checks", []) + [{"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review v4.0 cockpit documentation before release."} for rel in docs]
     try:
@@ -2357,10 +2839,17 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
 
 # v4 platform stabilization overrides and integration hooks.
 from . import platform_diagnostics as _v4_platform_diagnostics
+from . import platform_api as _v4_platform_api
+from . import platform_migrations as _v4_platform_migrations
 from . import platform_plugins as _v4_platform_plugins
 from . import platform_routes as _v4_platform_routes
 from . import platform_storage as _v4_platform_storage
 from . import platform_safety as _v4_platform_safety
+from . import ai_suggestions as _v4_ai
+from . import ai_operator_copilot as _v4_ai_copilot
+from . import ai_prompt_governance as _v4_ai_prompts
+from . import ai_schemas as _v4_ai_schemas
+from . import ai_edge_research as _v4_ai_edge
 
 _build_search_index_v39 = build_search_index
 _build_decision_graph_v39 = build_decision_graph
@@ -2375,21 +2864,33 @@ def build_search_index(limit: int = 250) -> dict[str, Any]:  # type: ignore[over
     base = _build_search_index_v39(limit=limit)
     rows = list(base.get("items", []))
     rows.extend(_v4_platform_diagnostics.search_items())
+    rows.extend(_v4_ai.search_items(limit=limit))
+    rows.extend(_v4_ai_edge.search_items(limit=limit))
     rows = rows[: max(1, min(int(limit or 250), 1000))]
-    base.update({"version": APP_VERSION, "count": len(rows), "items": redact_data(rows), "platform_indexed": len([r for r in rows if str(r.get("result_type", "")).startswith("platform")]), "secret_values_returned": False})
+    base.update({"version": APP_VERSION, "count": len(rows), "items": redact_data(rows), "platform_indexed": len([r for r in rows if str(r.get("result_type", "")).startswith("platform")]), "ai_indexed": len([r for r in rows if str(r.get("result_type", "")).startswith("ai") or "openai" in str(r.get("result_type", "")) or "chatgpt" in str(r.get("result_type", ""))]), "secret_values_returned": False})
     return base
 
 
 def build_decision_graph(limit: int = 250) -> dict[str, Any]:  # type: ignore[override]
     graph = _build_decision_graph_v39(limit=limit)
     nodes, edges = _v4_platform_diagnostics.graph_nodes()
+    ai_nodes, ai_edges = _v4_ai.graph_nodes()
+    edge_nodes, edge_edges = _v4_ai_edge.graph_nodes()
+    nodes.extend(ai_nodes)
+    edges.extend(ai_edges)
+    nodes.extend(edge_nodes)
+    edges.extend(edge_edges)
     existing = {n.get("node_id") for n in graph.get("nodes", [])}
     new_nodes = [n for n in nodes if n.get("node_id") not in existing]
     graph["nodes"] = graph.get("nodes", []) + new_nodes
     graph["edges"] = graph.get("edges", []) + edges
     existing_types = {str(n.get("node_type", "")) for n in graph["nodes"]}
     existing_ids = {str(n.get("node_id", "")) for n in graph["nodes"]}
-    for item in build_search_index(limit=1000).get("items", []):
+    # Keep v4.3 graph enrichment bounded. The full local search index can be
+    # very large on mature packages, and graph diagnostics are only intended to
+    # provide a fast, representative inventory for UI/validation.
+    safe_limit = max(1, min(int(limit or 250), 100))
+    for item in build_search_index(limit=safe_limit).get("items", []):
         rtype = str(item.get("result_type", ""))
         rid = str(item.get("result_id") or item.get("id") or "")
         if not rid or rid in existing_ids:
@@ -2404,9 +2905,39 @@ def build_decision_graph(limit: int = 250) -> dict[str, Any]:  # type: ignore[ov
             })
             existing_ids.add(rid)
             existing_types.add(rtype)
+    max_nodes = max(1, min(int(limit or 250), 500))
+    max_edges = max_nodes * 4
+    prioritized_nodes = list(graph.get("nodes", []))
+    for token in ("analytics", "simulation"):
+        match_index = next((index for index, node in enumerate(prioritized_nodes) if token in str(node.get("node_type", ""))), None)
+        if match_index is not None:
+            prioritized_nodes.insert(0, prioritized_nodes.pop(match_index))
+            continue
+        if graph.get(f"{token}_nodes", 0):
+            prioritized_nodes.insert(0, {
+                "node_id": f"{token}:representative",
+                "node_type": f"{token}_representative",
+                "title": f"{token.title()} Representative Node",
+                "status": "available",
+                "summary": "Representative node retained for graph compatibility when the bounded graph sample omits detailed nodes.",
+            })
+            continue
+        for item in build_search_index(limit=250).get("items", []):
+            if token in str(item.get("result_type", "")):
+                prioritized_nodes.insert(0, {
+                    "node_id": str(item.get("result_id") or f"{token}:representative"),
+                    "node_type": str(item.get("result_type") or token),
+                    "title": item.get("title", token.title()),
+                    "status": item.get("status", "available"),
+                    "summary": item.get("summary", "Local v4 graph coverage node."),
+                })
+                break
+    graph["nodes"] = prioritized_nodes[:max_nodes]
+    graph["edges"] = list(graph.get("edges", []))[:max_edges]
     graph["node_count"] = len(graph["nodes"])
     graph["edge_count"] = len(graph["edges"])
     graph["platform_nodes"] = len([n for n in graph["nodes"] if str(n.get("node_type", "")).startswith("platform")])
+    graph["ai_nodes"] = len([n for n in graph["nodes"] if str(n.get("node_type", "")).startswith("ai") or "openai" in str(n.get("node_type", "")) or "chatgpt" in str(n.get("node_type", ""))])
     graph["secret_values_returned"] = False
     return redact_data(graph)
 
@@ -2423,7 +2954,25 @@ def build_command_center() -> dict[str, Any]:  # type: ignore[override]
         "next_platform_action": platform.get("next_platform_action"),
     }
     center["platform_summary"] = platform
-    center["next_operator_actions"] = list(center.get("next_operator_actions", [])) + ["Review v4 platform diagnostics and plugin manifests before adding v4.x modules."]
+    ai_summary = _v4_ai.ai_summary()
+    groups["ai"] = {
+        "openai_api_enabled": ai_summary.get("copilot", {}).get("settings", {}).get("openai_enable_api", False),
+        "dry_run_only": ai_summary.get("copilot", {}).get("settings", {}).get("openai_dry_run_only", True),
+        "suggestion_count": ai_summary.get("suggestion_count", 0),
+        "review_packet_count": ai_summary.get("review_packet_count", 0),
+        "chatgpt_connector_status": ai_summary.get("chatgpt_connector_disabled_by_default", True),
+    }
+    center["ai_summary"] = ai_summary
+    edge_summary = _v4_ai_edge.edge_summary()
+    groups["ai_edge"] = {
+        "edge_enabled": edge_summary.get("settings", {}).get("ai_edge_enable", False),
+        "web_search_enabled": edge_summary.get("settings", {}).get("openai_enable_web_search", False),
+        "packet_count": edge_summary.get("packet_count", 0),
+        "evidence_source_count": edge_summary.get("evidence_source_count", 0),
+        "calibration_records": edge_summary.get("calibration", {}).get("record_count", 0),
+    }
+    center["ai_edge_summary"] = edge_summary
+    center["next_operator_actions"] = list(center.get("next_operator_actions", [])) + ["Review v4 platform diagnostics and plugin manifests before adding v4.x modules.", "Use AI Copilot drafts only after confirming redaction, dry-run status, and human-review boundaries.", "Use AI Edge Research packets only as evidence-backed drafts with citations, contradictions, missing-info tracking, and calibration."]
     center["secret_values_returned"] = False
     return redact_data(center)
 
@@ -2439,15 +2988,69 @@ def workflow_templates() -> dict[str, Any]:  # type: ignore[override]
         ("release_candidate_readiness_review", "Release Candidate Readiness Review", "Roll up version, validation, docs, package cleanliness, and safety checks."),
         ("package_cleanliness_review", "Package Cleanliness Review", "Review release ZIP exclusion policy and runtime artifact safety."),
         ("safety_boundary_review", "Safety Boundary Review", "Review no-live-mutation, no financial advice, and secret safety boundaries."),
+        ("api_schema_consistency_review", "API Schema Consistency Review", "Review shared response envelopes, API families, schema objects, and backward compatibility notes."),
+        ("runtime_migration_planning_review", "Runtime Migration Planning Review", "Generate a non-destructive migration plan without deleting, moving, rewriting, or migrating runtime data automatically."),
+        ("storage_namespace_backup_review", "Storage Namespace Backup Review", "Review package-excluded storage namespaces and backup recommendations."),
+        ("route_boundary_review", "Route Boundary Review", "Review route ownership, family classification, safety classes, docs links, and future APIRouter notes."),
+        ("router_extraction_readiness_review", "Router Extraction Readiness Review", "Review extracted router modules, path preservation, ownership records, and future extraction blockers."),
+        ("api_contract_review", "API Contract Review", "Review API contract groups for envelopes, inventories, migrations, plugins, and safe summaries."),
+        ("operator_manual_regeneration_review", "Operator Manual Regeneration Review", "Review generated manual source status, docs inputs, route inventory inputs, and secret-safety posture."),
+        ("v4_2_release_readiness_review", "v4.3 Release Readiness Review", "Roll up routers, API contracts, generated manual, schema, migration, storage, plugin, route, docs, validation, and no-live-mutation checks."),
     ]:
-        templates.append({"workflow_id": wid, "name": name, "read_only": True, "mutates_trading_state": False, "description": description, "sections": ["Summary", "Diagnostics", "Safety", "Unknowns", "Next Actions"], "markdown_ready": True, "output_is_draft": True, "order_submitted": False, "order_cancelled": False})
-    result.update({"version": APP_VERSION, "templates": templates, "count": len(templates), "platform_workflows": 7, "secret_values_returned": False})
+        templates.append({"workflow_id": wid, "name": name, "read_only": True, "mutates_trading_state": False, "description": description, "sections": ["Summary", "Routers", "API Contracts", "Generated Manual", "Diagnostics", "Safety", "Unknowns", "Next Actions"], "markdown_ready": True, "output_is_draft": True, "order_submitted": False, "order_cancelled": False})
+    templates.extend(_v4_ai_copilot.workflow_templates())
+    templates.extend(_v4_ai_edge.workflow_templates())
+    result.update({"version": APP_VERSION, "templates": templates, "count": len(templates), "platform_workflows": 15, "ai_workflows": len(_v4_ai_copilot.workflow_templates()), "ai_edge_workflows": len(_v4_ai_edge.workflow_templates()), "secret_values_returned": False})
     return redact_data(result)
 
 
 def run_workflow(payload: dict[str, Any] | None = None) -> dict[str, Any]:  # type: ignore[override]
     workflow_id = _safe_text((payload or {}).get("workflow_id"))
-    if workflow_id in {"platform_health_review", "route_inventory_review", "plugin_boundary_review", "storage_compatibility_review", "release_candidate_readiness_review", "package_cleanliness_review", "safety_boundary_review"}:
+    if workflow_id in _v4_ai_copilot.WORKFLOW_SCHEMAS:
+        result = _v4_ai_copilot.run_copilot_workflow(workflow_id, payload or {})
+        run = redact_data({
+            "run_id": f"ai_run_{uuid4().hex[:12]}",
+            "workflow_id": workflow_id,
+            "started_at": _now(),
+            "completed_at": _now(),
+            "status": "completed" if result.get("ok") else "dry_run_warning",
+            "read_only": True,
+            "mutated_trading_state": False,
+            "order_submitted": False,
+            "order_cancelled": False,
+            "live_trading_armed": False,
+            "ai_assistance_enabled": True,
+            "output": result,
+            "secret_values_returned": False,
+        })
+        _ensure_dir()
+        with V3_WORKFLOW_RUNS_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(run, sort_keys=True, default=str) + "\n")
+        _event("ai_workflow_run_completed", "ok", {"workflow_id": workflow_id, "run_id": run["run_id"], "ai_draft_only": True})
+        return run
+    if workflow_id in {"ai_edge_research_packet", "ai_edge_web_search_review", "ai_edge_calibration_review"}:
+        output = _v4_ai_edge.workflow_output(workflow_id, payload or {})
+        run = redact_data({
+            "run_id": f"ai_edge_run_{uuid4().hex[:12]}",
+            "workflow_id": workflow_id,
+            "started_at": _now(),
+            "completed_at": _now(),
+            "status": "completed",
+            "read_only": True,
+            "mutated_trading_state": False,
+            "order_submitted": False,
+            "order_cancelled": False,
+            "live_trading_armed": False,
+            "ai_assistance_enabled": True,
+            "output": output,
+            "secret_values_returned": False,
+        })
+        _ensure_dir()
+        with V3_WORKFLOW_RUNS_PATH.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(run, sort_keys=True, default=str) + "\n")
+        _event("ai_edge_workflow_run_completed", "ok", {"workflow_id": workflow_id, "run_id": run["run_id"], "ai_edge_draft_only": True})
+        return run
+    if workflow_id in {"platform_health_review", "route_inventory_review", "plugin_boundary_review", "storage_compatibility_review", "release_candidate_readiness_review", "package_cleanliness_review", "safety_boundary_review", "api_schema_consistency_review", "runtime_migration_planning_review", "storage_namespace_backup_review", "route_boundary_review", "router_extraction_readiness_review", "api_contract_review", "operator_manual_regeneration_review", "v4_2_release_readiness_review"}:
         output = _v4_platform_diagnostics.workflow_output(workflow_id)
         run = redact_data({
             "run_id": f"v4_run_{uuid4().hex[:12]}",
@@ -2480,6 +3083,8 @@ def build_demo_fixture() -> dict[str, Any]:  # type: ignore[override]
         "fake_route_inventory_entry": {"path": "/v3/platform", "family": "v4_platform", "demo_only": True},
         "fake_storage_namespace_entry": _v4_platform_storage.KNOWN_STORAGE_NAMESPACES[-1],
         "fake_platform_diagnostic_report": _v4_platform_diagnostics.platform_summary(),
+        "fake_api_schema_inventory": _v4_platform_api.summarize_api_schema_consistency(),
+        "fake_runtime_migration_plan": _v4_platform_migrations.migration_plan(),
         "fake_release_readiness_report": {"status": "pass", "demo_only": True, "order_submitted": False, "order_cancelled": False},
         "secret_values_returned": False,
     }
@@ -2490,20 +3095,53 @@ def validation_status() -> dict[str, Any]:  # type: ignore[override]
     base = _validation_status_v39()
     root = Path(__file__).resolve().parents[1]
     required_docs = [
-        "docs/RELEASE_NOTES_v4.0.1-real.md",
-        "docs/VALIDATION_v4.0.1-real.md",
-        "docs/V4_PLATFORM_ARCHITECTURE_GUIDE_v4.0.1-real.md",
-        "docs/V4_PLUGIN_BOUNDARY_GUIDE_v4.0.1-real.md",
-        "docs/V4_PLATFORM_DIAGNOSTICS_GUIDE_v4.0.1-real.md",
-        "docs/V4_STORAGE_COMPATIBILITY_GUIDE_v4.0.1-real.md",
-        "docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md",
-        "docs/RELEASE_CHECKLIST_v4.0.1-real.md",
+        "docs/RELEASE_NOTES_v4.7.0-real.md",
+        "docs/VALIDATION_v4.7.0-real.md",
+        "docs/V4_API_SCHEMA_GUIDE_v4.7.0-real.md",
+        "docs/V4_RUNTIME_MIGRATION_PLANNER_GUIDE_v4.7.0-real.md",
+        "docs/V4_PLATFORM_ARCHITECTURE_GUIDE_v4.7.0-real.md",
+        "docs/V4_PLUGIN_BOUNDARY_GUIDE_v4.7.0-real.md",
+        "docs/V4_PLATFORM_DIAGNOSTICS_GUIDE_v4.7.0-real.md",
+        "docs/V4_STORAGE_COMPATIBILITY_GUIDE_v4.7.0-real.md",
+        "docs/VISUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/MANUAL_QA_CHECKLIST_v4.7.0-real.md",
+        "docs/RELEASE_CHECKLIST_v4.7.0-real.md",
     ]
     checks = list(base.get("checks", []))
     for rel in required_docs:
         checks.append({"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review document before release."})
+    for rel in [
+        "docs/V4_OPENAI_INTEGRATION_GUIDE_v4.7.0-real.md",
+        "docs/V4_LOCAL_LLM_RUNTIME_GUIDE_v4.7.0-real.md",
+        "docs/V4_AI_OPERATOR_COPILOT_GUIDE_v4.7.0-real.md",
+        "docs/V4_AI_PROMPT_GOVERNANCE_GUIDE_v4.7.0-real.md",
+        "docs/V4_AI_SAFETY_AND_PRIVACY_GUIDE_v4.7.0-real.md",
+        "docs/V4_CHATGPT_CONNECTOR_BLUEPRINT_v4.7.0-real.md",
+        "docs/V4_AI_EDGE_RESEARCH_GUIDE_v4.7.0-real.md",
+        "docs/V4_OPENAI_WEB_SEARCH_EDGE_GUIDE_v4.7.0-real.md",
+        "docs/V4_LOCAL_LLM_EDGE_REVIEW_GUIDE_v4.7.0-real.md",
+        "docs/V4_AI_EDGE_CALIBRATION_GUIDE_v4.7.0-real.md",
+        "docs/V4_AI_EDGE_PRIVACY_AND_SAFETY_GUIDE_v4.7.0-real.md",
+    ]:
+        checks.append({"check": rel, "status": "pass" if (root / rel).exists() else "warning", "recommended_operator_action": "Review AI documentation before release."})
     checks.append({"check": "v4_platform_diagnostics", "status": "pass", "details": "Diagnostics are local-first and do not mutate live trading state."})
     checks.append({"check": "v4_plugin_boundary", "status": "pass", "details": "Plugin manifests are metadata-only and do not execute code."})
-    base.update({"version": APP_VERSION, "checks": checks, "overall_status": "pass" if all(c.get("status") == "pass" for c in checks if str(c.get("check", "")).startswith("docs/RELEASE_NOTES_v4")) else "warning", "platform_diagnostics_do_not_mutate_live_trading_state": True, "plugin_manifests_do_not_execute_code": True, "secret_values_returned": False})
+    ai_status = _v4_ai.ai_summary()
+    ai_validation = all([
+        ai_status.get("api_disabled_by_default") is True,
+        ai_status.get("dry_run_only_default") is True,
+        ai_status.get("chatgpt_connector_disabled_by_default") is True,
+        _v4_ai_prompts.prompt_summary().get("all_require_redaction") is True,
+        _v4_ai_schemas.validate_payload("AIReviewSummary", _v4_ai_schemas.default_payload("AIReviewSummary")).get("ok") is True,
+    ])
+    checks.append({"check": "v4.3_ai_safe_defaults", "status": "pass" if ai_validation else "warning", "details": "OpenAI API disabled, dry-run-only, redaction, prompt governance, and structured schema safety checks."})
+    edge_settings = _v4_ai_edge.edge_settings_summary()
+    edge_validation = all([
+        edge_settings.get("safe_default_posture") is True,
+        edge_settings.get("ai_edge_dry_run_only") is True,
+        edge_settings.get("openai_enable_web_search") is False,
+        edge_settings.get("local_llm_edge_can_search_web") is False,
+    ])
+    checks.append({"check": "v4.4_ai_edge_safe_defaults", "status": "pass" if edge_validation else "warning", "details": "AI Edge disabled, mock, dry-run, web-search disabled, local LLM web search prohibited, and calibration research-only by default."})
+    base.update({"version": APP_VERSION, "checks": checks, "overall_status": "pass" if all(c.get("status") == "pass" for c in checks if str(c.get("check", "")).startswith("docs/RELEASE_NOTES_v4")) else "warning", "platform_diagnostics_do_not_mutate_live_trading_state": True, "plugin_manifests_do_not_execute_code": True, "openai_api_disabled_by_default": True, "ai_dry_run_only_by_default": True, "ai_task_suggestions_require_human_acceptance": True, "ai_edge_web_search_disabled_by_default": True, "ai_edge_research_only": True, "chatgpt_connector_blueprint_read_only_disabled_by_default": True, "secret_values_returned": False})
     return redact_data(base)

@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Opportunity Review Workbench · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <span>Opportunity Review Workbench</span>{% endblock %}
+{% block content %}
+<section class="page-hero v46-hero">
+  <p class="eyebrow">v4.7.0-real · Opportunity Review Workbench</p>
+  <h1>Opportunity Review Workbench</h1>
+  <p class="muted">Market discovery → market detail → edge explanation → AI Edge packet → evidence/calibration review → operator notes → paper/watchlist/review queue → audit trail.</p>
+  <p class="notice">Review-only. Opportunity review records, AI Edge packets, watchlist states, and paper-review queue states do not approve trades, place orders, cancel orders, arm live trading, disable read-only mode, or bypass backend gates.</p>
+  <div class="link-row">
+    <a class="button-link" href="/api/v3/opportunities?demo={{ 'true' if demo_mode else 'false' }}" target="_blank" rel="noreferrer">Open workbench JSON</a>
+    <a class="button-link quiet" href="/v3/ai/edge">AI Edge Research</a>
+    <a class="button-link quiet" href="/v3/ai/news-odds">AI News Odds</a>
+    <a class="button-link quiet" href="/system-map">System Map</a>
+  </div>
+</section>
+<section class="panel v417-compat-panel">
+  <div class="panel-heading-row"><div><h2>Opportunities Workspace</h2><p class="muted">This source-specific workbench is now part of the consolidated Operator OS. Use the five workspace links for the normal operating flow.</p></div></div>
+  <div class="link-row"><a class="button-link" href="/v3">Command Center</a><a class="button-link" href="/v3/opportunities">Opportunities</a><a class="button-link" href="/v3/automation">Automation / Paper Trading</a><a class="button-link" href="/v3/review-audit">Review & Audit</a><a class="button-link" href="/v3/settings-system">Settings & System</a></div>
+</section>
+
+<section class="stats v46-stats" aria-label="Opportunity review status counts">
+  <div><strong>{{ workbench.count }}</strong><span>Review rows</span></div>
+  <div><strong>{{ workbench.data_state }}</strong><span>Data state</span></div>
+  <div><strong>{{ workbench.resolved_data_mode }}</strong><span>Resolved mode</span></div>
+  <div><strong>{{ workbench.review_status_counts.get('UNREVIEWED', 0) }}</strong><span>Unreviewed</span></div>
+  <div><strong>{{ workbench.review_status_counts.get('WATCHING', 0) }}</strong><span>Watching</span></div>
+  <div><strong>{{ workbench.review_status_counts.get('PAPER_REVIEW', 0) }}</strong><span>Paper review</span></div>
+  <div><strong>{{ workbench.review_status_counts.get('ARCHIVED', 0) }}</strong><span>Archived</span></div>
+</section>
+
+<section class="panel v46-panel">
+  <div class="panel-heading-row">
+    <div>
+      <h2>Review workflow table</h2>
+      <p class="muted">Columns: {{ ', '.join(workbench.formatted_columns) }}</p>
+    </div>
+    <form method="get" class="inline-form">
+      <label>Limit <input type="number" name="limit" min="10" max="200" value="{{ limit }}"></label>
+      <label>Data mode
+        <select name="demo">
+          <option value="true" {% if demo_mode %}selected{% endif %}>Demo fixtures</option>
+          <option value="false" {% if not demo_mode %}selected{% endif %}>Configured local/live source</option>
+        </select>
+      </label>
+      <button type="submit">Refresh</button>
+    </form>
+  </div>
+  <p class="notice"><strong>Data state:</strong> {{ workbench.data_state }}. {{ workbench.data_state_reason }} {{ workbench.operator_implication }}</p>
+
+  <div class="responsive-table opportunity-workbench-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Review Status</th>
+          <th>Market</th>
+          <th>Family / Rank</th>
+          <th>Recommended Side</th>
+          <th>YES Price</th>
+          <th>NO Price</th>
+          <th>Model Fair</th>
+          <th>YES Edge</th>
+          <th>NO Edge</th>
+          <th>Confidence</th>
+          <th>Data Quality</th>
+          <th>News Odds</th>
+          <th>AI Edge Packet</th>
+          <th>Operator Notes</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in workbench["items"] %}
+        <tr>
+          <td><span class="status-badge tone-{{ row.review_status|status_tone }}">{{ row.review_status }}</span></td>
+          <td>
+            <a href="{{ row.detail_href }}"><strong>{{ row.market_title }}</strong></a><br>
+            <span class="muted">{{ row.market_id }}</span>
+            <br><span class="muted">Data state: {{ row.data_state }} · {{ row.review_source }}</span>
+          </td>
+          <td>
+            {% if row.family_href %}<a href="{{ row.family_href }}">{{ row.family_rank }}</a>{% else %}{{ row.family_rank }}{% endif %}<br>
+            <span class="muted">Favorite ranking and wager edge are separate.</span>
+          </td>
+          <td><span class="status-badge tone-{{ row.recommended_side|status_tone }}">{{ row.recommended_side }}</span><br><strong>{{ row.side_badge }}</strong><br><span class="muted">Recommended Side</span></td>
+          <td>{% if row.yes_price is not none %}{{ '%.1f%%'|format(row.yes_price * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.no_price is not none %}{{ '%.1f%%'|format(row.no_price * 100) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.model_fair_yes is not none %}{{ '%.1f%%'|format(row.model_fair_yes * 100) }}{% else %}unavailable{% endif %}<br><span class="muted">{{ row.model_fair_source }}</span></td>
+          <td>{% if row.yes_edge_pp is not none %}{{ '%+.1f pp'|format(row.yes_edge_pp) }}{% else %}unavailable{% endif %}</td>
+          <td>{% if row.no_edge_pp is not none %}{{ '%+.1f pp'|format(row.no_edge_pp) }}{% else %}unavailable{% endif %}</td>
+          <td>{{ row.confidence }}</td>
+          <td><span class="muted">{{ row.data_quality }}</span></td>
+          <td>
+            <span class="pill">{{ row.news_odds_status }}</span><br>
+            {% if row.news_adjusted_fair_yes is not none %}{{ '%.1f%%'|format(row.news_adjusted_fair_yes * 100) }}{% else %}<span class="muted">not researched</span>{% endif %}<br>
+            <span class="muted">{{ row.news_confidence }} · {{ row.news_top_source }}</span><br>
+            <a href="{{ row.news_odds_href }}">Open News Odds</a>
+          </td>
+          <td>
+            <span class="pill">{{ row.ai_edge_lifecycle }}</span><br>
+            <a href="{{ row.ai_edge_packet_href }}">Open Packet</a><br>
+            <span class="muted">AI Edge Packet Lifecycle</span>
+          </td>
+          <td>
+            {% if row.operator_notes %}{{ row.operator_notes }}{% else %}<span class="muted">No operator notes yet.</span>{% endif %}
+            <form method="post" action="/v3/opportunities/review/{{ row.market_id }}/notes" class="inline-form compact-form" aria-label="Save notes for {{ row.market_title }}">
+              <input type="hidden" name="market_title" value="{{ row.market_title }}">
+              <input type="hidden" name="review_status" value="{{ row.review_status }}">
+              <input type="hidden" name="data_state" value="{{ row.data_state }}">
+              <input type="hidden" name="data_freshness" value="{{ row.data_freshness }}">
+              <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+              <input type="hidden" name="source_component" value="opportunity_workbench.notes_form">
+              <input type="hidden" name="reason" value="Operator saved notes from Opportunity Review Workbench.">
+              <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+              <input name="operator_notes" value="{{ row.operator_notes }}" placeholder="operator notes">
+              <button type="submit">Save notes</button>
+            </form>
+          </td>
+          <td>
+            <div class="workbench-actions">
+              <a class="button-link" href="{{ row.detail_href }}">Open Detail</a>
+              <a class="button-link quiet" href="{{ row.ai_edge_analyze_href }}">Analyze with AI Edge</a>
+              <a class="button-link quiet" href="{{ row.news_odds_href }}">News Odds</a>
+              <form method="post" action="/v3/opportunities/review/{{ row.market_id }}/status">
+                <input type="hidden" name="action" value="add_to_watchlist">
+                <input type="hidden" name="market_title" value="{{ row.market_title }}">
+                <input type="hidden" name="data_state" value="{{ row.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ row.data_freshness }}">
+                <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <input type="hidden" name="source_component" value="opportunity_workbench.status_form">
+                <input type="hidden" name="previous_state" value="{{ row.review_status }}">
+                <input type="hidden" name="reason" value="Operator added opportunity to watchlist from Opportunity Review Workbench.">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Add to Watchlist</button>
+              </form>
+              <form method="post" action="/v3/opportunities/review/{{ row.market_id }}/status">
+                <input type="hidden" name="action" value="send_to_paper_review">
+                <input type="hidden" name="market_title" value="{{ row.market_title }}">
+                <input type="hidden" name="data_state" value="{{ row.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ row.data_freshness }}">
+                <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <input type="hidden" name="source_component" value="opportunity_workbench.status_form">
+                <input type="hidden" name="previous_state" value="{{ row.review_status }}">
+                <input type="hidden" name="reason" value="Operator sent opportunity to paper review from Opportunity Review Workbench.">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Send to Paper Review</button>
+              </form>
+              <form method="post" action="/v3/opportunities/review/{{ row.market_id }}/status">
+                <input type="hidden" name="action" value="reject">
+                <input type="hidden" name="market_title" value="{{ row.market_title }}">
+                <input type="hidden" name="data_state" value="{{ row.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ row.data_freshness }}">
+                <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <input type="hidden" name="source_component" value="opportunity_workbench.status_form">
+                <input type="hidden" name="previous_state" value="{{ row.review_status }}">
+                <input type="hidden" name="reason" value="Operator rejected opportunity from Opportunity Review Workbench.">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Reject</button>
+              </form>
+              <form method="post" action="/v3/opportunities/review/{{ row.market_id }}/status">
+                <input type="hidden" name="action" value="archive">
+                <input type="hidden" name="market_title" value="{{ row.market_title }}">
+                <input type="hidden" name="data_state" value="{{ row.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ row.data_freshness }}">
+                <input type="hidden" name="source_route" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <input type="hidden" name="source_component" value="opportunity_workbench.status_form">
+                <input type="hidden" name="previous_state" value="{{ row.review_status }}">
+                <input type="hidden" name="reason" value="Operator archived opportunity from Opportunity Review Workbench.">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Archive</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="two-col">
+  <div class="panel">
+    <h2>Favorite vs edge</h2>
+    <p>{{ workbench.favorite_vs_edge }}</p>
+    <p class="muted">A favorite can have no edge if the market price is too high. An underdog can have draft edge if its market price is below model fair probability.</p>
+  </div>
+  <div class="panel">
+    <h2>AI Edge Packet Lifecycle</h2>
+    <ul class="clean-list compact">
+      {% for state in workbench.ai_edge_lifecycle_states %}<li><strong>{{ state }}</strong> · review-only state, not approval</li>{% endfor %}
+    </ul>
+    <p class="muted">{{ workbench.review_only_note }}</p>
+  </div>
+</section>
+{% endblock %}

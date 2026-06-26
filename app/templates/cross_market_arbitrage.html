@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Cross-Market Arbitrage · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/opportunities">Opportunity Review</a> / <span>Cross-Market Arbitrage</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.17.0-real · Cross-Market Arbitrage</p>
+  <h1>Cross-Market Arbitrage</h1>
+  <p class="muted">Polymarket, Kalshi, and future venue snapshots are normalized, matched deterministically, scored for equivalence, and reviewed for net margin after fees, slippage, liquidity, and resolution risk.</p>
+  <p class="notice">Detection/review only. Candidates are not guaranteed profits and do not place orders, cancel orders, approve trades, or arm live trading.</p>
+  <p class="muted">Review actions persist local audit rows only. Use them to mark candidates for human follow-up, not to execute across venues.</p>
+  <div class="link-row">
+    <a class="button-link" href="/api/v3/arbitrage/scan?demo={{ 'true' if demo_mode else 'false' }}&min_margin={{ min_margin }}&min_confidence={{ min_confidence }}" target="_blank" rel="noreferrer">Open scan JSON</a>
+    <a class="button-link quiet" href="/api/v3/arbitrage/config" target="_blank" rel="noreferrer">Config JSON</a>
+    <a class="button-link quiet" href="/v3/opportunities">Opportunity Review</a>
+    <a class="button-link quiet" href="/v3/ai/news-odds">AI News Odds</a>
+  </div>
+</section>
+
+<section class="stats v47-stats" aria-label="Arbitrage scan status">
+  <div><strong>{{ scan.opportunity_count }}</strong><span>Displayed candidates</span></div>
+  <div><strong>{{ scan.candidate_pair_count }}</strong><span>Matched pairs</span></div>
+  <div><strong>{{ scan.market_snapshot_count }}</strong><span>Venue snapshots</span></div>
+  <div><strong>{{ scan.scanner_status }}</strong><span>Scanner status</span></div>
+  <div><strong>{{ scan.data_state }}</strong><span>Data state</span></div>
+  <div><strong>{{ 'enabled' if settings.kalshi_enabled else 'disabled' }}</strong><span>Kalshi</span></div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading-row">
+    <div>
+      <h2>Venue status</h2>
+      <p class="muted">Missing credentials or disabled adapters are explicit and do not block the rest of the console.</p>
+    </div>
+    <form method="get" class="inline-form">
+      <label>Min margin <input type="number" name="min_margin" min="0" max="100" step="0.1" value="{{ min_margin }}"></label>
+      <label>Min confidence <input type="number" name="min_confidence" min="0" max="1" step="0.01" value="{{ min_confidence }}"></label>
+      <label>Data mode
+        <select name="demo">
+          <option value="true" {% if demo_mode %}selected{% endif %}>Demo fixtures</option>
+          <option value="false" {% if not demo_mode %}selected{% endif %}>Configured live read</option>
+        </select>
+      </label>
+      <button type="submit">Refresh</button>
+    </form>
+    <form method="post" action="/v3/arbitrage/scan/record" class="inline-form">
+      <input type="hidden" name="min_margin" value="{{ min_margin }}">
+      <input type="hidden" name="min_confidence" value="{{ min_confidence }}">
+      <input type="hidden" name="demo" value="{{ 'true' if demo_mode else 'false' }}">
+      <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+      <input type="hidden" name="reason" value="Operator recorded scan snapshot from Cross-Market Arbitrage page.">
+      <button type="submit" class="button-link">Record scan snapshot</button>
+    </form>
+  </div>
+  <p class="notice"><strong>Data state:</strong> {{ scan.data_state }}. {{ scan.data_state_reason }} {{ scan.scanner_status_reason }}</p>
+  <div class="stats v47-stats">
+    {% for status in scan.venue_statuses %}
+      <div>
+        <strong>{{ status.venue }}</strong>
+        <span><span class="status-badge tone-{{ status.status|status_tone }}">{{ status.status }}</span> · {{ status.data_state }}</span>
+        <span>{{ 'live read' if status.live else status.message }}</span>
+        <span class="muted">{{ status.operator_implication }}</span>
+      </div>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading-row">
+    <div>
+      <h2>Feature readiness</h2>
+      <p class="muted">Readiness rows distinguish working, partial, config-required, scaffolded, disabled, unavailable, and error states before scan results are trusted.</p>
+    </div>
+    <div class="link-row">
+      <a class="button-link quiet" href="/api/v3/features/status" target="_blank" rel="noreferrer">Feature status JSON</a>
+      <a class="button-link quiet" href="/api/v3/features/stub-burndown" target="_blank" rel="noreferrer">Stub map JSON</a>
+    </div>
+  </div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Feature</th><th>Status</th><th>Data state</th><th>Operator implication</th><th>Next action</th></tr></thead>
+      <tbody>
+        {% for row in feature_statuses %}
+          <tr>
+            <td><strong>{{ row.title }}</strong><br><span class="muted">{{ row.feature_id }}</span></td>
+            <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted">{{ row.reason }}</span></td>
+            <td>{{ row.data_state }}</td>
+            <td>{{ row.operator_implication }}</td>
+            <td>{{ row.next_action }}</td>
+          </tr>
+        {% endfor %}
+        {% for row in stub_burndown_items %}
+          <tr>
+            <td><strong>{{ row.title }}</strong><br><span class="muted">{{ row.feature_id }}</span></td>
+            <td><span class="status-badge tone-{{ row.status|status_tone }}">{{ row.status }}</span><br><span class="muted">{{ row.reason }}</span></td>
+            <td>{{ row.data_state }}</td>
+            <td>{{ row.operator_implication }}</td>
+            <td>{{ row.next_action }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Opportunity table</h2>
+  {% if scan["items"] %}
+  <div class="responsive-table">
+    <table>
+      <thead>
+        <tr>
+          <th>Classification</th>
+          <th>Matched markets</th>
+          <th>Trade review</th>
+          <th>Gross margin</th>
+          <th>Fees / slippage</th>
+          <th>Net margin</th>
+          <th>Executable size</th>
+          <th>Equivalence</th>
+          <th>Risk flags</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for item in scan["items"] %}
+        <tr>
+          <td><span class="status-badge tone-{{ item.classification|status_tone }}">{{ item.classification }}</span><br><span class="muted">{{ item.recommended_action }}</span></td>
+          <td>
+            <strong>{{ item.market_a.market_title }}</strong><br>
+            <span class="muted">{{ item.market_a.venue }} · {{ item.market_a.venue_market_id }}</span><br>
+            <span class="muted">{{ item.market_b.venue }} · {{ item.market_b.venue_market_id }}</span>
+          </td>
+          <td>
+            {% for leg in item.legs %}
+              <div><strong>{{ leg.side }}</strong> on {{ leg.venue }} @ {{ '%.1f%%'|format(leg.ask * 100) }}</div>
+            {% endfor %}
+          </td>
+          <td>{{ '%+.2f%%'|format(item.gross_arbitrage_margin_pct) }}</td>
+          <td>{{ '%.2f%%'|format(item.estimated_fees_pct) }} / {{ '%.2f%%'|format(item.estimated_slippage_pct) }}</td>
+          <td><strong>{{ '%+.2f%%'|format(item.net_arbitrage_margin_pct) }}</strong></td>
+          <td>{{ '%.2f'|format(item.depth_adjusted_executable_size) }}<br><span class="muted">stake {{ '%.2f'|format(item.max_suggested_stake) }}</span></td>
+          <td>{{ '%.0f%%'|format(item.equivalence.equivalence_score * 100) }}<br><span class="muted">resolution risk {{ '%.0f%%'|format(item.equivalence.resolution_mismatch_risk * 100) }}</span></td>
+          <td>
+            {% for flag in item.equivalence.mismatch_flags %}
+              <span class="pill">{{ flag }}</span>
+            {% else %}
+              <span class="muted">No deterministic mismatch flags.</span>
+            {% endfor %}
+          </td>
+          <td>
+            <div class="workbench-actions">
+              {% for leg in item.legs %}
+                {% if leg.market_url %}<a class="button-link quiet" href="{{ leg.market_url }}" target="_blank" rel="noreferrer">Open {{ leg.venue }}</a>{% endif %}
+              {% endfor %}
+              <form method="post" action="/v3/arbitrage/opportunity/{{ item.opportunity_id }}/review">
+                <input type="hidden" name="action" value="review_requested">
+                <input type="hidden" name="data_state" value="{{ scan.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ scan.data_state }}">
+                <input type="hidden" name="scan_id" value="{{ scan.scan_id }}">
+                <input type="hidden" name="target_name" value="{{ item.market_a.market_title }}">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link">Send to review queue</button>
+              </form>
+              <form method="post" action="/v3/arbitrage/opportunity/{{ item.opportunity_id }}/review">
+                <input type="hidden" name="action" value="watchlist">
+                <input type="hidden" name="data_state" value="{{ scan.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ scan.data_state }}">
+                <input type="hidden" name="scan_id" value="{{ scan.scan_id }}">
+                <input type="hidden" name="target_name" value="{{ item.market_a.market_title }}">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Add to watchlist</button>
+              </form>
+              <form method="post" action="/v3/arbitrage/opportunity/{{ item.opportunity_id }}/review">
+                <input type="hidden" name="action" value="ignored">
+                <input type="hidden" name="data_state" value="{{ scan.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ scan.data_state }}">
+                <input type="hidden" name="scan_id" value="{{ scan.scan_id }}">
+                <input type="hidden" name="target_name" value="{{ item.market_a.market_title }}">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Ignore for now</button>
+              </form>
+              <form method="post" action="/v3/arbitrage/opportunity/{{ item.opportunity_id }}/review">
+                <input type="hidden" name="action" value="rejected">
+                <input type="hidden" name="data_state" value="{{ scan.data_state }}">
+                <input type="hidden" name="data_freshness" value="{{ scan.data_state }}">
+                <input type="hidden" name="scan_id" value="{{ scan.scan_id }}">
+                <input type="hidden" name="target_name" value="{{ item.market_a.market_title }}">
+                <input type="hidden" name="return_to" value="{{ request.url.path }}{% if request.url.query %}?{{ request.url.query }}{% endif %}">
+                <button type="submit" class="button-link quiet">Reject / ignore</button>
+              </form>
+            </div>
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No cross-market arbitrage candidates passed the current filters. Scanner may be disabled, venues may be disabled, or all matches may have been rejected by confidence/risk controls.</p>
+  {% endif %}
+</section>
+
+<section class="two-col">
+  <div class="panel">
+    <h2>Config posture</h2>
+    <ul class="clean-list compact">
+      <li><strong>Review only:</strong> {{ settings.arbitrage_review_only }}</li>
+      <li><strong>Data state:</strong> {{ scan.data_state }}</li>
+      <li><strong>Scanner reason:</strong> {{ scan.scanner_status_reason }}</li>
+      <li><strong>Min net margin:</strong> {{ settings.arbitrage_min_net_margin_pct }}%</li>
+      <li><strong>Min confidence:</strong> {{ settings.arbitrage_min_confidence }}</li>
+      <li><strong>Max stale seconds:</strong> {{ settings.arbitrage_max_stale_seconds }}</li>
+      <li><strong>Orderbook fetch:</strong> {{ settings.arbitrage_fetch_orderbooks }}</li>
+    </ul>
+  </div>
+  <div class="panel">
+    <h2>Limitations</h2>
+    <ul class="compact">
+      <li>Kalshi is disabled unless `KALSHI_ENABLED=true`; private calls require operator-provided credentials.</li>
+      <li>Unsupported competitor venues stay as disabled scaffolds until a real adapter is implemented.</li>
+      <li>Resolution mismatches can convert apparent arbitrage into loss; candidates require manual review.</li>
+      <li>No blind execution is implemented by this scanner.</li>
+    </ul>
+  </div>
+</section>
+{% endblock %}

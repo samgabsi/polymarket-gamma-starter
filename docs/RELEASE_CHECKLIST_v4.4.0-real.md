@@ -1,0 +1,27 @@
+# Release Checklist - v4.4.0-real
+
+- [ ] README current version is `v4.4.0-real`.
+- [ ] Package identity is `Polymarket OP Console`.
+- [ ] Package slug is `polymarket-op-console`.
+- [ ] Release ZIP is named `polymarket-op-console-v4.4.0-real.zip`.
+- [ ] AI modules and router modules import successfully.
+- [ ] Extracted AI, platform, and v3 core UX routes preserve public paths.
+- [ ] OpenAI defaults are API-disabled, Responses API-disabled, dry-run-only, redacted, and human-approval-required.
+- [ ] AI prompt templates require redaction, human approval, safety statements, and structured schemas.
+- [ ] AI suggestion drafts require explicit human acceptance before local task creation.
+- [ ] ChatGPT connector blueprint is read-only, auth-required, and disabled by default.
+- [ ] AI Edge defaults are disabled, mock, dry-run-only, approval-gated, redacted, and web-search disabled.
+- [ ] AI Edge packets include evidence sources, citations, contradictions, missing information, probability drafts, and calibration hooks.
+- [ ] OpenAI web-search dry-run route returns blockers and `external_network_called=false` by default.
+- [ ] Local LLM edge review requires app-provided evidence and returns `local_llm_claimed_web_search=false`.
+- [ ] AI Edge exports omit raw prompts, raw responses, secrets, and live-trading mutation flags.
+- [ ] Route ownership registry exposes extracted, planned, metadata-only, legacy-preserved, and do-not-move-yet statuses.
+- [ ] API contract tests pass without network or live credentials.
+- [ ] Generated operator manual and inventories exist under `docs/generated/`.
+- [ ] Generated manual secret scan passes.
+- [ ] Runtime migration planner remains dry-run-only and non-destructive.
+- [ ] Platform diagnostics and exports do not mutate live trading state.
+- [ ] Plugin manifests remain metadata-only and reject forbidden capabilities.
+- [ ] Command palette and keyboard shortcuts do not place or cancel orders.
+- [ ] Task and guided review completion do not approve trades.
+- [ ] Release package excludes runtime data, `data/ai/`, caches, venvs, screenshots, secrets, logs, and local `.env`.

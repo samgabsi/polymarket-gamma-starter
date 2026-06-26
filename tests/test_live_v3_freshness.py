@@ -82,7 +82,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_v36_version():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_freshness_policy_job_scan_notifications_exports_are_safe():
@@ -137,7 +137,7 @@ def test_freshness_routes_and_apis_render(authed_client):
     for route in ["/v3/freshness", "/v3/freshness/planner", "/v3/freshness/schedules", "/v3/freshness/jobs", "/v3/freshness/notifications", "/v3/freshness/readiness", "/v3/freshness/history", "/v3/freshness/settings"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Freshness" in response.text
         assert "read-only" in response.text.lower()
 

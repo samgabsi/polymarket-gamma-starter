@@ -19,10 +19,10 @@
     {% if user %}<p class="muted">Signed in as <strong>{{ user.username }}</strong> · {{ user.role }} · <a href="/">Dashboard</a> · <a href="/positions">Positions</a> · <a href="/logout">Logout</a>{% if user.role == "admin" %} · <a href="/users">Manage users</a>{% endif %}</p>{% endif %}
     <p><a href="/">← Back to dashboard</a></p>
     <section class="panel detail">
-      <p class="eyebrow">Market detail · Gamma metadata + CLOB books + research packet + paper trading · notes · source targets · v0.5.11</p>
+      <p class="eyebrow">Market detail · Gamma metadata + CLOB books + market-edge recommendation + AI Edge wiring + paper trading · v4.7.0-real</p>
       <h1>{{ market.question }}</h1>
       <p><a href="{{ market.url }}" target="_blank" rel="noreferrer">{{ market.polymarket_url_label }}</a> <span class="muted">confidence: {{ market.polymarket_url_confidence }}</span></p>
-      <p class="muted">v0.5.11 keeps the original no-live-trading flow and turns saved evidence into conservative probability-model inputs. If Gamma does not provide a parent event slug, this button opens Polymarket search instead.</p>
+      <p class="muted">v4.7.0-real keeps the original no-live-trading flow, adds explicit YES/NO/HOLD draft edge labels, and keeps all market-edge/AI Edge output review-only. If Gamma does not provide a parent event slug, this button opens Polymarket search instead.</p>
       <form method="get" action="/watchlist/add/{{ market.id }}" class="inline-form">
         <input name="note" placeholder="optional watchlist note" value="Research candidate">
         <button type="submit">{{ "Update watchlist" if is_watched else "Add to watchlist" }}</button>
@@ -37,6 +37,23 @@
       <h2>Outcomes</h2>
       <div class="prices big">{% for outcome in market.outcomes %}<span>{{ outcome.name }}: {{ '%.4f'|format(outcome.price) }}</span>{% endfor %}</div>
 
+      {% set edge = market.market_edge_recommendation or {} %}
+      <h2>v4.7 Market Edge Recommendation</h2>
+      <p class="muted">Favorite ranking and wager edge are separate. Favorite means highest price/probability in a detected family; edge compares model fair probability against current YES/NO market-implied prices.</p>
+      <section class="stats mini">
+        <div><strong>{{ edge.recommended_side or 'INSUFFICIENT DATA' }}</strong><span>Recommended side</span></div>
+        <div><strong>{{ edge.side_badge or 'INSUFFICIENT DATA' }}</strong><span>Draft badge</span></div>
+        <div><strong>{{ '%.1f%%'|format(edge.model_fair_yes * 100) if edge.model_fair_yes is not none else 'unavailable' }}</strong><span>Model fair YES</span></div>
+        <div><strong>{{ '%+.1f pp'|format(edge.yes_edge_pp) if edge.yes_edge_pp is not none else 'unavailable' }}</strong><span>YES edge</span></div>
+        <div><strong>{{ '%+.1f pp'|format(edge.no_edge_pp) if edge.no_edge_pp is not none else 'unavailable' }}</strong><span>NO edge</span></div>
+        <div><strong>{{ edge.confidence_label or 'low' }}</strong><span>Confidence</span></div>
+      </section>
+      <p><strong>Reason:</strong> {{ edge.explanation or 'Model fair probability or market-implied price is unavailable.' }}</p>
+      <p><strong>Group rank:</strong> {{ edge.group_rank_label or 'No family detected' }}</p>
+      <p class="muted">Source: {{ edge.model_fair_source or 'unavailable' }} · threshold YES {{ edge.minimum_yes_edge_pp or '2.0' }} pp / NO {{ edge.minimum_no_edge_pp or '2.0' }} pp · {{ edge.edge_calculation_note }}</p>
+      {% if edge.data_quality_warnings %}<ul class="muted compact">{% for warning in edge.data_quality_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
+      <div class="link-row"><a class="button-link" href="{{ edge.ai_edge_market_href or '/v3/ai/edge' }}">Analyze with AI Edge</a><a class="button-link quiet" href="{{ edge.ai_edge_packet_href or '/api/v3/ai/edge/packets' }}">Open AI Edge Packet</a><a class="button-link quiet" href="{{ edge.calibration_href or '/v3/ai/edge/calibration' }}">Calibration</a></div>
+      <p class="muted">{{ edge.safety_note }}</p>
 
       <h2>Probability Model v1</h2>
       {% set pm = market.probability_model %}

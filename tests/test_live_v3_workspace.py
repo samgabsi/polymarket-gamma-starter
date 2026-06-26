@@ -53,7 +53,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_v38_version():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_guided_flow_session_dependency_preview_saved_view_packet_exports_are_safe():
@@ -125,7 +125,7 @@ def test_workspace_routes_and_apis_render(authed_client):
     for route in ["/v3/workspace", "/v3/workspace/daily-review", "/v3/workspace/dependencies"]:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text
         assert "Guided" in response.text or "guided" in response.text
         assert "not trade approval" in response.text or "do not place" in response.text
 

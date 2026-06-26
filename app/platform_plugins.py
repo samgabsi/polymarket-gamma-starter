@@ -23,7 +23,7 @@ def _manifest(plugin_id: str, title: str, plugin_type: str, capabilities: list[s
         "title": title,
         "description": description or f"Safe local manifest for {title}.",
         "version": "0.1.0-manifest-only",
-        "app_compatibility": ["4.0.1-real"],
+        "app_compatibility": [APP_VERSION, "v4.x"],
         "enabled": bool(enabled),
         "plugin_type": plugin_type if plugin_type in PLUGIN_TYPES else "disabled-placeholder",
         "allowed_routes": [f"/v3/platform/plugins#{plugin_id}"],
@@ -83,6 +83,10 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     caps = manifest.get("capabilities") if isinstance(manifest.get("capabilities"), list) else []
     forbidden_requested = [c for c in caps if action_is_forbidden(c)]
     problems = []
+    required_fields = ["plugin_id", "title", "version", "plugin_type", "capabilities", "no_live_mutation", "no_secret_access", "no_network_by_default"]
+    missing_required = [field for field in required_fields if field not in manifest]
+    if missing_required:
+        problems.append("required fields missing")
     if not manifest.get("no_live_mutation", True):
         problems.append("no_live_mutation must remain true")
     if not manifest.get("no_secret_access", True):
@@ -93,14 +97,27 @@ def validate_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         problems.append("forbidden live mutation capability requested")
     if manifest.get("plugin_type") not in PLUGIN_TYPES:
         problems.append("unknown plugin type")
+    api_namespaces = manifest.get("allowed_api_namespaces") if isinstance(manifest.get("allowed_api_namespaces"), list) else []
+    storage_namespaces = manifest.get("allowed_storage_namespaces") if isinstance(manifest.get("allowed_storage_namespaces"), list) else []
+    if any(str(ns).startswith("/api/live") or str(ns).startswith("/api/v2/live") for ns in api_namespaces):
+        problems.append("live mutation api namespace declaration rejected")
+    if any("secret" in str(ns).lower() or "credential" in str(ns).lower() for ns in storage_namespaces):
+        problems.append("secret storage namespace declaration rejected")
+    compatibility = manifest.get("app_compatibility") if isinstance(manifest.get("app_compatibility"), list) else []
+    if compatibility and APP_VERSION not in compatibility and "v4.x" not in compatibility:
+        problems.append("app compatibility range does not include current version")
     return safety_flags({
         "ok": len(problems) == 0,
         "status": "pass" if len(problems) == 0 else "fail",
         "problems": problems,
+        "missing_required_fields": missing_required,
         "forbidden_requested": forbidden_requested,
         "manifest_only": True,
         "arbitrary_code_executed": False,
         "remote_code_loaded": False,
+        "no_live_mutation_enforced": manifest.get("no_live_mutation", True) is True,
+        "no_secret_access_enforced": manifest.get("no_secret_access", True) is True,
+        "no_network_by_default_enforced": manifest.get("no_network_by_default", True) is True,
     })
 
 

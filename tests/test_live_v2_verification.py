@@ -24,7 +24,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_4():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_verification_report_without_network_is_safe(monkeypatch):
@@ -32,7 +32,7 @@ def test_verification_report_without_network_is_safe(monkeypatch):
         monkeypatch.delenv(key, raising=False)
     import asyncio
     report = asyncio.run(live_v2.build_live_v2_verification_report(attempt_network=False))
-    assert report["version"] == "4.0.1-real"
+    assert report["version"] == "4.17.0-real"
     assert report["secret_values_returned"] is False
     assert "No real order placement" in report["safety_statement"]
     assert any(row["name"] == "network_checks" and row["status"] == "skipped" for row in report["checks"])
@@ -41,13 +41,13 @@ def test_verification_report_without_network_is_safe(monkeypatch):
 
 def test_demo_readiness_report():
     report = live_v2.build_live_v2_demo_readiness()
-    assert report["version"] == "4.0.1-real"
+    assert report["version"] == "4.17.0-real"
     assert report["secret_values_returned"] is False
     assert any(row["name"] == "live_not_armed_by_default" for row in report["checks"])
 
 
 def test_verification_markdown_export():
-    md = live_v2.live_v2_verification_to_markdown({"version": "4.0.1-real", "generated_at": "now", "overall_status": "pass", "checks": [{"name": "x", "status": "pass", "explanation": "ok", "error_redacted": ""}], "safety_statement": "No real order placement or cancellation was performed."})
+    md = live_v2.live_v2_verification_to_markdown({"version": "4.17.0-real", "generated_at": "now", "overall_status": "pass", "checks": [{"name": "x", "status": "pass", "explanation": "ok", "error_redacted": ""}], "safety_statement": "No real order placement or cancellation was performed."})
     assert "Live Read-Only Verification Report" in md
     assert "No real order placement" in md
 
@@ -72,4 +72,4 @@ def test_required_v2_live_routes_still_exist(authed_client):
     for route in routes:
         response = authed_client.get(route)
         assert response.status_code == 200, route
-        assert "v4.0.1-real" in response.text
+        assert "v4.7.0-real" in response.text

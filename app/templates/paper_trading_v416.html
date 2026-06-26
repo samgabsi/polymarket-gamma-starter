@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Automated Paper Trading{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3">Operator OS</a> / <span>Paper Trading</span>{% endblock %}
+{% block content %}
+<section class="page-header">
+  <div>
+    <p class="eyebrow">{{ status.app_version }} · automated paper strategy loop</p>
+    <h1>Automated Paper Trading</h1>
+    <p class="page-subtitle">Paper-only automation that scores candidates, simulates fills, tracks positions/P&amp;L, and records every decision without submitting or cancelling real orders.</p>
+  </div>
+  <div class="settings-health tone-ok">
+    <span>Safety posture</span>
+    <strong>paper only</strong>
+    <small>live execution used: {{ status.live_execution_used }}</small>
+  </div>
+</section>
+
+<div class="callout warning"><strong>Paper trading only:</strong> No real orders will be placed. No real orders will be cancelled. Live execution remains disabled for this subsystem. Simulated fills are local ledger records only.</div>
+{% if action_status %}<div class="callout ok"><strong>{{ action_status|replace('_',' ')|title }}.</strong> {{ action_detail }}</div>{% endif %}
+
+<section class="content-card">
+  <div class="section-header"><div><h2>Automation Workspace</h2><p class="muted">This detailed paper-trading page is embedded in the consolidated Operator OS Automation workspace.</p></div><a class="button-link" href="/v3/automation">Open Automation / Paper Trading workspace</a></div>
+  <div class="link-row"><a class="button-link quiet" href="/v3">Command Center</a><a class="button-link quiet" href="/v3/opportunities">Opportunities</a><a class="button-link quiet" href="/v3/review-audit">Review & Audit</a><a class="button-link quiet" href="/v3/settings-system">Settings & System</a></div>
+</section>
+
+<section class="metric-grid" aria-label="Paper trading status">
+  <article class="metric-card"><strong>{{ status.status }}</strong><span>Paper engine</span></article>
+  <article class="metric-card"><strong>{{ status.automation_status }}</strong><span>Automation</span></article>
+  <article class="metric-card"><strong>{{ status.scheduler_status }}</strong><span>Scheduler</span></article>
+  <article class="metric-card"><strong>{{ '${:,.2f}'.format(account.equity or 0) }}</strong><span>Paper equity</span></article>
+  <article class="metric-card"><strong>{{ status.open_position_count }}</strong><span>Open positions</span></article>
+  <article class="metric-card"><strong>{{ account.daily_paper_trades or 0 }}</strong><span>Today's paper trades</span></article>
+  <article class="metric-card"><strong>{{ '${:,.2f}'.format(account.daily_paper_notional or 0) }}</strong><span>Today's simulated notional</span></article>
+  <article class="metric-card"><strong>{{ '${:,.2f}'.format(account.unrealized_pnl or 0) }}</strong><span>Unrealized P/L</span></article>
+</section>
+
+<section class="content-card">
+  <div class="section-header">
+    <div>
+      <h2>Controls</h2>
+      <p class="help-text">Run-once is enabled only when both PAPER_TRADING_ENABLED and PAPER_TRADING_AUTOMATION_ENABLED are true. Reset only resets the local paper account and never touches exchange state.</p>
+    </div>
+    <div class="action-bar">
+      <a class="button-link quiet" href="/api/v3/paper/status">Status JSON</a>
+      <a class="button-link quiet" href="/api/v3/paper/config">Config JSON</a>
+      <a class="button-link quiet" href="/api/v3/paper/audit">Audit JSON</a>
+    </div>
+  </div>
+  {% if config.enabled and config.automation_enabled %}
+  <form method="post" action="/v3/paper-trading/run-once" class="inline-form"><button class="button-link" type="submit">Run paper strategy once</button></form>
+  {% else %}
+  <div class="callout warning"><strong>Run disabled:</strong> {{ status.enabled_reason }} This is explicit and prevents silent no-op automation.</div>
+  {% endif %}
+  <form method="post" action="/v3/paper-trading/reset" class="filter-grid">
+    <label>Reset starting balance
+      <input name="starting_balance" type="number" min="1" step="1" value="{{ config.starting_balance or 1000 }}">
+    </label>
+    <div class="action-bar"><button class="button-link danger" type="submit">Reset paper account</button></div>
+  </form>
+</section>
+
+<section class="content-card">
+  <h2>Last run summary</h2>
+  {% if last_run %}
+  <section class="metric-grid">
+    <article class="metric-card"><strong>{{ last_run.status }}</strong><span>Status</span></article>
+    <article class="metric-card"><strong>{{ last_run.candidates_considered or 0 }}</strong><span>Candidates considered</span></article>
+    <article class="metric-card"><strong>{{ last_run.paper_trades_placed or 0 }}</strong><span>Paper trades placed</span></article>
+    <article class="metric-card"><strong>{{ last_run.rejected_count or 0 }}</strong><span>Rejected</span></article>
+    <article class="metric-card"><strong>{{ '${:,.2f}'.format(last_run.total_simulated_notional or 0) }}</strong><span>Simulated notional</span></article>
+    <article class="metric-card"><strong>{{ last_run.data_freshness_state or 'unknown' }}</strong><span>Data state</span></article>
+  </section>
+  <p class="help-text"><code>{{ last_run.run_id }}</code> · paper_only={{ last_run.paper_only }} · live_execution_used={{ last_run.live_execution_used }}</p>
+  {% if last_run.risk_rejections %}<div class="callout warning"><strong>Top rejection reason:</strong> {{ last_run.risk_rejections[0] }}</div>{% endif %}
+  {% else %}
+  <div class="empty-state"><h3>No paper automation run yet</h3><p>Enable paper trading gates and run the strategy once. If no live/local signals are provided, the runner can use a clearly labeled paper-only sample candidate.</p></div>
+  {% endif %}
+</section>
+
+<section class="content-card">
+  <h2>Open paper positions</h2>
+  {% if positions %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Market</th><th>Side</th><th>Qty</th><th>Avg</th><th>Current</th><th>Cost</th><th>Unrealized P/L</th><th>Data</th></tr></thead>
+    <tbody>{% for item in positions %}<tr><td><strong>{{ item.market_title }}</strong><br><code>{{ item.market_id }}</code></td><td>{{ item.side }}</td><td>{{ '%.4f'|format(item.quantity or 0) }}</td><td>{{ '%.4f'|format(item.average_price or 0) }}</td><td>{{ '%.4f'|format(item.current_estimated_price or 0) }}</td><td>{{ '${:,.2f}'.format(item.cost_basis or 0) }}</td><td>{{ '${:,.2f}'.format(item.unrealized_pnl or 0) }}</td><td>{{ item.data_freshness_state }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}
+  <div class="empty-state"><h3>No open paper positions</h3><p>Positions will appear only after a simulated fill. This page never displays real exchange positions as paper positions.</p></div>
+  {% endif %}
+</section>
+
+<section class="content-card">
+  <h2>Recent paper orders and fills</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Order</th><th>Market</th><th>Side</th><th>Fill</th><th>Notional</th><th>Safety</th></tr></thead>
+    <tbody>
+      {% for item in recent_orders %}<tr><td>{{ item.timestamp }}</td><td><code>{{ item.order_id }}</code><br>{{ item.status }}</td><td>{{ item.market_title }}<br><code>{{ item.market_id }}</code></td><td>{{ item.side }}</td><td>{{ item.simulated_fill_price }}</td><td>{{ '${:,.2f}'.format(item.notional or 0) }}</td><td>paper_only={{ item.paper_only }}<br>live_execution_used={{ item.live_execution_used }}</td></tr>{% else %}<tr><td colspan="7"><div class="empty-state"><h3>No paper orders yet</h3><p>Run a paper strategy cycle after enabling paper gates.</p></div></td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Fill</th><th>Order</th><th>Side</th><th>Price</th><th>Fee</th><th>Model</th></tr></thead>
+    <tbody>{% for item in recent_fills %}<tr><td>{{ item.timestamp }}</td><td><code>{{ item.fill_id }}</code></td><td><code>{{ item.order_id }}</code></td><td>{{ item.side }}</td><td>{{ item.price }}</td><td>{{ '${:,.2f}'.format(item.fee or 0) }}</td><td>{{ item.fill_model_used }}</td></tr>{% else %}<tr><td colspan="7"><div class="empty-state"><h3>No paper fills yet</h3><p>Fills are simulated only and never come from a live exchange endpoint.</p></div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="content-card">
+  <h2>Decision log</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Time</th><th>Action</th><th>Market</th><th>Side</th><th>Edge / Confidence</th><th>Reason</th><th>Risk checks</th></tr></thead>
+    <tbody>{% for item in recent_decisions %}<tr><td>{{ item.timestamp }}<br><code>{{ item.decision_id }}</code></td><td>{{ item.final_action }}</td><td>{{ item.market_title }}<br><code>{{ item.market_id }}</code></td><td>{{ item.side }}</td><td>{{ item.edge_pct }}% / {{ item.confidence }}</td><td>{{ item.reason }}</td><td>{% if item.risk_checks_failed %}<ul>{% for reason in item.risk_checks_failed[:4] %}<li>{{ reason }}</li>{% endfor %}</ul>{% else %}passed{% endif %}</td></tr>{% else %}<tr><td colspan="7"><div class="empty-state"><h3>No paper decisions yet</h3><p>The strategy runner writes a decision for every considered candidate, including skips and rejections.</p></div></td></tr>{% endfor %}</tbody>
+  </table></div>
+</section>
+
+<section class="content-card">
+  <h2>Configuration snapshot</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Setting</th><th>Value</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td>PAPER_TRADING_ENABLED</td><td>{{ config.enabled }}</td><td>Enables the paper broker/ledger only.</td></tr>
+      <tr><td>PAPER_TRADING_AUTOMATION_ENABLED</td><td>{{ config.automation_enabled }}</td><td>Allows the run-once strategy loop to create simulated orders.</td></tr>
+      <tr><td>PAPER_TRADING_MAX_ORDER_NOTIONAL</td><td>{{ config.max_order_notional }}</td><td>Per-order simulated notional cap.</td></tr>
+      <tr><td>PAPER_TRADING_MIN_EDGE_PCT</td><td>{{ config.min_edge_pct }}</td><td>Minimum edge before a paper trade can be placed.</td></tr>
+      <tr><td>PAPER_TRADING_MIN_CONFIDENCE</td><td>{{ config.min_confidence }}</td><td>Minimum confidence before a paper trade can be placed.</td></tr>
+      <tr><td>PAPER_TRADING_FILL_MODEL</td><td>{{ config.fill_model }}</td><td>How simulated fills are priced.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

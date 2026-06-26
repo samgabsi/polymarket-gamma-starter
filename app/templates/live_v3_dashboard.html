@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Polymarket OP Console v4.0.1-real</title>
+  <title>Polymarket OP Console v4.17.0-real</title>
   <link rel="stylesheet" href="/static/v3_design.css">
   <script src="/static/v3_interactions.js" defer></script>
 </head>
@@ -12,14 +12,14 @@
 <div class="v3-app-shell">
   <aside class="v3-sidebar" aria-label="Primary navigation">
     <div class="v3-brand">
-      <div class="v3-brand-kicker">v4.0.1-real · platform stabilization / operator cockpit / guided workspace</div>
+      <div class="v3-brand-kicker">v4.17.0-real · Operator OS compatibility / advanced local workflows</div>
       <h1>Operator Intelligence OS</h1>
-      <p>Crisp local-first command center for strategy, research, monitoring, portfolio, governance, data, analytics, simulation, datasets, freshness planning, operator task planning, cockpit views, guided reviews, task dependencies, and read-only workflows.</p>
+      <p>Unified local-first surface linking Operator OS, AI Copilot, AI Edge Research, Live Controls, Platform, Cockpit, Workspace, Tasks, Data/Freshness, Simulation, Analytics, and Settings without weakening safety gates.</p>
     </div>
     {% set nav_groups = [
-      ('Operate', [('command_center','Command Center','/v3','⌁'),('platform','Platform','/v3/platform','health'),('cockpit','Operator Cockpit','/v3/cockpit','panels'),('workspace','Guided Workspace','/v3/workspace','guide'),('tasks','Tasks & Daily Ops','/v3/tasks','todo'),('live','Live Controls','/v2-live','safe'),('ticket','Trade Ticket','/v2-live','gate'),('audit','Audit','/v2-live/audit','log')]),
+      ('Operate', [('home','Home','/','home'),('command_center','Command Center','/v3','⌁'),('system_map','System Map','/system-map','map'),('platform','Platform','/v3/platform','health'),('ai','AI Copilot','/v3/ai','AI'),('cockpit','Operator Cockpit','/v3/cockpit','panels'),('workspace','Guided Workspace','/v3/workspace','guide'),('tasks','Tasks & Daily Ops','/v3/tasks','todo'),('live','Live Controls','/v2-live','safe'),('ticket','Trade Ticket','/v2-live','gate'),('audit','Audit','/v2-live/audit','log')]),
       ('Analyze', [('analytics','Analytics','/v3/analytics','learn'),('simulation','Simulation Lab','/v3/simulation','replay'),('datasets','Datasets','/v3/datasets','snap'),('freshness','Freshness','/v3/freshness','fresh'),('portfolio','Portfolio','/v2-live/portfolio','risk'),('monitoring','Monitoring','/v2-live/monitoring','alert'),('graph','Graph','/v3/graph','map'),('search','Search','/v3/search','⌘K')]),
-      ('Build Thesis', [('strategy','Strategy','/v2-live/strategy','thesis'),('research','Research','/v2-live/research','source'),('briefs','Packets & Briefs','/v3/briefs','report')]),
+      ('Build Thesis', [('strategy','Strategy','/v2-live/strategy','thesis'),('research','Research','/v2-live/research','source'),('ai_edge','AI Edge','/v3/ai/edge','edge'),('briefs','Packets & Briefs','/v3/briefs','report')]),
       ('Govern', [('governance','Governance','/v2-live/governance','review'),('data','Data / Backup','/v2-live/data','health'),('settings','Settings','/v3/settings','cfg')]),
       ('Output', [('workflows','Workflows','/v3/workflows','run'),('docs','Docs','/v3/docs','docs')])
     ] %}
@@ -48,19 +48,55 @@
       </div>
     </div>
 
+    <nav class="v3-global-bridge" aria-label="Unified operator surface bridge">
+      <a href="/">Home</a>
+      <a href="/v3">Operator OS</a>
+      <a href="/v3/ai">AI Copilot</a>
+      <a href="/v3/ai/edge">AI Edge Research</a>
+      <a href="/v2-live">Live Controls</a>
+      <a href="/v3/platform">Platform</a>
+      <a href="/v3/cockpit">Cockpit</a>
+      <a href="/v3/workspace">Workspace</a>
+      <a href="/v3/tasks">Tasks</a>
+      <a href="/settings">Settings</a>
+      <a href="/system-map">Route Map</a>
+    </nav>
+
+    {% if request.query_params.get('action_status') %}
+    <section class="v3-action-feedback" role="status">
+      <strong>{{ request.query_params.get('action_status')|replace('_', ' ')|title }}</strong>
+      {% if request.query_params.get('action_detail') %}<span>{{ request.query_params.get('action_detail') }}</span>{% endif %}
+    </section>
+    {% endif %}
+
     <section class="v3-page-hero">
-      <div class="v3-label">Platform Diagnostics / Operator Cockpit / Guided Workspace / Task Intelligence / Dataset Builder / Simulation Lab / Operator Intelligence</div>
+      <div class="v3-label">Unified Operator Surface / v2-v3-AI Navigation Bridge / Safety-Preserved Sections</div>
       <h2>{{ 'Command Center' if section == 'command_center' else section|replace('_', ' ')|title }}</h2>
-      <p>v4.0 stabilizes the Operator Intelligence platform with diagnostics, plugin manifest boundaries, route inventory, storage compatibility, and release-candidate safety hardening without autonomous trading.</p>
+      <p class="v3-muted">Dataset Builder / Simulation Lab / Operator Intelligence</p>
+      <p>v4.17 consolidates the default experience into five Operator OS workspaces while preserving this advanced/source-specific cockpit as a compatibility route.</p>
       <div class="v3-hero-actions">
-        <a class="v3-button primary" href="/v3">Open Command Center</a>
+        <a class="v3-button primary" href="/v3">Open Command Center</a><a class="v3-button" href="/">Home</a><a class="v3-button" href="/system-map">System Map</a><a class="v3-button" href="/v2-live">Live Controls</a>
         <a class="v3-button" href="/v3/workflows">Run Read-Only Workflow</a>
-        <a class="v3-button" href="/v3/analytics">Open Analytics</a><a class="v3-button" href="/v3/simulation">Open Simulation Lab</a><a class="v3-button" href="/v3/datasets">Open Datasets</a><a class="v3-button" href="/v3/freshness">Open Freshness</a><a class="v3-button" href="/v3/platform">Platform Health</a><a class="v3-button" href="/v3/cockpit">Operator Cockpit</a><a class="v3-button" href="/v3/tasks">Open Tasks</a><a class="v3-button" href="/v3/workspace">Guided Workspace</a>
-        <a class="v3-button" href="/docs/V4_PLATFORM_ARCHITECTURE_GUIDE_v4.0.1-real.md">Platform Guide</a><a class="v3-button" href="/docs/V3_OPERATOR_COCKPIT_GUIDE_v4.0.1-real.md">Cockpit Guide</a><a class="v3-button" href="/docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.0.1-real.md">Guided Workspace Guide</a>
+        <a class="v3-button" href="/v3/analytics">Open Analytics</a><a class="v3-button" href="/v3/simulation">Open Simulation Lab</a><a class="v3-button" href="/v3/datasets">Open Datasets</a><a class="v3-button" href="/v3/freshness">Open Freshness</a><a class="v3-button" href="/v3/platform">Platform Health</a><a class="v3-button" href="/v3/ai">AI Copilot</a><a class="v3-button" href="/v3/cockpit">Operator Cockpit</a><a class="v3-button" href="/v3/tasks">Open Tasks</a><a class="v3-button" href="/v3/workspace">Guided Workspace</a>
+        <a class="v3-button" href="/v3/ai/edge">AI Edge Research</a>
+        <a class="v3-button" href="/docs/V4_OPENAI_INTEGRATION_GUIDE_v4.7.0-real.md">OpenAI Guide</a><a class="v3-button" href="/docs/V4_LOCAL_LLM_RUNTIME_GUIDE_v4.7.0-real.md">Local LLM Guide</a><a class="v3-button" href="/docs/V4_CHATGPT_CONNECTOR_BLUEPRINT_v4.7.0-real.md">ChatGPT Blueprint</a><a class="v3-button" href="/docs/V4_AI_SAFETY_AND_PRIVACY_GUIDE_v4.7.0-real.md">AI Safety</a>
       </div>
     </section>
 
     {% if section == 'command_center' %}
+
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>Unified System Bridge</h2><span class="v3-badge ok">navigation only</span></div>
+      <p class="v3-muted">Polymarket OP Console is now flattened into one operator surface. Use these bridge links to move among the safety-critical v2 live-control plane, v3 Operator OS, AI draft/review layer, AI Edge Research, and platform diagnostics without memorizing URLs.</p>
+      <div class="v3-grid">
+        <article class="v3-card compact"><h3>v2 Live Controls</h3><p class="v3-muted">Safety-critical compatibility layer. Backend gates, approvals, confirmations, audit, and kill-switch controls remain the source of truth.</p><div class="v3-actions"><a href="/v2-live">Open v2 Live</a><a href="/live">Alias /live</a></div></article>
+        <article class="v3-card compact"><h3>v3 Operator OS</h3><p class="v3-muted">Command center, workflows, search, graph, tasks, guided review, cockpit, analytics, data, and operator intelligence.</p><div class="v3-actions"><a href="/v3">Open v3</a><a href="/operator-os">Alias /operator-os</a></div></article>
+        <article class="v3-card compact"><h3>AI Copilot</h3><p class="v3-muted">Draft summaries, explanations, prompt governance, OpenAI/local LLM providers, and suggestions that require human acceptance.</p><div class="v3-actions"><a href="/v3/ai">Open AI</a><a href="/ai">Alias /ai</a></div></article>
+        <article class="v3-card compact"><h3>AI Edge Research</h3><p class="v3-muted">Evidence-backed research packets, citations, contradictions, draft probabilities, web-search dry-run plans, and calibration.</p><div class="v3-actions"><a href="/v3/ai/edge">Open Edge</a><a href="/edge">Alias /edge</a></div></article>
+        <article class="v3-card compact"><h3>Platform</h3><p class="v3-muted">Diagnostics, route inventory, schemas, migrations, plugins, storage, and package/release health.</p><div class="v3-actions"><a href="/v3/platform">Open Platform</a><a href="/platform">Alias /platform</a></div></article>
+      </div>
+      <div class="v3-warning"><strong>Navigation safety:</strong> these links and aliases only navigate. They do not place orders, cancel orders, approve trades, arm live trading, disable read-only mode, disable the kill switch, or bypass backend gates.</div>
+    </section>
     <section class="v3-grid-wide">
       <div>
         <section class="v3-card">
@@ -160,22 +196,36 @@
     {% endif %}
 
     {% if section == 'platform' %}
+
     <section class="v3-card">
-      <div class="v3-section-title"><h2>v4 Platform Diagnostics</h2><span class="v3-badge ok">release-candidate hardening</span></div>
-      <p class="v3-muted">Platform diagnostics, route inventory, plugin manifests, storage compatibility, and exports are local-first operator aids. They do not execute plugin code, call network-heavy workflows, or mutate live trading state.</p>
+      <div class="v3-section-title"><h2>Platform Bridge</h2><span class="v3-badge ok">local diagnostics</span></div>
+      <p class="v3-muted">Platform diagnostics are now linked into the main operator surface. They explain routes, schemas, migrations, plugins, storage, and package health without mutating live trading state.</p>
+      <div class="v3-actions"><a href="/">Home</a><a href="/v3">Operator OS</a><a href="/v3/ai">AI Copilot</a><a href="/system-map">System Map</a><a href="/settings">Settings</a></div>
+    </section>
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>v4.3 Platform Diagnostics</h2><span class="v3-badge ok">routers / contracts / manual</span></div>
+      <p class="v3-muted">Platform diagnostics, schema inventory, route ownership, extracted routers, API contracts, generated manual status, plugin manifests, migration planning, storage compatibility, and exports are local-first operator aids. They do not execute plugin code, call network-heavy workflows, automatically migrate runtime data, or mutate live trading state.</p>
       <div class="v3-grid small">
         <div class="v3-card compact"><div class="v3-label">Status</div><div class="v3-metric">{{ platform_health.overall_status }}</div></div>
         <div class="v3-card compact"><div class="v3-label">Routes</div><div class="v3-metric">{{ platform_routes.count }}</div></div>
-        <div class="v3-card compact"><div class="v3-label">Plugins</div><div class="v3-metric">{{ platform_plugins.count }}</div></div>
+        <div class="v3-card compact"><div class="v3-label">API families</div><div class="v3-metric">{{ platform_api_schema.summary.api_family_count or 0 }}</div></div>
+        <div class="v3-card compact"><div class="v3-label">Migration steps</div><div class="v3-metric">{{ platform_migrations.step_count or 0 }}</div></div>
+        <div class="v3-card compact"><div class="v3-label">Extracted routers</div><div class="v3-metric">{{ platform_health.extracted_router_count or 0 }}</div></div>
+        <div class="v3-card compact"><div class="v3-label">Manual</div><div class="v3-metric">{{ 'ready' if platform_diagnostics.generated_manual.exists else 'pending' }}</div></div>
         <div class="v3-card compact"><div class="v3-label">Storage namespaces</div><div class="v3-metric">{{ platform_storage.count }}</div></div>
+        <div class="v3-card compact"><div class="v3-label">Plugins</div><div class="v3-metric">{{ platform_plugins.count }}</div></div>
       </div>
-      <div class="v3-danger-zone"><strong>Platform safety:</strong> plugin manifests are metadata only and do not execute arbitrary code. Diagnostics, route inventory, health checks, storage summaries, and platform exports do not place orders, cancel orders, approve trades, arm live trading, or bypass backend gates.</div>
-      <div class="v3-actions"><a href="/api/v3/platform/summary">Summary JSON</a><a href="/api/v3/platform/diagnostics">Diagnostics JSON</a><a href="/api/v3/platform/export.md">Export Markdown</a><a href="/docs/V4_PLUGIN_BOUNDARY_GUIDE_v4.0.1-real.md">Plugin Boundary Guide</a></div>
+      <div class="v3-danger-zone"><strong>Platform safety:</strong> extracted routers, API contracts, manual generation, plugin manifests, diagnostics, schema inventory, route inventory, health checks, migration plans, storage summaries, and platform exports do not place orders, cancel orders, approve trades, arm live trading, bypass backend gates, or automatically migrate runtime data.</div>
+      <div class="v3-actions"><a href="/api/v3/platform/summary">Summary JSON</a><a href="/api/v3/platform/route-registry">Route Registry</a><a href="/api/v3/platform/schema/export.md">Schema Export</a><a href="/api/v3/platform/migrations/export.md">Migration Export</a><a href="/api/v3/platform/export.md">Platform Export</a><a href="/docs/V4_ROUTER_ARCHITECTURE_GUIDE_v4.7.0-real.md">Router Guide</a><a href="/docs/V4_API_CONTRACTS_GUIDE_v4.7.0-real.md">API Contracts</a><a href="/docs/generated/OPERATOR_MANUAL_v4.7.0-real.md">Generated Manual</a></div>
     </section>
     <section class="v3-grid">
-      <article class="v3-card"><h3>Route Inventory</h3><div class="v3-table-wrap"><table class="v3-table"><caption>UI and API route families.</caption><thead><tr><th>Path</th><th>Family</th><th>Methods</th><th>Safety</th></tr></thead><tbody>{% for route in platform_routes["items"][:80] %}<tr><td><strong>{{ route.path }}</strong><br><span class="v3-muted">{{ route.name }}</span></td><td>{{ route.family }}</td><td>{{ route.methods|join(', ') }}</td><td>{{ route.safety_notes }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No route inventory available.</div></td></tr>{% endfor %}</tbody></table></div></article>
+      <article class="v3-card"><h3>Route Inventory</h3><div class="v3-table-wrap"><table class="v3-table"><caption>UI and API route families.</caption><thead><tr><th>Path</th><th>Family</th><th>Owner</th><th>Router</th><th>Safety</th></tr></thead><tbody>{% for route in platform_routes["items"][:80] %}<tr><td><strong>{{ route.path }}</strong><br><span class="v3-muted">{{ route.name }} · {{ route.methods|join(', ') }}</span></td><td>{{ route.family }}<br><span class="v3-muted">{{ route.extraction_status }}</span></td><td>{{ route.owner_module }}</td><td>{{ route.router_module }}</td><td>{{ route.safety_class }}<br><span class="v3-muted">{{ route.compatibility_notes }}</span></td></tr>{% else %}<tr><td colspan="5"><div class="v3-empty">No route inventory available.</div></td></tr>{% endfor %}</tbody></table></div></article>
+      <article class="v3-card"><h3>Route Ownership Registry</h3><div class="v3-table-wrap"><table class="v3-table"><caption>Extraction status by family.</caption><thead><tr><th>Family</th><th>Router</th><th>Status</th><th>Routes</th></tr></thead><tbody>{% for owner in platform_routes.route_ownership_registry["items"] %}<tr><td><strong>{{ owner.title }}</strong><br><span class="v3-muted">{{ owner.family_id }}</span></td><td>{{ owner.router_module }}</td><td><span class="v3-badge {{ 'ok' if owner.extraction_status == 'extracted' else 'warn' if owner.extraction_status in ['planned','metadata-only'] else 'unknown' }}">{{ owner.extraction_status }}</span></td><td>{{ owner.route_count }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No ownership records available.</div></td></tr>{% endfor %}</tbody></table></div><div class="v3-actions"><a href="/api/v3/platform/route-registry">Registry JSON</a><a href="/api/v3/platform/routes/export.md">Route Export</a></div></article>
+      <article class="v3-card"><h3>API Schema Inventory</h3><div class="v3-table-wrap"><table class="v3-table"><caption>Shared schema and envelope coverage.</caption><thead><tr><th>Family</th><th>Owner</th><th>Normalized</th><th>Compatibility</th></tr></thead><tbody>{% for family in platform_api_schema.data.api_families %}<tr><td>{{ family.title }}<br><span class="v3-muted">{{ family.route_prefixes|join(', ') }}</span></td><td>{{ family.module_owner }}</td><td>{{ family.normalized_response }}</td><td>{{ family.compatibility_note }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No API schema inventory available.</div></td></tr>{% endfor %}</tbody></table></div><div class="v3-actions"><a href="/api/v3/platform/schema">Schema JSON</a><a href="/api/v3/platform/schema/envelopes">Envelope JSON</a><a href="/api/v3/platform/schema/export.md">Export Markdown</a></div></article>
+      <article class="v3-card"><h3>Contracts And Manual</h3><p><strong>API contracts:</strong> {{ platform_diagnostics.api_contracts.contract_groups|length }} groups · {{ platform_diagnostics.api_contracts.tests_file }}</p><p><strong>Manual source:</strong> {{ platform_diagnostics.generated_manual.path }}</p><p><strong>Manual exists:</strong> {{ platform_diagnostics.generated_manual.exists }}</p><p class="v3-muted">Generated docs are deterministic and do not include runtime records or secrets.</p><div class="v3-actions"><a href="/docs/generated/OPERATOR_MANUAL_v4.7.0-real.md">Manual Source</a><a href="/docs/generated/ROUTE_INVENTORY_v4.7.0-real.md">Route Inventory</a><a href="/docs/generated/API_SCHEMA_INVENTORY_v4.7.0-real.md">API Inventory</a></div></article>
+      <article class="v3-card"><h3>Runtime Migration Planner</h3><p class="v3-muted">The planner inventories package-excluded runtime namespaces and proposes operator-reviewed actions only. It does not delete, move, rewrite, migrate, place orders, cancel orders, or arm live trading.</p><div class="v3-table-wrap"><table class="v3-table"><caption>Non-destructive migration plan.</caption><thead><tr><th>Step</th><th>Namespace</th><th>Classification</th><th>Instruction</th></tr></thead><tbody>{% for step in platform_migration_plan.steps[:20] %}<tr><td>{{ step.step_id }}</td><td>{{ step.namespace }}</td><td><span class="v3-badge {{ 'danger' if step.classification == 'destructive action prohibited' else 'warn' if step.classification in ['manual review required','schema unknown','backup recommended'] else 'ok' }}">{{ step.classification }}</span></td><td>{{ step.operator_instruction }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No migration plan available.</div></td></tr>{% endfor %}</tbody></table></div><div class="v3-actions"><a href="/api/v3/platform/migrations/summary">Summary JSON</a><a href="/api/v3/platform/migrations/plan">Plan JSON</a><a href="/api/v3/platform/migrations/export.md">Export Markdown</a></div></article>
       <article class="v3-card"><h3>Plugin Manifest Boundary</h3><div class="v3-list">{% for plugin in platform_plugins["items"] %}<div class="v3-list-item"><strong>{{ plugin.title }}</strong> <span class="v3-badge {{ 'ok' if plugin.validation.ok else 'danger' }}">{{ plugin.validation.status }}</span><p>{{ plugin.description }}</p><span class="v3-muted">{{ plugin.plugin_type }} · metadata only · no live mutation: {{ plugin.no_live_mutation }}</span></div>{% else %}<div class="v3-empty">No plugin manifests loaded.</div>{% endfor %}</div></article>
-      <article class="v3-card"><h3>Storage Compatibility</h3><div class="v3-table-wrap"><table class="v3-table"><caption>Runtime stores excluded from release ZIPs.</caption><thead><tr><th>Namespace</th><th>Path</th><th>Lazy</th><th>Excluded</th></tr></thead><tbody>{% for item in platform_storage["items"] %}<tr><td>{{ item.namespace }}</td><td>{{ item.path }}</td><td>{{ item.created_lazily }}</td><td>{{ item.package_excluded }}</td></tr>{% endfor %}</tbody></table></div></article>
+      <article class="v3-card"><h3>Storage Compatibility</h3><div class="v3-table-wrap"><table class="v3-table"><caption>Runtime stores excluded from release ZIPs.</caption><thead><tr><th>Namespace</th><th>Format</th><th>Introduced</th><th>Backup</th></tr></thead><tbody>{% for item in platform_storage_map["items"] %}<tr><td>{{ item.namespace }}<br><span class="v3-muted">{{ item.path }}</span></td><td>{{ item.expected_format }}</td><td>{{ item.introduced_in }}</td><td>{{ item.backup_recommended }}</td></tr>{% endfor %}</tbody></table></div><div class="v3-actions"><a href="/api/v3/platform/migrations/storage-map">Storage Map JSON</a><a href="/api/v3/platform/storage/export.md">Storage Export</a></div></article>
       <article class="v3-card"><h3>Safety Boundary</h3><p>{{ platform_safety["standard_safety_statement"] }}</p><ul>{% for action in platform_safety["forbidden_live_mutation_actions"][:12] %}<li>{{ action }}</li>{% endfor %}</ul></article>
     </section>
     {% endif %}
@@ -325,14 +375,46 @@
       <div class="v3-danger-zone"><strong>Cockpit safety:</strong> cockpit controls do not place orders, cancel orders, approve trades, or bypass backend gates. No cockpit, shortcut, command-palette, layout, focus-mode, dependency, guided-review, task, cadence, saved-view, or packet action places or cancels orders. Live submission still requires the existing backend gates.</div>
     </section>
 
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>System Readiness / Feature Status</h2><span class="v3-badge ok">honest UI map</span></div>
+      <p class="v3-muted">Visible features are classified as working, disabled, config-required, partial, scaffolded, or unavailable so the console does not imply fake functionality.</p>
+      <div class="v3-table-wrap"><table class="v3-table"><caption>Feature status registry</caption><thead><tr><th>Feature</th><th>Status</th><th>Area</th><th>Operator action</th><th>Reason</th></tr></thead><tbody>{% for item in feature_status["items"] %}<tr><td><strong>{{ item.title }}</strong><br><span class="v3-muted">{{ item.feature_id }}</span></td><td><span class="v3-badge {{ 'ok' if item.status == 'working' else 'warn' if item.status in ['config_required','partial','scaffolded'] else 'unknown' }}">{{ item.status }}</span></td><td>{{ item.area }}</td><td>{{ item.operator_action }}</td><td>{{ item.reason }}</td></tr>{% else %}<tr><td colspan="5"><div class="v3-empty">Feature status registry unavailable.</div></td></tr>{% endfor %}</tbody></table></div>
+      {% set stub_map = feature_status.get('stub_burndown', {}) %}
+      {% if stub_map.get('items') %}
+      <h3>Stub Burn-down Map</h3>
+      <div class="v3-table-wrap"><table class="v3-table"><caption>Stub burn-down registry</caption><thead><tr><th>Feature</th><th>Status</th><th>Surface</th><th>Backend</th><th>UI wiring</th></tr></thead><tbody>{% for item in stub_map["items"] %}<tr><td><strong>{{ item.title }}</strong><br><span class="v3-muted">{{ item.feature_id }}</span></td><td><span class="v3-badge {{ 'ok' if item.status == 'working' else 'warn' if item.status in ['config_required','partial','needs_tests','needs_docs','needs_ui_wiring','needs_backend_wiring'] else 'unknown' }}">{{ item.status }}</span></td><td>{{ item.visible_surface }}</td><td>{{ item.backend_wiring }}</td><td>{{ item.ui_wiring }}</td></tr>{% endfor %}</tbody></table></div>
+      {% endif %}
+      <div class="v3-actions"><a href="/api/v3/features/status">Feature status JSON</a><a href="/api/v3/features/stub-burndown">Stub burn-down JSON</a></div>
+    </section>
+
     <section class="v3-cockpit-grid" data-v3-command-palette-root>
       <article class="v3-card v3-cockpit-panel">
-        <div class="v3-section-title"><h2>Layout Selector</h2><span class="v3-badge ok">saved layouts</span></div>
-        <div class="v3-list">{% for layout in cockpit_layouts["items"] %}<div class="v3-list-item"><strong>{{ layout.title }}</strong> {% if layout.selected %}<span class="v3-badge ok">selected</span>{% endif %}<p>{{ layout.description }}</p><span class="v3-muted">{{ layout.layout_type }} · panels: {{ layout.panel_ids|length }}</span></div>{% else %}<div class="v3-empty">No cockpit layouts available.</div>{% endfor %}</div>
+        <div class="v3-section-title"><h2>Layout Selector</h2><span class="v3-badge ok">selectable + persistent</span></div>
+        <div class="v3-callout"><strong>Active layout:</strong> {{ cockpit_selected_layout.title or cockpit_summary.active_cockpit_layout }} <span class="v3-muted">({{ cockpit_summary.active_cockpit_layout }})</span></div>
+        <form class="v3-inline-form" action="/v3/cockpit/layouts/save-selected" method="post">
+          <label class="v3-sr-only" for="save-layout-title">Saved layout title</label>
+          <input id="save-layout-title" class="v3-field" name="title" placeholder="Optional saved layout title">
+          <button type="submit">Save current layout copy</button>
+        </form>
+        <div class="v3-list" data-v3-layout-selector>{% for layout in cockpit_layouts["items"] %}
+          <form class="v3-list-item v3-select-card {{ 'selected' if layout.selected else '' }}" action="/v3/cockpit/layouts/{{ layout.layout_id }}/select" method="post" data-v3-layout-card data-layout-id="{{ layout.layout_id }}">
+            <button type="submit" class="v3-card-button" aria-pressed="{{ 'true' if layout.selected else 'false' }}">
+              <strong>{{ layout.title }}</strong> {% if layout.selected %}<span class="v3-badge ok">selected</span>{% else %}<span class="v3-badge unknown">select</span>{% endif %}
+              <p>{{ layout.description }}</p>
+              <span class="v3-muted">{{ layout.layout_type }} · panels: {{ layout.panel_ids|length }} · default focus {{ layout.default_focus_panel }}</span>
+            </button>
+          </form>{% else %}<div class="v3-empty">No cockpit layouts available.</div>{% endfor %}</div>
       </article>
       <article class="v3-card v3-cockpit-panel">
-        <div class="v3-section-title"><h2>Focused Review Modes</h2><span class="v3-badge warn">navigation only</span></div>
-        <div class="v3-list">{% for focus in cockpit_focus_modes["items"][:8] %}<div class="v3-list-item"><strong>{{ focus.title }}</strong><p>{{ focus.suggested_next_safe_action }}</p><span class="v3-muted">{{ focus.layout_id }} · {{ focus.entry_route }}</span></div>{% else %}<div class="v3-empty">No focus modes loaded.</div>{% endfor %}</div>
+        <div class="v3-section-title"><h2>Focused Review Modes</h2><span class="v3-badge ok">start + navigate</span></div>
+        <div class="v3-list" data-v3-focus-modes>{% for focus in cockpit_focus_modes["items"][:8] %}
+          <form class="v3-list-item v3-select-card {{ 'selected' if cockpit_settings.active_focus_mode_id == focus.focus_mode_id else '' }}" action="/v3/cockpit/focus-modes/{{ focus.focus_mode_id }}/start" method="post" data-v3-focus-card data-focus-id="{{ focus.focus_mode_id }}">
+            <button type="submit" class="v3-card-button" aria-pressed="{{ 'true' if cockpit_settings.active_focus_mode_id == focus.focus_mode_id else 'false' }}">
+              <strong>{{ focus.title }}</strong> {% if cockpit_settings.active_focus_mode_id == focus.focus_mode_id %}<span class="v3-badge ok">active</span>{% else %}<span class="v3-badge unknown">start</span>{% endif %}
+              <p>{{ focus.suggested_next_safe_action }}</p>
+              <span class="v3-muted">{{ focus.layout_id }} · opens {{ focus.entry_route }} · panels {{ focus.relevant_panels|length }}</span>
+            </button>
+          </form>{% else %}<div class="v3-empty">No focus modes loaded.</div>{% endfor %}</div>
       </article>
       <article class="v3-card v3-cockpit-panel">
         <div class="v3-section-title"><h2>Side-by-Side Task / Source / Review Context</h2><span class="v3-badge ok">safe summaries</span></div>
@@ -378,7 +460,12 @@
     <section class="v3-card">
       <div class="v3-section-title"><h2>Guided Review Launcher</h2><span class="v3-badge ok">local-first</span></div>
       <p class="v3-muted">Start daily, weekly, task-triage, blocked-task, dataset, freshness, simulation, analytics, governance, monitoring, portfolio, or research review flows. Starting a flow creates a local session only.</p>
-      <div class="v3-actions"><a href="/api/v3/workspace/daily-review/start">Daily review API</a><a href="/api/v3/workspace/weekly-review/start">Weekly review API</a><a href="/api/v3/workspace/task-triage/start">Task triage API</a><a href="/api/v3/workspace/export.md">Export Markdown</a><a href="/docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.0.1-real.md">Guide</a></div>
+      <div class="v3-actions">
+        <form action="/v3/workspace/daily-review/start" method="post"><button type="submit">Start Daily Review</button></form>
+        <form action="/v3/workspace/weekly-review/start" method="post"><button type="submit">Start Weekly Review</button></form>
+        <form action="/v3/workspace/task-triage/start" method="post"><button type="submit">Start Task Triage</button></form>
+        <a href="/api/v3/workspace/export.md">Export Markdown</a><a href="/docs/V3_GUIDED_OPERATOR_WORKSPACE_GUIDE_v4.7.0-real.md">Guide</a>
+      </div>
       <div class="v3-danger-zone"><strong>Workspace safety:</strong> guided reviews, dependencies, saved views, source previews, and packets do not place orders, cancel orders, approve trades, sign transactions, arm live trading, or bypass backend gates.</div>
     </section>
     <section class="v3-grid-wide">
@@ -440,9 +527,186 @@
     {% endif %}
 
 
-    {% if section == 'settings' %}
-    <section class="v3-grid-wide"><div class="v3-card"><h2>v3 Settings Boundary</h2><p>AI assistance is disabled by default. External provider scaffolding remains explicit, redacted, and advisory-only.</p><pre>{{ settings | tojson(indent=2) }}</pre></div><div class="v3-card"><h2>UX Release Status</h2><p><span class="v3-badge ok">Design system active</span></p><p><span class="v3-badge ok">Screenshots not bundled</span></p><p><span class="v3-badge ok">Backend gates preserved</span></p><pre>{{ validation_status | tojson(indent=2) }}</pre></div></section>
+    {% if section == 'ai' %}
+
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>AI Copilot In The Unified Surface</h2><span class="v3-badge warn">drafts only</span></div>
+      <p class="v3-muted">AI is discoverable from Home, Operator OS, v2 Live Controls, Platform, Cockpit, Workspace, Tasks, and Settings. AI outputs are drafts for human review; they are not financial advice, not trade approval, and cannot place/cancel orders or arm live trading.</p>
+      <div class="v3-actions"><a href="/">Home</a><a href="/v3">Operator OS</a><a href="/v2-live">Live Controls</a><a href="/v3/platform">Platform</a><a href="/system-map">System Map</a><a href="/v3/ai/edge">AI Edge Research</a><a href="/v3/ai/local-llm">Local LLM</a><a href="/v3/ai/openai">OpenAI</a></div>
+    </section>
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>AI Edge Research</h2><span class="v3-badge ok">evidence-backed drafts</span></div>
+      <p class="v3-muted">AI Edge Research creates review-only packets with app-provided evidence, source metadata, citations, contradictions, missing-information tracking, dry-run OpenAI web-search request plans, local LLM evidence review boundaries, draft probabilities, and calibration records. It is disabled by default and does not place/cancel orders, approve trades, or call the web on page load.</p>
+      <div class="v3-grid">
+        <div class="v3-card compact"><div class="v3-label">Edge enabled</div><div class="v3-metric">{{ ai_edge_settings.ai_edge_enable }}</div><span class="v3-badge {{ 'warn' if ai_edge_settings.ai_edge_enable else 'ok' }}">disabled default</span></div>
+        <div class="v3-card compact"><div class="v3-label">Edge provider</div><div class="v3-metric">{{ ai_edge_settings.ai_edge_provider }}</div><span class="v3-badge ok">mock default</span></div>
+        <div class="v3-card compact"><div class="v3-label">Web search</div><div class="v3-metric">{{ ai_edge_settings.openai_enable_web_search }}</div><span class="v3-badge {{ 'warn' if ai_edge_settings.openai_enable_web_search else 'ok' }}">off default</span></div>
+        <div class="v3-card compact"><div class="v3-label">Packets</div><div class="v3-metric">{{ ai_edge_summary.packet_count or 0 }}</div><span class="v3-badge ok">research only</span></div>
+        <div class="v3-card compact"><div class="v3-label">Evidence</div><div class="v3-metric">{{ ai_edge_summary.evidence_source_count or 0 }}</div><span class="v3-badge ok">citations</span></div>
+        <div class="v3-card compact"><div class="v3-label">Calibration</div><div class="v3-metric">{{ ai_edge_calibration_summary.record_count or 0 }}</div><span class="v3-badge ok">outcome tracking</span></div>
+      </div>
+      <div class="v3-danger-zone"><strong>AI Edge boundary:</strong> OpenAI web search is disabled by default, runtime/private data is not sent by default, local LLM edge review cannot claim web search, market-implied comparison is disabled by default, and probability drafts are not trade signals.</div>
+      <div class="v3-danger-zone"><strong>v4.7 AI News Odds + edge clarity:</strong> rows now label Recommended Side as YES, NO, HOLD, NEEDS REVIEW, or INSUFFICIENT DATA; Favorite rank is separate from YES/NO draft edge; every market-row packet is review-only and cannot submit, cancel, approve, or arm live trading.</div>
+      <div class="v3-actions"><a href="/api/v3/ai/edge/summary">Summary JSON</a><a href="/api/v3/ai/edge/packets">Packets</a><a href="/api/v3/ai/edge/evidence">Evidence</a><a href="/api/v3/ai/edge/calibration/summary">Calibration</a><a href="/api/v3/ai/edge/market/example/summary">Market Summary API</a><a href="/api/v3/ai/edge/family/example/summary">Family Summary API</a><a href="/api/v3/ai/edge/openai-web-dry-run">Web Dry-run API</a><a href="/api/v3/ai/edge/export.md">Edge Export</a><a href="/docs/V4_AI_EDGE_RESEARCH_GUIDE_v4.7.0-real.md">Edge Guide</a></div>
+    </section>
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>Multi-Provider AI Operator Copilot</h2><span class="v3-badge ok">drafts only</span></div>
+      <p class="v3-muted">AI outputs are drafts for human review. AI outputs are not financial advice, not trade approval, cannot place or cancel orders, cannot arm live trading, cannot disable safety gates, and AI task suggestions require explicit human acceptance. OpenAI, local LLM, and mock providers share the same redaction and no-live-mutation boundary.</p>
+      <div class="v3-grid">
+        <div class="v3-card compact"><div class="v3-label">AI provider</div><div class="v3-metric">{{ ai_settings.ai.ai_provider }}</div><span class="v3-badge ok">mock default</span></div>
+        <div class="v3-card compact"><div class="v3-label">AI enabled</div><div class="v3-metric">{{ ai_settings.ai.ai_enable }}</div><span class="v3-badge {{ 'warn' if ai_settings.ai.ai_enable else 'ok' }}">disabled by default</span></div>
+        <div class="v3-card compact"><div class="v3-label">OpenAI API</div><div class="v3-metric">{{ ai_settings.openai.openai_enable_api }}</div><span class="v3-badge {{ 'warn' if ai_settings.openai.openai_enable_api else 'ok' }}">disabled by default</span></div>
+        <div class="v3-card compact"><div class="v3-label">Local LLM</div><div class="v3-metric">{{ ai_settings.local_llm.local_llm_enable }}</div><span class="v3-badge {{ 'warn' if ai_settings.local_llm.local_llm_enable else 'ok' }}">localhost opt-in</span></div>
+        <div class="v3-card compact"><div class="v3-label">Dry-run only</div><div class="v3-metric">{{ ai_settings.ai.ai_dry_run_only }}</div><span class="v3-badge ok">no network by default</span></div>
+        <div class="v3-card compact"><div class="v3-label">Recommended local model</div><div class="v3-metric">{{ ai_model_recommendations.recommended_default_for_mac_mini_m4_16gb }}</div><span class="v3-badge ok">Mac mini M4 16GB</span></div>
+        <div class="v3-card compact"><div class="v3-label">Suggestions</div><div class="v3-metric">{{ ai_summary.suggestion_count or 0 }}</div><span class="v3-badge warn">accept manually</span></div>
+        <div class="v3-card compact"><div class="v3-label">Review packets</div><div class="v3-metric">{{ ai_summary.review_packet_count or 0 }}</div><span class="v3-badge ok">human review</span></div>
+        <div class="v3-card compact"><div class="v3-label">Prompt templates</div><div class="v3-metric">{{ ai_prompts.count or 0 }}</div><span class="v3-badge ok">governed</span></div>
+        <div class="v3-card compact"><div class="v3-label">Audit records</div><div class="v3-metric">{{ ai_summary.audit_record_count or 0 }}</div><span class="v3-badge ok">hashes only</span></div>
+      </div>
+      <div class="v3-danger-zone"><strong>AI safety boundary:</strong> AI is disabled by default, provider is mock by default, OpenAI API calls and local LLM calls are disabled by default, dry-run mode is enabled by default, no runtime/market/task/docs/diagnostic data is sent by default, redaction is required, tool calling is disabled, remote MCP is disabled, and secrets must never be sent or logged.</div>
+      <div class="v3-actions">
+        <a href="/api/v3/ai/summary">Summary JSON</a><a href="/api/v3/ai/providers">Providers</a>
+        <form action="/v3/ai/providers/test-dry-run" method="post"><input type="hidden" name="provider" value="mock"><button type="submit">Run Provider Dry-run</button></form>
+        <a href="/api/v3/ai/model-recommendations">Model Recommendations</a><a href="/api/v3/ai/export.md">AI Export</a><a href="/docs/V4_AI_OPERATOR_COPILOT_GUIDE_v4.7.0-real.md">Copilot Guide</a><a href="/docs/V4_LOCAL_LLM_RUNTIME_GUIDE_v4.7.0-real.md">Local LLM Guide</a>
+      </div>
+    </section>
+
+    <section class="v3-grid-wide">
+      <div>
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Edge Research Packets</h2><span class="v3-badge ok">citations required</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>Evidence-backed AI edge research packets</caption><thead><tr><th>Packet</th><th>Status</th><th>Evidence</th><th>Probability Draft</th></tr></thead><tbody>{% for packet in ai_edge_packets["items"] %}<tr><td><strong>{{ packet.title }}</strong><br><span class="v3-muted">{{ packet.packet_id }}</span></td><td><span class="v3-badge {{ 'ok' if packet.status == 'draft' else 'unknown' }}">{{ packet.status }}</span></td><td>{{ packet.evidence_sources|length }} sources<br><span class="v3-muted">{{ packet.contradictions|length }} contradictions · {{ packet.missing_information|length }} missing</span></td><td>{{ packet.probability_draft.fair_probability if packet.probability_draft else 'n/a' }}<br><span class="v3-muted">not a trade signal</span></td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No AI Edge packets yet. Generate a dry-run packet explicitly through the API.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/edge/packets">Packets JSON</a><form action="/v3/ai/edge/packets/generate" method="post"><button type="submit">Generate Draft Packet</button></form><a href="/api/v3/ai/edge/export.csv">CSV</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Edge Evidence</h2><span class="v3-badge ok">source metadata</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>Normalized evidence sources for AI Edge Research</caption><thead><tr><th>Citation</th><th>Source</th><th>Stance</th><th>Snippet</th></tr></thead><tbody>{% for source in ai_edge_evidence["items"] %}<tr><td><strong>{{ source.citation_label }}</strong></td><td>{{ source.title }}<br><span class="v3-muted">{{ source.domain or source.url }}</span></td><td>{{ source.claim_stance }}</td><td>{{ source.snippet }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No AI Edge evidence sources recorded.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/edge/evidence">Evidence JSON</a><form action="/v3/ai/edge/evidence/normalize" method="post"><button type="submit">Preview Normalize Evidence</button></form><a href="/api/v3/ai/edge/evidence/export.md">Evidence Export</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Edge Calibration</h2><span class="v3-badge ok">research only</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>Draft probability calibration records</caption><thead><tr><th>Packet</th><th>Status</th><th>Draft Probability</th><th>Brier</th></tr></thead><tbody>{% for record in ai_edge_calibration["items"] %}<tr><td><strong>{{ record.packet_id }}</strong><br><span class="v3-muted">{{ record.calibration_id }}</span></td><td>{{ record.status }}</td><td>{{ record.draft_probability }}</td><td>{{ record.brier_score or 'pending' }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No AI Edge calibration records yet.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/edge/calibration/summary">Calibration Summary</a><a href="/api/v3/ai/edge/calibration/export.md">Markdown</a><a href="/api/v3/ai/edge/calibration/export.csv">CSV</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Provider Layer</h2><span class="v3-badge ok">multi-provider</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>OpenAI, local LLM, and mock providers</caption><thead><tr><th>Provider</th><th>Model</th><th>Enabled</th><th>Network</th><th>Safety</th></tr></thead><tbody>{% for provider in ai_providers["items"] %}<tr><td><strong>{{ provider.provider_title }}</strong><br><span class="v3-muted">{{ provider.provider_id }}</span></td><td>{{ provider.model }}</td><td>{{ provider.enabled }}</td><td>{{ provider.network_allowed }}</td><td>dry-run={{ provider.dry_run }}<br>no live mutation={{ provider.no_live_mutation }}</td></tr>{% else %}<tr><td colspan="5"><div class="v3-empty">No AI providers loaded.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/providers">Providers JSON</a><a href="/api/v3/ai/providers/health">Health</a><a href="/api/v3/ai/providers/export.md">Markdown Export</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>Local Model Recommendations</h2><span class="v3-badge ok">16GB Apple Silicon</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>Local LLM model fit guidance</caption><thead><tr><th>Model</th><th>Runtime</th><th>Use case</th><th>Install</th><th>16GB status</th></tr></thead><tbody>{% for model in ai_model_recommendations["items"] %}<tr><td><strong>{{ model.model }}</strong></td><td>{{ model.provider_runtime }}</td><td>{{ model.intended_use_case }}</td><td><code>{{ model.install_command }}</code></td><td>{% if model.recommended_default_for_mac_mini_m4_16gb %}<span class="v3-badge ok">default</span>{% elif model.experimental_for_16gb %}<span class="v3-badge warn">experimental</span>{% else %}<span class="v3-badge unknown">supported</span>{% endif %}</td></tr>{% else %}<tr><td colspan="5"><div class="v3-empty">No model recommendations loaded.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/model-recommendations">Recommendations JSON</a><a href="/api/v3/ai/model-recommendations/export.md">Markdown</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Suggestion Inbox</h2><input class="v3-field" data-v3-table-filter="#ai-suggestions-table" placeholder="Filter suggestions"></div>
+          <p class="v3-muted">Suggestions stay as drafts until accepted by a human. Acceptance creates a local operator task only; it does not approve trades, place orders, cancel orders, arm live trading, or mutate live configuration.</p>
+          <div class="v3-table-wrap"><table id="ai-suggestions-table" class="v3-table"><caption>AI task suggestions requiring human acceptance</caption><thead><tr><th>Status</th><th>Priority</th><th>Suggestion</th><th>Safety</th><th>Hashes</th></tr></thead><tbody>{% for item in ai_suggestions["items"] %}<tr><td><span class="v3-badge {{ 'ok' if item.human_status == 'accepted' else 'warn' if item.human_status == 'draft' else 'unknown' }}">{{ item.human_status }}</span></td><td>{{ item.suggested_priority }}</td><td><strong>{{ item.title }}</strong><br><span class="v3-muted">{{ item.summary }}</span><br><span class="v3-muted">Task: {{ item.accepted_task_id or 'not accepted' }}</span></td><td>{{ item.safety_label }}<br><span class="v3-muted">no live mutation={{ item.no_live_mutation }}</span></td><td><span class="v3-muted">{{ item.prompt_hash[:12] if item.prompt_hash else 'dry-run' }} / {{ item.response_hash[:12] if item.response_hash else 'dry-run' }}</span></td></tr>{% else %}<tr><td colspan="5"><div class="v3-empty">No AI suggestions yet. Generate one explicitly through the API; no suggestions run on page load.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/suggestions">Suggestions JSON</a><a href="/api/v3/ai/suggestions/export.csv">CSV</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>Prompt Governance</h2><span class="v3-badge ok">redaction required</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>AI prompt templates and schemas</caption><thead><tr><th>Template</th><th>Category</th><th>Schema</th><th>Controls</th></tr></thead><tbody>{% for prompt in ai_prompts["items"] %}<tr><td><strong>{{ prompt.title }}</strong><br><span class="v3-muted">{{ prompt.template_id }} · {{ prompt.prompt_hash[:16] }}</span></td><td>{{ prompt.category }}</td><td>{{ prompt.output_schema_reference }}</td><td>redaction={{ prompt.required_redaction }}<br>approval={{ prompt.human_approval_required }}<br>dry-run={{ prompt.dry_run_supported }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No AI prompt templates loaded.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/prompts/export.md">Prompt Export</a><a href="/docs/V4_AI_PROMPT_GOVERNANCE_GUIDE_v4.7.0-real.md">Prompt Guide</a></div>
+        </section>
+
+        <section class="v3-card">
+          <div class="v3-section-title"><h2>AI Review Packets</h2><span class="v3-badge ok">draft packets</span></div>
+          <div class="v3-table-wrap"><table class="v3-table"><caption>AI-assisted review packets</caption><thead><tr><th>Packet</th><th>Workflow</th><th>Status</th><th>Summary</th></tr></thead><tbody>{% for packet in ai_review_packets["items"] %}<tr><td><strong>{{ packet.title }}</strong><br><span class="v3-muted">{{ packet.packet_id }}</span></td><td>{{ packet.workflow_id }}</td><td>{{ packet.status }}</td><td>{{ packet.summary }}</td></tr>{% else %}<tr><td colspan="4"><div class="v3-empty">No AI review packets yet.</div></td></tr>{% endfor %}</tbody></table></div>
+          <div class="v3-actions"><a href="/api/v3/ai/review-packets">Packets JSON</a><form action="/v3/ai/review-packets/generate" method="post"><button type="submit">Generate Review Packet</button></form></div>
+        </section>
+      </div>
+      <aside>
+        <section class="v3-card"><h2>Generic AI Configuration</h2><p><strong>Provider:</strong> {{ ai_settings.ai.ai_provider }}</p><p><strong>AI enabled:</strong> {{ ai_settings.ai.ai_enable }}</p><p><strong>Dry-run only:</strong> {{ ai_settings.ai.ai_dry_run_only }}</p><p><strong>Network allowed:</strong> {{ ai_settings.ai.ai_allow_network }}</p><p><strong>Redaction before send:</strong> {{ ai_settings.ai.ai_redact_before_send }}</p><p><strong>Human approval:</strong> {{ ai_settings.ai.ai_require_operator_approval }}</p><div class="v3-actions"><a href="/api/v3/ai/settings">Settings JSON</a></div></section>
+        <section class="v3-card"><h2>Local LLM Configuration</h2><p><strong>Provider:</strong> {{ ai_settings.local_llm.local_llm_provider }}</p><p><strong>Model:</strong> {{ ai_settings.local_llm.local_llm_model }}</p><p><strong>Endpoint:</strong> {{ ai_settings.local_llm.local_llm_base_url }}</p><p><strong>Enabled:</strong> {{ ai_settings.local_llm.local_llm_enable }}</p><p><strong>Localhost required:</strong> {{ ai_settings.local_llm.local_llm_require_localhost }}</p><p><strong>Network allowed:</strong> {{ ai_settings.local_llm.local_llm_allow_network }}</p><p class="v3-muted">Install recommended default: <code>ollama pull qwen3:8b</code></p><div class="v3-actions"><a href="/api/v3/ai/local-llm/status">Local LLM JSON</a><a href="/docs/V4_LOCAL_LLM_RUNTIME_GUIDE_v4.7.0-real.md">Local LLM Guide</a></div></section>
+        <section class="v3-card"><h2>OpenAI Configuration</h2><p><strong>Review model:</strong> {{ ai_settings.openai.model_review }}</p><p><strong>Fast model:</strong> {{ ai_settings.openai.model_fast }}</p><p><strong>Low-cost model:</strong> {{ ai_settings.openai.model_low_cost }}</p><p><strong>API key configured:</strong> {{ ai_settings.openai.openai_api_key_configured }}</p><p><strong>Key value returned:</strong> {{ ai_settings.openai.openai_api_key_value_returned }}</p><p><strong>Tool calling:</strong> {{ ai_settings.openai.openai_enable_tool_calling }}</p><p><strong>Remote MCP:</strong> {{ ai_settings.openai.openai_enable_remote_mcp }}</p><p><strong>Web/File/Code tools:</strong> {{ ai_settings.openai.openai_enable_web_search }} / {{ ai_settings.openai.openai_enable_file_search }} / {{ ai_settings.openai.openai_enable_code_interpreter }}</p><div class="v3-actions"><a href="/api/v3/ai/settings">Settings JSON</a></div></section>
+        <section class="v3-card"><h2>Data Sharing Permissions</h2><ul><li>Runtime data: {{ ai_settings.openai.openai_allow_sending_runtime_data }}</li><li>Market data: {{ ai_settings.openai.openai_allow_sending_market_data }}</li><li>Tasks: {{ ai_settings.openai.openai_allow_sending_tasks }}</li><li>Docs: {{ ai_settings.openai.openai_allow_sending_docs }}</li><li>Diagnostics: {{ ai_settings.openai.openai_allow_sending_platform_diagnostics }}</li><li>Migration reports: {{ ai_settings.openai.openai_allow_sending_migration_reports }}</li></ul></section>
+        <section class="v3-card"><h2>AI Audit Hashes</h2><div class="v3-list">{% for item in ai_audit["items"][:8] %}<div class="v3-list-item"><strong>{{ item.workflow_id }}</strong><p>{{ item.mode }} · {{ item.input_category }}</p><span class="v3-muted">{{ item.prompt_hash[:16] if item.prompt_hash else '' }} / {{ item.response_hash[:16] if item.response_hash else '' }}</span></div>{% else %}<div class="v3-empty">No AI audit records yet.</div>{% endfor %}</div><div class="v3-actions"><a href="/api/v3/ai/audit/export.md">Audit Export</a></div></section>
+        <section class="v3-card"><h2>Redaction Preview</h2><p class="v3-muted">Secret-like values are redacted before any allowed send path. API keys are never shown.</p><pre>{{ ai_redaction_preview.redacted | tojson(indent=2) }}</pre></section>
+        <section class="v3-card"><h2>ChatGPT Connector Blueprint</h2><p><strong>MCP server enabled:</strong> {{ ai_chatgpt_connector.mcp_server_enabled }}</p><p><strong>Read-only:</strong> {{ ai_chatgpt_connector.read_only }}</p><p><strong>Auth required:</strong> {{ ai_chatgpt_connector.auth_required }}</p><p class="v3-muted">Blueprint only. Forbidden tools include order placement, cancellation, trade approval, signing, live arming, kill-switch disablement, read-only disablement, live config mutation, and secret export.</p><details><summary>Forbidden tools</summary><ul>{% for tool in ai_chatgpt_connector.forbidden_tools %}<li>{{ tool }}</li>{% endfor %}</ul></details><div class="v3-actions"><a href="/api/v3/ai/chatgpt-connector">Blueprint JSON</a><a href="/docs/V4_CHATGPT_CONNECTOR_BLUEPRINT_v4.7.0-real.md">Blueprint Doc</a></div></section>
+      </aside>
+    </section>
     {% endif %}
+
+
+    {% if section == 'settings' %}
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>Settings / Feature Readiness Workflow</h2><span class="v3-badge ok">v4.15 operator preferences</span></div>
+      <p class="v3-muted">This page is the non-secret operator preference surface for AI odds adjustment, cross-market arbitrage, Kalshi readiness, and review-only safety posture. It persists UI-safe preferences locally, masks secrets, validates numeric values, and makes restart-required settings explicit. process environment and .env values remain the runtime source of truth until the app is restarted or the admin configuration console is used.</p>
+      <div class="v3-grid">
+        <div class="v3-card compact"><div class="v3-label">Storage state</div><div class="v3-metric">{{ settings.settings_storage_state }}</div><span class="v3-badge {{ 'ok' if settings.configured_preference_count else 'unknown' }}">{{ settings.configured_preference_count }} saved</span></div>
+        <div class="v3-card compact"><div class="v3-label">Save supported</div><div class="v3-metric">{{ settings.operator_feedback.save_supported }}</div><span class="v3-badge ok">local JSON</span></div>
+        <div class="v3-card compact"><div class="v3-label">Secrets masked</div><div class="v3-metric">{{ settings.operator_feedback.secrets_masked }}</div><span class="v3-badge ok">no secret echo</span></div>
+        <div class="v3-card compact"><div class="v3-label">Runtime env mutated</div><div class="v3-metric">False</div><span class="v3-badge ok">review only</span></div>
+      </div>
+      {% if settings.settings_warning %}<div class="v3-warning"><strong>Settings warning:</strong> {{ settings.settings_warning }}</div>{% endif %}
+      <div class="v3-danger-zone"><strong>Settings safety:</strong> saving this v3 preference form never places orders, cancels orders, approves trades, stores secrets, arms live trading, disables read-only mode, or mutates the current process environment. Restart-required settings are advisory until applied through env/config and restart.</div>
+    </section>
+
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>Editable UI-Safe Preferences</h2><span class="v3-badge warn">restart required where noted</span></div>
+      <form action="/v3/settings/preferences/save" method="post" data-v3-settings-form>
+        {% for group in settings.sections %}
+        <section class="v3-card compact">
+          <h3>{{ group.group }}</h3>
+          <div class="v3-table-wrap">
+            <table class="v3-table"><caption>{{ group.group }} settings.</caption><thead><tr><th>Setting</th><th>Current runtime</th><th>Saved preference</th><th>Source</th><th>Edit</th></tr></thead><tbody>
+              {% for item in group["items"] %}
+              <tr>
+                <td><strong>{{ item.label }}</strong><br><span class="v3-muted">{{ item.env_key }} · {{ item.description }}</span>{% if item.requires_restart %}<br><span class="v3-badge warn">restart required</span>{% endif %}{% if item.review_only %}<span class="v3-badge ok">review-only</span>{% endif %}</td>
+                <td>{{ item.runtime_value }}</td>
+                <td>{% if item.saved %}{{ item.saved_preference }}{% else %}<span class="v3-muted">not saved</span>{% endif %}</td>
+                <td><span class="v3-badge {{ 'ok' if item.source == 'ui_preference' else 'unknown' }}">{{ item.source }}</span><br><span class="v3-muted">runtime: {{ item.runtime_source }}</span></td>
+                <td>
+                  {% if item.editable %}
+                    {% if item.value_type == 'bool' %}
+                      <input type="hidden" name="setting__{{ item.key }}" value="false">
+                      <label><input type="checkbox" name="setting__{{ item.key }}" value="true" {% if item.effective_operator_value %}checked{% endif %}> enabled</label>
+                    {% elif item.control == 'select' %}
+                      <select name="setting__{{ item.key }}">
+                        {% for value in item.allowed_values %}<option value="{{ value }}" {% if value == item.effective_operator_value %}selected{% endif %}>{{ value }}</option>{% endfor %}
+                      </select>
+                    {% elif item.value_type in ['float','int'] %}
+                      <input class="v3-field" type="number" name="setting__{{ item.key }}" value="{{ item.effective_operator_value }}" min="{{ item.min_value }}" max="{{ item.max_value }}" step="{{ item.step }}">
+                    {% else %}
+                      <input class="v3-field" type="text" name="setting__{{ item.key }}" value="{{ item.effective_operator_value }}">
+                    {% endif %}
+                  {% else %}
+                    <span class="v3-badge unknown">not editable here</span><br><span class="v3-muted">Use environment/admin console; secrets are never echoed.</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% else %}<tr><td colspan="5"><div class="v3-empty">No settings in this group.</div></td></tr>{% endfor %}
+            </tbody></table>
+          </div>
+        </section>
+        {% else %}<div class="v3-empty">Settings registry unavailable.</div>{% endfor %}
+        <div class="v3-actions"><button type="submit">Save UI-safe preferences</button><a href="/api/v3/settings">Settings JSON</a><a href="/settings/configuration">Admin configuration console</a><a href="/api/v3/features/status">Feature readiness JSON</a></div>
+      </form>
+    </section>
+
+    <section class="v3-card">
+      <div class="v3-section-title"><h2>Feature Readiness Linked to Settings</h2><span class="v3-badge ok">truthfulness map</span></div>
+      <p class="v3-muted">Statuses below are the same readiness objects used by the cockpit and API. They distinguish working, partial, disabled, config-required, scaffolded, unavailable, and error states before the operator trusts a visible control.</p>
+      <div class="v3-table-wrap"><table class="v3-table"><caption>Settings-relevant feature statuses.</caption><thead><tr><th>Feature</th><th>Status</th><th>Data state</th><th>Operator implication</th><th>Next action</th></tr></thead><tbody>
+        {% for item in feature_status["items"] %}
+          {% if item.area in ['settings','ai','arbitrage','venue-registry','audit'] %}
+          <tr><td><strong>{{ item.title }}</strong><br><span class="v3-muted">{{ item.feature_id }}</span></td><td><span class="v3-badge {{ 'ok' if item.status == 'working' else 'warn' if item.status in ['config_required','partial','scaffolded'] else 'unknown' }}">{{ item.status }}</span></td><td>{{ item.data_state }}</td><td>{{ item.operator_implication }}</td><td>{{ item.next_action }}</td></tr>
+          {% endif %}
+        {% else %}<tr><td colspan="5"><div class="v3-empty">Feature status unavailable.</div></td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+
+    <section class="v3-grid-wide"><div class="v3-card"><h2>Raw v3 Settings Contract</h2><p class="v3-muted">The API returns null/unknown-style context and redacted values instead of omitting safety fields silently.</p><pre>{{ settings | tojson(indent=2) }}</pre></div><div class="v3-card"><h2>UX Release Status</h2><p><span class="v3-badge ok">Design system active</span></p><p><span class="v3-badge ok">Screenshots not bundled</span></p><p><span class="v3-badge ok">Backend gates preserved</span></p><pre>{{ validation_status | tojson(indent=2) }}</pre></div></section>
+    {% endif %}
+
 
 
     {% if section == 'freshness' %}
@@ -484,7 +748,7 @@
     </section>
     {% endif %}
     {% if section == 'docs' %}
-    <section class="v3-card"><h2>v4.0 Documentation</h2><p class="v3-muted">Documentation was refreshed for the Operator Task Planner, Daily Ops, Weekly Planning, cadence, freshness, datasets, simulation, analytics, and v3 safety boundaries.</p><div class="v3-actions"><a href="/docs/V3_FRESHNESS_SCHEDULER_GUIDE_v4.0.1-real.md">Freshness Scheduler Guide</a><a href="/docs/V3_UI_UX_REDESIGN_GUIDE_v4.0.1-real.md">UI/UX Redesign Guide</a><a href="/docs/V3_OPERATOR_INTELLIGENCE_OS_GUIDE_v4.0.1-real.md">V3 Operator Intelligence OS Guide</a><a href="/docs/V3_OPERATOR_ANALYTICS_GUIDE_v4.0.1-real.md">Operator Analytics Guide</a><a href="/docs/V2_TO_V3_MIGRATION_GUIDE_v4.0.1-real.md">V2 to V3 Migration Guide</a><a href="/docs/VISUAL_QA_CHECKLIST_v4.0.1-real.md">Visual QA Checklist</a><a href="/docs/MANUAL_QA_CHECKLIST_v4.0.1-real.md">Manual QA Checklist</a><a href="/docs/RELEASE_CHECKLIST_v4.0.1-real.md">Release Checklist</a><a href="/docs/VALIDATION_v4.0.1-real.md">Validation Report</a></div></section>
+    <section class="v3-card"><h2>v4.7 Documentation</h2><p class="v3-muted">Documentation was refreshed for AI News Odds, source weighting, corroboration, duplicate detection, fair-probability adjustment, AI Edge Research, web-search review packets, local LLM evidence review, calibration, multi-provider AI Copilot, OpenAI/local LLM runtime, prompt governance, AI safety/privacy, modular routers, API contracts, generated manual source, runtime migration planning, route ownership, storage compatibility, plugin safety, task planner, guided workspace, cockpit, freshness, datasets, simulation, analytics, and v3 safety boundaries.</p><div class="v3-actions"><a href="/docs/V4_AI_NEWS_ODDS_ADJUSTMENT_ENGINE_GUIDE_v4.7.0-real.md">AI News Odds</a><a href="/docs/V4_SOURCE_WEIGHTING_AND_CORROBORATION_GUIDE_v4.7.0-real.md">Source Weighting</a><a href="/docs/V4_AI_EDGE_RESEARCH_GUIDE_v4.7.0-real.md">AI Edge Guide</a><a href="/docs/V4_OPENAI_WEB_SEARCH_EDGE_GUIDE_v4.7.0-real.md">Web Search Edge</a><a href="/docs/V4_LOCAL_LLM_EDGE_REVIEW_GUIDE_v4.7.0-real.md">Local LLM Edge</a><a href="/docs/V4_AI_EDGE_CALIBRATION_GUIDE_v4.7.0-real.md">Edge Calibration</a><a href="/docs/V4_AI_EDGE_PRIVACY_AND_SAFETY_GUIDE_v4.7.0-real.md">Edge Safety</a><a href="/docs/V4_OPENAI_INTEGRATION_GUIDE_v4.7.0-real.md">OpenAI Guide</a><a href="/docs/V4_LOCAL_LLM_RUNTIME_GUIDE_v4.7.0-real.md">Local LLM Guide</a><a href="/docs/V4_AI_OPERATOR_COPILOT_GUIDE_v4.7.0-real.md">AI Copilot Guide</a><a href="/docs/V4_AI_PROMPT_GOVERNANCE_GUIDE_v4.7.0-real.md">Prompt Governance</a><a href="/docs/V4_AI_SAFETY_AND_PRIVACY_GUIDE_v4.7.0-real.md">AI Safety & Privacy</a><a href="/docs/generated/OPERATOR_MANUAL_v4.7.0-real.md">Generated Manual</a><a href="/docs/RELEASE_CHECKLIST_v4.7.0-real.md">Release Checklist</a><a href="/docs/VALIDATION_v4.7.0-real.md">Validation Report</a></div></section>
     {% endif %}
 
     <section class="v3-warning"><strong>Safety boundary:</strong> v4.0 cockpit, shortcuts, command palette, guided reviews, tasks, daily ops, cadence, notifications, datasets, snapshots, simulation, replay, redesigned UI, search, graph, analytics, packets, reports, demo data, and workflows are operator-guidance features only. Live order submission still requires backend risk gates, human approval, warning acknowledgement, typed confirmation phrase, Live Armed mode, read-only disabled, and kill switch disabled.</section>

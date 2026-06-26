@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}AI News Odds Source Weights · Polymarket OP Console{% endblock %}
+{% block breadcrumbs %}<a href="/">Overview</a> / <a href="/v3/ai/news-odds">AI News Odds</a> / <span>Source Weights</span>{% endblock %}
+{% block content %}
+<section class="page-hero v47-hero">
+  <p class="eyebrow">v4.7.0-real · Source weighting</p>
+  <h1>Source Weighting and Corroboration</h1>
+  <p class="notice">More copied sources do not equal more confidence. Source weighting does not prove truth; corroboration does not prove certainty.</p>
+</section>
+<section class="two-col">
+  <div class="panel"><h2>Default source type weights</h2><div class="responsive-table"><table><thead><tr><th>Source type</th><th>Weight</th></tr></thead><tbody>{% for key, value in source_weights.weights.items() %}<tr><td>{{ key }}</td><td>{{ value }}</td></tr>{% endfor %}</tbody></table></div></div>
+  <div class="panel"><h2>Scoring dimensions</h2><ul class="compact"><li>Credibility and source type</li><li>Recency and relevance to resolution criteria</li><li>Independent corroboration</li><li>Duplicate/syndication penalty</li><li>Contradiction penalty</li><li>Bounded max adjustment caps</li></ul></div>
+</section>
+<section class="panel"><h2>Principles</h2><ul class="compact">{% for item in source_weights.principles %}<li>{{ item }}</li>{% endfor %}</ul><p class="muted">Max adjustment cap: {{ settings.max_adjustment_pp }} pp · no-primary-source cap: {{ settings.max_no_primary_source_adjustment_pp }} pp · low-confidence cap: {{ settings.max_low_confidence_adjustment_pp }} pp.</p></section>
+{% endblock %}

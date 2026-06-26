@@ -45,7 +45,7 @@ def authed_client(monkeypatch, tmp_path):
 
 
 def test_version_is_v2_8():
-    assert APP_VERSION == "4.0.1-real"
+    assert APP_VERSION == "4.17.0-real"
 
 
 def test_governance_crud_exports_and_safety():
@@ -88,7 +88,7 @@ def test_governance_routes_and_api_endpoints(authed_client):
     page = authed_client.get("/v2-live/governance")
     assert page.status_code == 200
     assert "Governance / Decision Journal" in page.text
-    assert "v4.0.1-real" in page.text
+    assert "v4.7.0-real" in page.text
     assert authed_client.get("/api/v2/live/governance").status_code == 200
     journal = authed_client.post("/api/v2/live/governance/journal", json={"decision_title": "API journal", "decision_type": "risk_decision"})
     assert journal.status_code == 200

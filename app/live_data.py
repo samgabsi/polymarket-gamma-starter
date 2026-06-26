@@ -512,7 +512,7 @@ def import_apply(payload: dict[str, Any] | None = None) -> dict[str, Any]:
 
 def migration_registry() -> dict[str, Any]:
     subsystems = {name: {"current_schema_version": APP_VERSION, "target_schema_version": APP_VERSION, "migration_needed": False} for name in SUBSYSTEMS}
-    return {"version": APP_VERSION, "known_app_versions": ["2.0.0-real", "2.1.0-real", "2.2.0-real", "2.3.0-real", "2.4.0-real", "2.5.0-real", "2.6.0-real", "2.7.0-real", "2.8.0-real", "2.9.0-real", "3.0.0-real", "3.6.0-real", "4.0.1-real", APP_VERSION], "subsystems": subsystems, "migration_needed": False, "secret_values_returned": False}
+    return {"version": APP_VERSION, "known_app_versions": ["2.0.0-real", "2.1.0-real", "2.2.0-real", "2.3.0-real", "2.4.0-real", "2.5.0-real", "2.6.0-real", "2.7.0-real", "2.8.0-real", "2.9.0-real", "3.0.0-real", "3.6.0-real", "4.4.0-real", APP_VERSION], "subsystems": subsystems, "migration_needed": False, "secret_values_returned": False}
 
 
 def migration_dry_run(payload: dict[str, Any] | None = None) -> dict[str, Any]:
